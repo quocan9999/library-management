@@ -31,7 +31,7 @@ class SchemaConstraintBehaviorIntegrationTest {
         assertThrows(DataAccessException.class, () -> insertAccount("admin", "phase4-new@example.test"));
         assertThrows(DataAccessException.class, () -> insertAccount(null, "phase4-first@example.test"));
 
-        insertMember(1, "PHASE4-MEMBER-1");
+        int memberId = insertMember(1, "PHASE4-MEMBER-1");
         assertThrows(DataAccessException.class, () -> insertMember(1, "PHASE4-MEMBER-2"));
 
         insertBook("PHASE4-BOOK-1", null, 3, 2, "1.25", "0.50");
@@ -49,11 +49,11 @@ class SchemaConstraintBehaviorIntegrationTest {
         assertThrows(DataAccessException.class,
                 () -> insertBook("PHASE4-BOOK-10", null, 1, 0, "0.00", "-0.01"));
 
-        insertLoan("PHASE4-LOAN-1", 1, Date.valueOf(LocalDate.of(2026, 10, 6)), "ACTIVE");
+        insertLoan("PHASE4-LOAN-1", memberId, Date.valueOf(LocalDate.of(2026, 10, 6)), "ACTIVE");
         assertThrows(DataAccessException.class,
-                () -> insertLoan("PHASE4-LOAN-SAME-DAY", 1, Date.valueOf(LocalDate.of(2026, 10, 5)), "ACTIVE"));
+                () -> insertLoan("PHASE4-LOAN-SAME-DAY", memberId, Date.valueOf(LocalDate.of(2026, 10, 5)), "ACTIVE"));
         assertThrows(DataAccessException.class,
-                () -> insertLoan("PHASE4-LOAN-BAD-STATUS", 1, Date.valueOf(LocalDate.of(2026, 10, 6)), "OPEN"));
+                () -> insertLoan("PHASE4-LOAN-BAD-STATUS", memberId, Date.valueOf(LocalDate.of(2026, 10, 6)), "OPEN"));
 
         int loanId = jdbcTemplate.queryForObject(
                 "SELECT id FROM loans WHERE loan_code = 'PHASE4-LOAN-1'", Integer.class);
@@ -85,11 +85,13 @@ class SchemaConstraintBehaviorIntegrationTest {
                 """, username, email);
     }
 
-    private void insertMember(int accountId, String memberCode) {
+    private int insertMember(int accountId, String memberCode) {
         jdbcTemplate.update("""
                 INSERT INTO members (account_id, member_code, created_at, updated_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, accountId, memberCode);
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE member_code = ?", Integer.class, memberCode);
     }
 
     private void insertBook(String bookCode, String isbn, int total, int available, String borrowFee, String lateFee) {
