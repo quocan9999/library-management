@@ -1,0 +1,117 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-create-loan-items
+      author: quocan9999
+      changes:
+        - createTable:
+            tableName: loan_items
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: loan_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: book_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: borrow_fee
+                  type: DECIMAL(12,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: late_fee_per_day
+                  type: DECIMAL(12,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: late_fee
+                  type: DECIMAL(12,2)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: returned_at
+                  type: DATETIME
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: loan_items
+            columnNames: loan_id, book_id
+            constraintName: uq_loan_items_loan_book
+        - addForeignKeyConstraint:
+            baseTableName: loan_items
+            baseColumnNames: loan_id
+            constraintName: fk_loan_items_loan
+            referencedTableName: loans
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - addForeignKeyConstraint:
+            baseTableName: loan_items
+            baseColumnNames: book_id
+            constraintName: fk_loan_items_book
+            referencedTableName: books
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: loan_items
+            indexName: idx_loan_items_loan_id
+            columns:
+              - column:
+                  name: loan_id
+        - createIndex:
+            tableName: loan_items
+            indexName: idx_loan_items_book_id
+            columns:
+              - column:
+                  name: book_id
+        - createIndex:
+            tableName: loan_items
+            indexName: idx_loan_items_book_status
+            columns:
+              - column:
+                  name: book_id
+              - column:
+                  name: status
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE loan_items ADD CONSTRAINT chk_loan_items_status CHECK (status IN ('BORROWED', 'RETURNED'))
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE loan_items ADD CONSTRAINT chk_loan_items_borrow_fee_nonnegative CHECK (borrow_fee >= 0)
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE loan_items ADD CONSTRAINT chk_loan_items_late_fee_per_day_nonnegative CHECK (late_fee_per_day >= 0)
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE loan_items ADD CONSTRAINT chk_loan_items_late_fee_nonnegative CHECK (late_fee >= 0)
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE loan_items ADD CONSTRAINT chk_loan_items_returned_at_consistent CHECK ((status = 'BORROWED' AND returned_at IS NULL) OR (status = 'RETURNED' AND returned_at IS NOT NULL))
+      rollback:
+        - dropTable:
+            tableName: loan_items

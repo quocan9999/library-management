@@ -1,0 +1,79 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-create-members
+      author: quocan9999
+      changes:
+        - createTable:
+            tableName: members
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: account_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: member_code
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: full_name
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: date_of_birth
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: phone
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: address
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: members
+            columnNames: account_id
+            constraintName: uq_members_account_id
+        - addUniqueConstraint:
+            tableName: members
+            columnNames: member_code
+            constraintName: uq_members_member_code
+        - addForeignKeyConstraint:
+            baseTableName: members
+            baseColumnNames: account_id
+            constraintName: fk_members_account
+            referencedTableName: accounts
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: members
+            indexName: idx_members_date_of_birth
+            columns:
+              - column:
+                  name: date_of_birth
+      rollback:
+        - dropTable:
+            tableName: members

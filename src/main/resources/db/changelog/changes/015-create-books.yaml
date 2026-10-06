@@ -1,0 +1,116 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-create-books
+      author: quocan9999
+      changes:
+        - createTable:
+            tableName: books
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: book_code
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: isbn
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: title
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: author
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: publisher
+                  type: VARCHAR(150)
+                  constraints:
+                    nullable: true
+              - column:
+                  name: published_date
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: total_quantity
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: available_quantity
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: borrow_fee
+                  type: DECIMAL(12,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: late_fee_per_day
+                  type: DECIMAL(12,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: books
+            columnNames: book_code
+            constraintName: uq_books_book_code
+        - addUniqueConstraint:
+            tableName: books
+            columnNames: isbn
+            constraintName: uq_books_isbn
+        - createIndex:
+            tableName: books
+            indexName: idx_books_title
+            columns:
+              - column:
+                  name: title
+        - createIndex:
+            tableName: books
+            indexName: idx_books_author
+            columns:
+              - column:
+                  name: author
+        - createIndex:
+            tableName: books
+            indexName: idx_books_published_date
+            columns:
+              - column:
+                  name: published_date
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE books ADD CONSTRAINT chk_books_total_quantity_nonnegative CHECK (total_quantity >= 0)
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE books ADD CONSTRAINT chk_books_available_quantity_bounds CHECK (available_quantity >= 0 AND available_quantity <= total_quantity)
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE books ADD CONSTRAINT chk_books_borrow_fee_nonnegative CHECK (borrow_fee >= 0)
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE books ADD CONSTRAINT chk_books_late_fee_per_day_nonnegative CHECK (late_fee_per_day >= 0)
+      rollback:
+        - dropTable:
+            tableName: books

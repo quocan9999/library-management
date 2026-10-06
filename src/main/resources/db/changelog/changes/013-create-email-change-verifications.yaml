@@ -1,0 +1,61 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-create-email-change-verifications
+      author: quocan9999
+      changes:
+        - createTable:
+            tableName: email_change_verifications
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: account_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: new_email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: code_hash
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expires_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: used_at
+                  type: DATETIME
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: email_change_verifications
+            baseColumnNames: account_id
+            constraintName: fk_email_change_verifications_account
+            referencedTableName: accounts
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: email_change_verifications
+            indexName: idx_email_change_verifications_account_id
+            columns:
+              - column:
+                  name: account_id
+      rollback:
+        - dropTable:
+            tableName: email_change_verifications

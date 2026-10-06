@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-create-loans
+      author: quocan9999
+      changes:
+        - createTable:
+            tableName: loans
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: loan_code
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: member_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: borrowed_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: due_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: loans
+            columnNames: loan_code
+            constraintName: uq_loans_loan_code
+        - addForeignKeyConstraint:
+            baseTableName: loans
+            baseColumnNames: member_id
+            constraintName: fk_loans_member
+            referencedTableName: members
+            referencedColumnNames: id
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: loans
+            indexName: idx_loans_member_status
+            columns:
+              - column:
+                  name: member_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: loans
+            indexName: idx_loans_due_date
+            columns:
+              - column:
+                  name: due_date
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE loans ADD CONSTRAINT chk_loans_due_date_after_borrowed_at CHECK (due_date > DATE(borrowed_at))
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE loans ADD CONSTRAINT chk_loans_status CHECK (status IN ('ACTIVE', 'PARTIALLY_RETURNED', 'RETURNED'))
+      rollback:
+        - dropTable:
+            tableName: loans
