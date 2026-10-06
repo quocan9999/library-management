@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-seed-admin-account
+      author: quocan9999
+      changes:
+        - insert:
+            tableName: accounts
+            columns:
+              - column:
+                  name: username
+                  value: admin
+              - column:
+                  name: password_hash
+                  value: $2a$12$17ke/KTmXXYnnHbsJ..kFeW0915J4D3RKlmlgDAExlYgpZWRiuWO2
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: email_verified
+                  valueBoolean: true
+              - column:
+                  name: enabled
+                  valueBoolean: true
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  valueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - delete:
+            tableName: accounts
+            where: username = 'admin'

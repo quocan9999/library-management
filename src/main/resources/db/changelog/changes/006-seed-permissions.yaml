@@ -1,0 +1,189 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-seed-permissions
+      author: quocan9999
+      changes:
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: code
+                  value: book:read
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 2
+              - column:
+                  name: code
+                  value: book:create
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 3
+              - column:
+                  name: code
+                  value: book:update
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 4
+              - column:
+                  name: code
+                  value: book:delete
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 5
+              - column:
+                  name: code
+                  value: book:import
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 6
+              - column:
+                  name: code
+                  value: member:read
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 7
+              - column:
+                  name: code
+                  value: member:create
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 8
+              - column:
+                  name: code
+                  value: member:update
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 9
+              - column:
+                  name: code
+                  value: member:delete
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 10
+              - column:
+                  name: code
+                  value: config:read
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 11
+              - column:
+                  name: code
+                  value: config:update
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 12
+              - column:
+                  name: code
+                  value: borrow:create
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 13
+              - column:
+                  name: code
+                  value: borrow:return
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 14
+              - column:
+                  name: code
+                  value: account:change-password
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 15
+              - column:
+                  name: code
+                  value: account:change-email
+              - column:
+                  name: created_at
+                  valueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - delete:
+            tableName: permissions
+            where: id BETWEEN 1 AND 15

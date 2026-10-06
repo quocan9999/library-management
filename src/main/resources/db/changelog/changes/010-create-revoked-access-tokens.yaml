@@ -1,0 +1,58 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-create-revoked-access-tokens
+      author: quocan9999
+      changes:
+        - createTable:
+            tableName: revoked_access_tokens
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: jti
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: account_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expires_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+              - column:
+                  name: revoked_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: revoked_access_tokens
+            baseColumnNames: account_id
+            constraintName: fk_revoked_access_tokens_account
+            referencedTableName: accounts
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: revoked_access_tokens
+            indexName: idx_revoked_access_tokens_account_id
+            columns:
+              - column:
+                  name: account_id
+        - createIndex:
+            tableName: revoked_access_tokens
+            indexName: idx_revoked_access_tokens_expires_at
+            columns:
+              - column:
+                  name: expires_at
+      rollback:
+        - dropTable:
+            tableName: revoked_access_tokens
