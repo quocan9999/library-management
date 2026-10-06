@@ -44,11 +44,14 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
-            JsonAuthenticationEntryPoint authenticationEntryPoint) throws Exception {
+            JsonAuthenticationEntryPoint authenticationEntryPoint,
+            JsonAccessDeniedHandler accessDeniedHandler) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(authenticationEntryPoint))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .anyRequest().authenticated())
