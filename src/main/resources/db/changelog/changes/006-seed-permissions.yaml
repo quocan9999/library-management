@@ -1,0 +1,177 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-seed-permissions
+      author: quocan9999
+
+      changes:
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: code
+                  value: book:read
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 2
+              - column:
+                  name: code
+                  value: book:create
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 3
+              - column:
+                  name: code
+                  value: book:update
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 4
+              - column:
+                  name: code
+                  value: book:delete
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 5
+              - column:
+                  name: code
+                  value: book:import
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 6
+              - column:
+                  name: code
+                  value: member:read
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 7
+              - column:
+                  name: code
+                  value: member:create
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 8
+              - column:
+                  name: code
+                  value: member:update
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 9
+              - column:
+                  name: code
+                  value: member:delete
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 10
+              - column:
+                  name: code
+                  value: borrow:create
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 11
+              - column:
+                  name: code
+                  value: borrow:return
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 12
+              - column:
+                  name: code
+                  value: account:change-password
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 13
+              - column:
+                  name: code
+                  value: account:change-email
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 14
+              - column:
+                  name: code
+                  value: config:read
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 15
+              - column:
+                  name: code
+                  value: config:update
+
+      rollback:
+        - delete:
+            tableName: permissions
+            where: >
+              code IN (
+                'book:read',
+                'book:create',
+                'book:update',
+                'book:delete',
+                'book:import',
+                'member:read',
+                'member:create',
+                'member:update',
+                'member:delete',
+                'borrow:create',
+                'borrow:return',
+                'account:change-password',
+                'account:change-email',
+                'config:read',
+                'config:update'
+              )

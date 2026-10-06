@@ -1,0 +1,196 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-seed-role-permissions
+      author: quocan9999
+
+      changes:
+        # ROLE_ADMIN
+        # book:read
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 1
+
+        # book:create
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 2
+
+        # book:update
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 3
+
+        # book:delete
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 4
+
+        # book:import
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 5
+
+        # member:read
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 6
+
+        # member:create
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 7
+
+        # member:update
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 8
+
+        # member:delete
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 9
+
+        # config:read
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 14
+
+        # config:update
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+              - column:
+                  name: permission_id
+                  valueNumeric: 15
+
+        # ROLE_USER
+        # book:read
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 2
+              - column:
+                  name: permission_id
+                  valueNumeric: 1
+
+        # borrow:create
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 2
+              - column:
+                  name: permission_id
+                  valueNumeric: 10
+
+        # borrow:return
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 2
+              - column:
+                  name: permission_id
+                  valueNumeric: 11
+
+        # account:change-password
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 2
+              - column:
+                  name: permission_id
+                  valueNumeric: 12
+
+        # account:change-email
+        - insert:
+            tableName: role_permissions
+            columns:
+              - column:
+                  name: role_id
+                  valueNumeric: 2
+              - column:
+                  name: permission_id
+                  valueNumeric: 13
+
+      rollback:
+        - delete:
+            tableName: role_permissions
+            where: >
+              role_id = 2
+              AND permission_id IN (1, 10, 11, 12, 13)
+
+        - delete:
+            tableName: role_permissions
+            where: >
+              role_id = 1
+              AND permission_id IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15)

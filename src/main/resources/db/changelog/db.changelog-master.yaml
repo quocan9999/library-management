@@ -2,3 +2,31 @@ databaseChangeLog:
   - include: 
       file: changes/001-create-roles.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/002-create-permissions.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/003-create-role-permissions.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/004-create-accounts.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/005-seed-roles.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/006-seed-permissions.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/007-seed-role-permissions.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/008-seed-admin-account.yaml
+      relativeToChangelogFile: true
