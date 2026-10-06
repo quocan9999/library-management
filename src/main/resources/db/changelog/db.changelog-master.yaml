@@ -30,3 +30,23 @@ databaseChangeLog:
   - include:
       file: changes/008-seed-admin-account.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/009-create-refresh-tokens.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/010-create-revoked-access-tokens.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/011-create-email-verification-tokens.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/012-create-password-reset-tokens.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/013-create-email-change-verifications.yaml
+      relativeToChangelogFile: true
