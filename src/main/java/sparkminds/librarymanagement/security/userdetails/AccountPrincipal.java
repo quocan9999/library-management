@@ -5,14 +5,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.springframework.security.core.CredentialsContainer;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-public final class AccountPrincipal implements UserDetails {
+public final class AccountPrincipal implements UserDetails, CredentialsContainer {
 
     private final String username;
-    private final String passwordHash;
+    private String passwordHash;
     private final boolean enabled;
     private final Set<GrantedAuthority> authorities;
 
@@ -38,6 +39,11 @@ public final class AccountPrincipal implements UserDetails {
     @Override
     public String getPassword() {
         return passwordHash;
+    }
+
+    @Override
+    public void eraseCredentials() {
+        passwordHash = null;
     }
 
     @Override

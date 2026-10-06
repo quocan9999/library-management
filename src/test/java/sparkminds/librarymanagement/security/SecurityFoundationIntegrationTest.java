@@ -2,6 +2,7 @@ package sparkminds.librarymanagement.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -63,6 +64,7 @@ class SecurityFoundationIntegrationTest {
 
         assertTrue(authentication.isAuthenticated());
         AccountPrincipal principal = assertInstanceOf(AccountPrincipal.class, authentication.getPrincipal());
+        assertNull(principal.getPassword(), "successful authentication must erase the stored password hash");
         assertEquals(ADMIN_AUTHORITIES, principal.getAuthorities().stream()
                 .map(authority -> authority.getAuthority())
                 .collect(Collectors.toSet()));
