@@ -50,3 +50,27 @@ databaseChangeLog:
   - include:
       file: changes/013-create-email-change-verifications.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/014-create-members.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/015-create-books.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/016-create-loans.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/017-create-loan-items.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/018-create-system-configs.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/019-seed-system-config.yaml
+      relativeToChangelogFile: true
