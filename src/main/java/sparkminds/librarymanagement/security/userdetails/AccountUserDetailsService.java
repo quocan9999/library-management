@@ -22,8 +22,8 @@ public class AccountUserDetailsService implements UserDetailsService {
 
     @Override
     @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        Account account = accountRepository.findByUsername(username)
+    public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
+        Account account = accountRepository.findByUsernameOrEmail(identifier, identifier)
                 .orElseThrow(() -> new UsernameNotFoundException("Account not found"));
 
         var role = account.getRole();
@@ -32,7 +32,7 @@ public class AccountUserDetailsService implements UserDetailsService {
                 .collect(Collectors.toUnmodifiableSet());
 
         return new AccountPrincipal(
-                account.getUsername(),
+                account.getUsername() != null ? account.getUsername() : account.getEmail(),
                 account.getPasswordHash(),
                 account.isEnabled(),
                 role.getCode(),
