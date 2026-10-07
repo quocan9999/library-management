@@ -116,7 +116,7 @@ export function LoginPage() {
                   type="error"
                   showIcon
                   role="alert"
-                  message={serverError}
+                  title={serverError}
                 />
               )}
 
