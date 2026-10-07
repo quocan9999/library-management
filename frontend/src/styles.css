@@ -430,17 +430,76 @@ input:focus-visible,
   display: none;
 }
 
-.home-screen {
-  display: grid;
-  min-height: 100vh;
+.session-bootstrap {
+  display: flex;
+  min-height: 100svh;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   padding: 24px;
-  place-items: center;
+  color: var(--navy);
+  background: var(--paper);
+  font-size: 14px;
+}
+
+.session-bootstrap__mark {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 2px solid rgba(26, 43, 73, 0.18);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: session-spin 750ms linear infinite;
+}
+
+@keyframes session-spin {
+  to { transform: rotate(360deg); }
+}
+
+.home-stage {
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  padding: clamp(24px, 4.5vw, 64px);
   background:
     radial-gradient(ellipse at 50% 0%, rgba(197, 155, 39, 0.09), transparent 34rem),
     var(--paper);
 }
 
-.home-screen h1 {
+.home-header {
+  display: flex;
+  width: 100%;
+  max-width: 1280px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 auto;
+}
+
+.home-header .brand-mark--compact .brand-mark__icon {
+  border-color: rgba(26, 43, 73, 0.15);
+  color: var(--navy);
+}
+
+.home-header .brand-mark--compact .brand-mark__title {
+  color: var(--navy);
+}
+
+.home-header .ant-btn {
+  border-color: var(--line);
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.home-header .ant-btn:hover {
+  border-color: var(--navy) !important;
+  color: var(--navy) !important;
+  background: rgba(26, 43, 73, 0.035) !important;
+}
+
+.home-greeting {
+  display: grid;
+  flex: 1;
+  place-items: center;
   margin: 0;
   color: var(--navy);
   font-size: clamp(32px, 5vw, 54px);
@@ -561,11 +620,31 @@ input:focus-visible,
   }
 }
 
+@media (max-width: 480px) {
+  .home-stage {
+    padding: 20px;
+  }
+
+  .home-header .brand-mark--compact .brand-mark__icon {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+
+  .home-header .brand-mark--compact .brand-mark__title {
+    font-size: 12px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .session-bootstrap__mark {
+    animation: none !important;
   }
 }

@@ -1,8 +1,24 @@
-import axios from 'axios';
+import axios, {
+  type AxiosError,
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from 'axios';
+import { getAccessToken, setAccessToken } from './tokenStore';
 import type { ApiEnvelope, LoginCredentials, LoginData } from './types';
 
+type AuthRequestConfig = InternalAxiosRequestConfig & {
+  skipAccessToken?: boolean;
+  authRetried?: boolean;
+};
+
+type AuthApiRequestConfig = AxiosRequestConfig & {
+  skipAccessToken: true;
+};
+
+const apiBaseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8081';
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8081',
+  baseURL: apiBaseURL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -10,15 +26,110 @@ export const apiClient = axios.create({
   },
 });
 
-export const authApi = {
-  async login(credentials: LoginCredentials): Promise<LoginData> {
-    const response = await apiClient.post<ApiEnvelope<LoginData>>('/api/v1/auth/login', credentials);
-    const data = response.data.data;
+apiClient.interceptors.request.use((config) => {
+  const authConfig = config as AuthRequestConfig;
+  if (authConfig.skipAccessToken) return config;
 
-    if (!response.data.success || !data?.accessToken) {
-      throw new Error('The sign-in response was incomplete.');
+  const accessToken = getAccessToken();
+  if (accessToken) {
+    config.headers.set('Authorization', `Bearer ${accessToken}`);
+  } else {
+    config.headers.delete('Authorization');
+  }
+
+  return config;
+});
+
+let refreshInFlight: Promise<string> | null = null;
+
+function refreshAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = authApi.refresh()
+      .then((result) => {
+        setAccessToken(result.accessToken);
+        return result.accessToken;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+
+  return refreshInFlight;
+}
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError<ApiEnvelope<unknown>>) => {
+    const config = error.config as AuthRequestConfig | undefined;
+    const isExpiredAccessToken =
+      error.response?.status === 401 && error.response.data?.code === 'AUTH_TOKEN_EXPIRED';
+
+    if (!config || config.skipAccessToken || !isExpiredAccessToken) {
+      return Promise.reject(error);
     }
 
-    return data;
+    if (config.authRetried) {
+      setAccessToken(null);
+      return Promise.reject(error);
+    }
+
+    config.authRetried = true;
+    try {
+      await refreshAccessToken();
+      return apiClient(config);
+    } catch (refreshError) {
+      setAccessToken(null);
+      return Promise.reject(refreshError);
+    }
+  },
+);
+
+function readLoginData(envelope: ApiEnvelope<LoginData>): LoginData {
+  const data = envelope.data;
+  if (!envelope.success || !data?.accessToken) {
+    throw new Error('The authentication response was incomplete.');
+  }
+  return data;
+}
+
+const authRequestConfig: AuthApiRequestConfig = {
+  withCredentials: true,
+  skipAccessToken: true,
+};
+
+let sessionRestore: Promise<LoginData> | null = null;
+
+export const authApi = {
+  async login(credentials: LoginCredentials): Promise<LoginData> {
+    const response = await apiClient.post<ApiEnvelope<LoginData>>(
+      '/api/v1/auth/login',
+      credentials,
+      authRequestConfig,
+    );
+    return readLoginData(response.data);
+  },
+
+  async refresh(): Promise<LoginData> {
+    const response = await apiClient.post<ApiEnvelope<LoginData>>(
+      '/api/v1/auth/refresh',
+      null,
+      authRequestConfig,
+    );
+    return readLoginData(response.data);
+  },
+
+  restoreSession(): Promise<LoginData> {
+    if (!sessionRestore) {
+      sessionRestore = this.refresh();
+    }
+    return sessionRestore;
+  },
+
+  async logout(accessToken: string | null): Promise<void> {
+    const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
+    await apiClient.post<ApiEnvelope<null>>('/api/v1/auth/logout', null, {
+      ...authRequestConfig,
+      headers,
+    });
   },
 };

@@ -7,6 +7,7 @@
     "dev": "vite --host localhost",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview --host localhost"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
     "globals": "^17.13.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
-    "vite": "^8.3.3"
+    "vite": "^8.3.3",
+    "vitest": "5.0.3"
   }
 }

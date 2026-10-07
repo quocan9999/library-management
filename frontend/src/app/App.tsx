@@ -3,13 +3,24 @@ import { useAuth } from '../auth/AuthContext';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 
+function SessionBootstrap() {
+  return (
+    <main className="session-bootstrap" role="status" aria-live="polite">
+      <span className="session-bootstrap__mark" aria-hidden="true" />
+      <span>Checking your library session…</span>
+    </main>
+  );
+}
+
 function RequireAuthentication({ children }: { children: React.ReactNode }) {
-  const { accessToken } = useAuth();
+  const { accessToken, isBootstrapping } = useAuth();
+  if (isBootstrapping) return <SessionBootstrap />;
   return accessToken ? children : <Navigate to="/login" replace />;
 }
 
 function RedirectSignedInUser({ children }: { children: React.ReactNode }) {
-  const { accessToken } = useAuth();
+  const { accessToken, isBootstrapping } = useAuth();
+  if (isBootstrapping) return <SessionBootstrap />;
   return accessToken ? <Navigate to="/" replace /> : children;
 }
 
