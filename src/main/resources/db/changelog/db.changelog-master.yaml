@@ -74,3 +74,7 @@ databaseChangeLog:
   - include:
       file: changes/019-seed-system-config.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/020-seed-demo-user.yaml
+      relativeToChangelogFile: true
