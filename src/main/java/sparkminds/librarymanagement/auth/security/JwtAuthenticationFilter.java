@@ -35,7 +35,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return SKIPPED_PATHS.contains(request.getServletPath());
+        String requestPath = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (!contextPath.isEmpty() && requestPath.startsWith(contextPath)) {
+            requestPath = requestPath.substring(contextPath.length());
+        }
+        return SKIPPED_PATHS.contains(requestPath);
     }
 
     @Override
