@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-seed-roles
+      author: quocan9999
+
+      changes:
+        - insert:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+              - column:
+                  name: code
+                  value: ROLE_ADMIN
+
+        - insert:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 2
+              - column:
+                  name: code
+                  value: ROLE_USER
+
+      rollback:
+        - delete:
+            tableName: roles
+            where: code = 'ROLE_USER'
+
+        - delete:
+            tableName: roles
+            where: code = 'ROLE_ADMIN'

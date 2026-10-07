@@ -1,0 +1,72 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-create-refresh-tokens
+      author: quocan9999
+
+      changes:
+        - createTable:
+            tableName: refresh_tokens
+            columns:
+              - column:
+                  name: id
+                  type: INT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: account_id
+                  type: INT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: jti
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+                    unique: true
+
+              - column:
+                  name: expires_at
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: revoked_at
+                  type: DATETIME
+
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            tableName: refresh_tokens
+            indexName: idx_refresh_tokens_account_id
+            columns:
+              - column:
+                  name: account_id
+
+        - createIndex:
+            tableName: refresh_tokens
+            indexName: idx_refresh_tokens_expires_at
+            columns:
+              - column:
+                  name: expires_at
+
+        - addForeignKeyConstraint:
+            baseTableName: refresh_tokens
+            baseColumnNames: account_id
+            referencedTableName: accounts
+            referencedColumnNames: id
+            constraintName: fk_refresh_tokens_account
+            onDelete: CASCADE
+
+      rollback:
+        - dropTable:
+            tableName: refresh_tokens

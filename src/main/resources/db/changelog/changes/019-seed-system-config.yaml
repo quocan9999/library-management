@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-seed-system-config
+      author: quocan9999
+
+      changes:
+        - insert:
+            tableName: system_configs
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+
+              - column:
+                  name: maintenance_mode
+                  valueBoolean: false
+
+      rollback:
+        - delete:
+            tableName: system_configs
+            where: id = 1

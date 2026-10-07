@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-create-system-configs
+      author: quocan9999
+
+      changes:
+        - createTable:
+            tableName: system_configs
+            columns:
+              - column:
+                  name: id
+                  type: TINYINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              - column:
+                  name: maintenance_mode
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropTable:
+            tableName: system_configs
