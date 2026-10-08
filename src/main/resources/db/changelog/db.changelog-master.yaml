@@ -78,3 +78,7 @@ databaseChangeLog:
   - include:
       file: changes/020-seed-demo-user.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/021-update-accounts-username-length.yaml
+      relativeToChangelogFile: true

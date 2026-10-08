@@ -19,7 +19,7 @@ public class Account {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "username", unique = true, length = 50)
+    @Column(name = "username", unique = true, length = 20)
     private String username;
 
     @Column(name = "email", unique = true, length = 255)
