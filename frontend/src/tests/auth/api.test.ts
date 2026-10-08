@@ -6,6 +6,7 @@ import {
 } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiClient, authApi } from '../../auth/api';
+import { setAccessToken } from '../../auth/tokenStore';
 import type { ApiEnvelope, LoginData } from '../../auth/types';
 
 const originalAdapter = apiClient.defaults.adapter;
@@ -58,6 +59,7 @@ function refreshedResponse(config: Parameters<AxiosAdapter>[0], accessToken: str
 afterEach(() => {
   apiClient.defaults.adapter = originalAdapter;
   delete apiClient.defaults.headers.common.Authorization;
+  setAccessToken(null);
 });
 
 describe('authenticated API client', () => {
@@ -220,6 +222,45 @@ describe('authenticated API client', () => {
 
     expect(logoutConfig?.withCredentials).toBe(true);
     expect(logoutConfig?.headers.get('Authorization')).toBe('Bearer explicit-access-token');
+  });
+
+  it('does not enable credentials on protected API requests', async () => {
+    let sentWithCredentials: boolean | undefined;
+    let authorization: string | undefined;
+    setAccessToken('protected-test-token');
+
+    apiClient.defaults.adapter = (async (config) => {
+      sentWithCredentials = config.withCredentials;
+      authorization = config.headers.get('Authorization')?.toString();
+      return response(config, { ok: true });
+    }) satisfies AxiosAdapter;
+
+    await apiClient.get('/api/v1/books');
+    expect(sentWithCredentials).toBe(false);
+    expect(authorization).toBe('Bearer protected-test-token');
+  });
+
+  it('keeps credentials enabled for login refresh and logout', async () => {
+    const values: Record<string, boolean | undefined> = {};
+    apiClient.defaults.adapter = (async (config) => {
+      values[config.url ?? ''] = config.withCredentials;
+      if (config.url === '/api/v1/auth/logout') {
+        return response(config, {
+          success: true, status: 200, code: 'AUTH_LOGOUT_SUCCESS',
+          message: 'Signed out.', data: null,
+          timestamp: new Date().toISOString(),
+        } satisfies ApiEnvelope<null>);
+      }
+      return refreshedResponse(config, 'valid-test-token');
+    }) satisfies AxiosAdapter;
+
+    await authApi.login({ identifier: 'admin', password: 'admin' });
+    await authApi.refresh();
+    await authApi.logout('valid-test-token');
+
+    expect(values['/api/v1/auth/login']).toBe(true);
+    expect(values['/api/v1/auth/refresh']).toBe(true);
+    expect(values['/api/v1/auth/logout']).toBe(true);
   });
 
   it('rejects logout when HTTP 200 does not confirm success', async () => {
