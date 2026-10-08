@@ -5,8 +5,8 @@ import {
   type AxiosResponse,
 } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
-import { apiClient, authApi } from './api';
-import type { ApiEnvelope, LoginData } from './types';
+import { apiClient, authApi } from '../../auth/api';
+import type { ApiEnvelope, LoginData } from '../../auth/types';
 
 const originalAdapter = apiClient.defaults.adapter;
 
@@ -220,6 +220,21 @@ describe('authenticated API client', () => {
 
     expect(logoutConfig?.withCredentials).toBe(true);
     expect(logoutConfig?.headers.get('Authorization')).toBe('Bearer explicit-access-token');
+  });
+
+  it('rejects logout when HTTP 200 does not confirm success', async () => {
+    apiClient.defaults.adapter = (async (config) => response(config, {
+      success: false,
+      status: 200,
+      code: 'AUTH_LOGOUT_FAILED',
+      message: 'Logout not confirmed.',
+      data: null,
+      timestamp: new Date().toISOString(),
+    } satisfies ApiEnvelope<null>)) satisfies AxiosAdapter;
+
+    await expect(authApi.logout('access-token')).rejects.toThrow(
+      'Logout was not confirmed by the server.',
+    );
   });
 
   it('deduplicates the initial refresh when the auth provider bootstraps twice', async () => {

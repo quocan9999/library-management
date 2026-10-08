@@ -126,10 +126,21 @@ export const authApi = {
   },
 
   async logout(accessToken: string | null): Promise<void> {
-    const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
-    await apiClient.post<ApiEnvelope<null>>('/api/v1/auth/logout', null, {
-      ...authRequestConfig,
-      headers,
-    });
+    const headers = accessToken
+      ? { Authorization: `Bearer ${accessToken}` }
+      : undefined;
+
+    const response = await apiClient.post<ApiEnvelope<null>>(
+      '/api/v1/auth/logout',
+      null,
+      { ...authRequestConfig, headers },
+    );
+
+    if (
+      response.data?.success !== true ||
+      response.data.code !== 'AUTH_LOGOUT_SUCCESS'
+    ) {
+      throw new Error('Logout was not confirmed by the server.');
+    }
   },
 };

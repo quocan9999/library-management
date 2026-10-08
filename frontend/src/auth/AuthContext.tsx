@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { authApi } from './api';
+import { logoutAndClearAccessToken } from './logout';
 import { getAccessToken, setAccessToken, subscribeToAccessToken } from './tokenStore';
 import type { LoginCredentials } from './types';
 
@@ -41,13 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      await authApi.logout(getAccessToken());
-    } catch {
-      // The API is idempotent; local sign-out must finish even if the request fails.
-    } finally {
-      setAccessToken(null);
-    }
+    await logoutAndClearAccessToken();
   }, []);
 
   const value = useMemo(
