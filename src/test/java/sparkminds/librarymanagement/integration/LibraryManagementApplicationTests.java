@@ -1,4 +1,4 @@
-package sparkminds.librarymanagement;
+package sparkminds.librarymanagement.integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

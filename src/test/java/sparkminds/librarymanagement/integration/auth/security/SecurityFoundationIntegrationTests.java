@@ -1,4 +1,4 @@
-package sparkminds.librarymanagement.auth.security;
+package sparkminds.librarymanagement.integration.auth.security;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

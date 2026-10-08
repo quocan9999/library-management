@@ -1,4 +1,4 @@
-package sparkminds.librarymanagement.auth.security;
+package sparkminds.librarymanagement.integration.auth.security;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;

@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.config;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -63,6 +64,19 @@ public class SecurityConfig {
             ApiAuthenticationEntryPoint authenticationEntryPoint
     ) {
         return new JwtAuthenticationFilter(authenticationService, authenticationEntryPoint);
+    }
+
+
+    // Ngăn JWT Filter đăng ký trực tiếp vào Servlet Filter Chain
+    // JWT Filter chỉ chạy thông qua Spring Security Filter Chain
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter jwtAuthenticationFilter)
+    {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(jwtAuthenticationFilter);
+
+        registration.setEnabled(false);
+
+        return registration;
     }
 
     @Bean
