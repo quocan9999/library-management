@@ -64,6 +64,14 @@ public class AccessTokenAuthenticationService {
             );
         }
 
+        if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
+            throw new ApiAuthenticationException(
+                    HttpStatus.FORBIDDEN,
+                    "EMAIL_NOT_VERIFIED",
+                    "Email chưa được xác thực. Vui lòng xác thực email trước khi đăng nhập."
+            );
+        }
+
         CustomUserPrincipal principal = CustomUserPrincipal.from(account);
         return UsernamePasswordAuthenticationToken.authenticated(
                 principal,

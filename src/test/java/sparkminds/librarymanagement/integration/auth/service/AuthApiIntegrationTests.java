@@ -20,6 +20,7 @@ import sparkminds.librarymanagement.auth.security.jwt.JwtTokenService;
 import sparkminds.librarymanagement.auth.security.jwt.JwtTokenType;
 
 import java.nio.charset.StandardCharsets;
+import jakarta.servlet.http.Cookie;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.Map;
@@ -31,6 +32,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -171,6 +173,32 @@ class AuthApiIntegrationTests {
                 .andReturn();
 
         assertThat(result.getResponse().getHeader("Set-Cookie")).isNull();
+    }
+
+    @Test
+    void revokingUserEmailVerificationDeniesRefreshAndPreviouslyIssuedAccessToken() throws Exception {
+        MvcResult initialLogin = login("user@gmail.com", "user")
+                .andExpect(status().isOk())
+                .andReturn();
+        String accessToken = JsonPath.read(initialLogin.getResponse().getContentAsString(), "$.data.accessToken");
+        String refreshCookie = initialLogin.getResponse().getHeader("Set-Cookie");
+        assertThat(refreshCookie).isNotNull().startsWith("refreshToken=");
+        String refreshToken = refreshCookie.substring("refreshToken=".length(), refreshCookie.indexOf(';'));
+
+        Account user = accountRepository.findByUsername("user").orElseThrow();
+        user.setEmailVerified(false);
+        accountRepository.saveAndFlush(user);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refreshToken", refreshToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"))
+                .andExpect(jsonPath("$.data.accessToken").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/protected-resource")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
     }
 
     private ResultActions login(String identifier, String password) throws Exception {
