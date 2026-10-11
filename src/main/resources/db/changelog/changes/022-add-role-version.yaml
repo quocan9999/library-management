@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 022-add-role-version
+      author: codex
+      comment: "Bổ sung phiên bản lạc quan cho Role Management"
+      preConditions:
+        - onFail: HALT
+        - onError: HALT
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'roles' AND column_name = 'version'
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM roles WHERE code = 'ROLE_SUPER_ADMIN'
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM accounts WHERE username = 'superadmin'
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permissions WHERE code IN ('role:read', 'role:update')
+
+      changes:
+        - addColumn:
+            tableName: roles
+            columns:
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+
+      rollback:
+        - dropColumn:
+            tableName: roles
+            columnName: version

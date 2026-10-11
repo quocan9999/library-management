@@ -82,3 +82,19 @@ databaseChangeLog:
   - include:
       file: changes/021-update-accounts-username-length.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/022-add-role-version.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/023-seed-role-management-permissions.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/024-seed-super-admin-account.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/025-disable-public-super-admin-seed.yaml
+      relativeToChangelogFile: true

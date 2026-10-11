@@ -20,15 +20,18 @@ public class AccessTokenAuthenticationService {
     private final JwtTokenService jwtTokenService;
     private final RevokedAccessTokenRepository revokedAccessTokenRepository;
     private final AccountRepository accountRepository;
+    private final EffectivePermissionService effectivePermissionService;
 
     public AccessTokenAuthenticationService(
             JwtTokenService jwtTokenService,
             RevokedAccessTokenRepository revokedAccessTokenRepository,
-            AccountRepository accountRepository
+            AccountRepository accountRepository,
+            EffectivePermissionService effectivePermissionService
     ) {
         this.jwtTokenService = jwtTokenService;
         this.revokedAccessTokenRepository = revokedAccessTokenRepository;
         this.accountRepository = accountRepository;
+        this.effectivePermissionService = effectivePermissionService;
     }
 
     @Transactional(readOnly = true)
@@ -72,7 +75,8 @@ public class AccessTokenAuthenticationService {
             );
         }
 
-        CustomUserPrincipal principal = CustomUserPrincipal.from(account);
+        CustomUserPrincipal principal = CustomUserPrincipal.from(
+                account, effectivePermissionService.resolve(account));
         return UsernamePasswordAuthenticationToken.authenticated(
                 principal,
                 null,

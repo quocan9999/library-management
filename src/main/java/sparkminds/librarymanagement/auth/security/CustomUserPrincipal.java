@@ -6,6 +6,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import sparkminds.librarymanagement.auth.entity.Account;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -15,6 +17,7 @@ public final class CustomUserPrincipal implements UserDetails {
     private final String username;
     private final String passwordHash;
     private final boolean enabled;
+    private final String roleCode;
     private final Set<GrantedAuthority> authorities;
 
     private CustomUserPrincipal(
@@ -22,19 +25,25 @@ public final class CustomUserPrincipal implements UserDetails {
             String username,
             String passwordHash,
             boolean enabled,
+            String roleCode,
             Set<GrantedAuthority> authorities
     ) {
         this.accountId = accountId;
         this.username = username;
         this.passwordHash = passwordHash;
         this.enabled = enabled;
+        this.roleCode = roleCode;
         this.authorities = authorities;
     }
 
-    public static CustomUserPrincipal from(Account account) {
-        Set<GrantedAuthority> authorities = account.getRole().getPermissions().stream()
-                .map(permission -> new SimpleGrantedAuthority(permission.getCode()))
-                .collect(Collectors.toUnmodifiableSet());
+    public static CustomUserPrincipal from(Account account, Collection<String> effectivePermissions) {
+        Set<GrantedAuthority> authorities = effectivePermissions.stream()
+                .sorted()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toCollection(LinkedHashSet::new),
+                        Collections::unmodifiableSet
+                ));
 
         String loginName = account.getUsername() != null ? account.getUsername() : account.getEmail();
         return new CustomUserPrincipal(
@@ -42,12 +51,17 @@ public final class CustomUserPrincipal implements UserDetails {
                 loginName,
                 account.getPasswordHash(),
                 account.isEnabled(),
+                account.getRole().getCode(),
                 authorities
         );
     }
 
     public Integer getAccountId() {
         return accountId;
+    }
+
+    public String getRoleCode() {
+        return roleCode;
     }
 
     @Override

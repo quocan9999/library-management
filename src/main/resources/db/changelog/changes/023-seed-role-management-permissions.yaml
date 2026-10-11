@@ -1,0 +1,63 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-seed-role-management-permissions
+      author: codex
+      comment: "Seed SUPER_ADMIN và hai quyền Role Management"
+
+      changes:
+        - insert:
+            tableName: roles
+            columns:
+              - column:
+                  name: code
+                  value: ROLE_SUPER_ADMIN
+              - column:
+                  name: description
+                  value: Quản trị viên hệ thống với toàn quyền
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: code
+                  value: role:read
+              - column:
+                  name: description
+                  value: Xem danh sách vai trò và danh mục quyền
+
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: code
+                  value: role:update
+              - column:
+                  name: description
+                  value: Cập nhật quyền của vai trò được phép
+
+        - sql:
+            dbms: mysql
+            sql: >
+              INSERT INTO role_permissions (role_id, permission_id)
+              SELECT r.id, p.id
+              FROM roles r
+              CROSS JOIN permissions p
+              WHERE r.code = 'ROLE_ADMIN'
+                AND p.code IN ('role:read', 'role:update')
+
+      rollback:
+        - sql:
+            dbms: mysql
+            sql: >
+              DELETE rp
+              FROM role_permissions rp
+              JOIN roles r ON r.id = rp.role_id
+              JOIN permissions p ON p.id = rp.permission_id
+              WHERE r.code = 'ROLE_ADMIN'
+                AND p.code IN ('role:read', 'role:update')
+        - delete:
+            tableName: permissions
+            where: code IN ('role:read', 'role:update')
+        - delete:
+            tableName: roles
+            where: code = 'ROLE_SUPER_ADMIN'

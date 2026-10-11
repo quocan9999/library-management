@@ -6,11 +6,13 @@ import axios, {
 import { getAccessToken, setAccessToken } from './tokenStore';
 import type {
   ApiEnvelope,
+  AuthMeData,
   LoginCredentials,
   LoginData,
   RegisterCredentials,
   RegisterData,
 } from './types';
+import { requestCapabilityRefresh } from './capabilityEvents';
 
 type AuthRequestConfig = InternalAxiosRequestConfig & {
   skipAccessToken?: boolean;
@@ -71,10 +73,17 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiEnvelope<unknown>>) => {
     const config = error.config as AuthRequestConfig | undefined;
+    const errorCode = error.response?.data?.code;
+    const isPermissionDenied = error.response?.status === 403 && errorCode === 'PERMISSION_DENIED';
+    const isCurrentAccountRequest = config?.url?.includes('/api/v1/auth/me');
+    if (isPermissionDenied && !isCurrentAccountRequest) requestCapabilityRefresh();
     const isExpiredAccessToken =
-      error.response?.status === 401 && error.response.data?.code === 'AUTH_TOKEN_EXPIRED';
+      error.response?.status === 401 && errorCode === 'AUTH_TOKEN_EXPIRED';
 
     if (!config || config.skipAccessToken || !isExpiredAccessToken) {
+      if (config && !config.skipAccessToken && error.response?.status === 401 && !isExpiredAccessToken) {
+        setAccessToken(null);
+      }
       return Promise.reject(error);
     }
 
@@ -175,7 +184,10 @@ export const authApi = {
 
   restoreSession(): Promise<LoginData> {
     if (!sessionRestore) {
-      sessionRestore = this.refresh();
+      const sharedRestore = this.refresh().finally(() => {
+        sessionRestore = null;
+      });
+      sessionRestore = sharedRestore;
     }
     return sessionRestore;
   },
@@ -197,5 +209,10 @@ export const authApi = {
     ) {
       throw new Error('Logout was not confirmed by the server.');
     }
+  },
+
+  async getMe(): Promise<AuthMeData> {
+    const response = await apiClient.get<ApiEnvelope<AuthMeData>>('/api/v1/auth/me');
+    return readRequiredData(response.data, 'AUTH_ME_SUCCESS');
   },
 };

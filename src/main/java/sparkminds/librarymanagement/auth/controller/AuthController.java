@@ -4,17 +4,22 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import sparkminds.librarymanagement.auth.dto.LoginRequest;
 import sparkminds.librarymanagement.auth.dto.LoginResponse;
+import sparkminds.librarymanagement.auth.dto.AuthMeResponse;
 import sparkminds.librarymanagement.auth.dto.RegisterRequest;
 import sparkminds.librarymanagement.auth.dto.RegisterResponse;
 import sparkminds.librarymanagement.auth.dto.ResendVerificationRequest;
 import sparkminds.librarymanagement.auth.dto.VerifyEmailRequest;
 import sparkminds.librarymanagement.auth.service.AuthService;
+import sparkminds.librarymanagement.auth.service.AuthMeService;
+import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
 import sparkminds.librarymanagement.auth.service.EmailVerificationService;
 import sparkminds.librarymanagement.auth.service.LoginResult;
 import sparkminds.librarymanagement.auth.service.RegistrationService;
@@ -27,6 +32,7 @@ import sparkminds.librarymanagement.common.api.ApiResponse;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthMeService authMeService;
     private final RegistrationService registrationService;
     private final EmailVerificationService emailVerificationService;
     private final ResendVerificationService resendVerificationService;
@@ -34,12 +40,14 @@ public class AuthController {
 
     public AuthController(
             AuthService authService,
+            AuthMeService authMeService,
             RegistrationService registrationService,
             EmailVerificationService emailVerificationService,
             ResendVerificationService resendVerificationService,
             RefreshCookieFactory refreshCookieFactory
     ) {
         this.authService = authService;
+        this.authMeService = authMeService;
         this.registrationService = registrationService;
         this.emailVerificationService = emailVerificationService;
         this.resendVerificationService = resendVerificationService;
@@ -94,5 +102,17 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookieFactory.create(result.refreshToken()).toString())
                 .body(body);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<AuthMeResponse>> currentAccount(
+            @AuthenticationPrincipal CustomUserPrincipal principal
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                HttpStatus.OK.value(),
+                "AUTH_ME_SUCCESS",
+                "Lấy thông tin tài khoản thành công",
+                authMeService.getCurrentAccount(principal)
+        ));
     }
 }

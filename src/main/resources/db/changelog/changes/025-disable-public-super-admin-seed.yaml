@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-disable-public-super-admin-seed
+      author: codex
+      comment: "Vô hiệu hóa tài khoản SUPER_ADMIN mặc định cũ ở môi trường triển khai"
+      context: "@production"
+
+      changes:
+        - update:
+            tableName: accounts
+            columns:
+              - column:
+                  name: enabled
+                  valueBoolean: false
+            where: "username = 'superadmin' AND password_hash = '$2a$12$vJDoN7He1X6/9Y7zAMQuQOrrCk7WxfB6eTOhcwCSU9CaTM2FKQa3W' AND role_id = (SELECT id FROM roles WHERE code = 'ROLE_SUPER_ADMIN') AND enabled = true"
