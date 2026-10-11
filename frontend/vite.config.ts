@@ -1,10 +1,8 @@
 import react from '@vitejs/plugin-react';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 
-// Đọc cùng một .env root với Spring Boot, bất kể terminal đang ở thư mục nào.
-const rootEnvDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// Vite chạy trong frontend/, còn Spring Boot đọc .env ở thư mục cha (root worktree).
+const rootEnvDir = '..';
 
 function parsePort(rawPort: string, name: string): number {
   const port = Number(rawPort);

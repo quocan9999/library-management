@@ -381,7 +381,12 @@ describe('public registration and verification routes', () => {
 
     expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
     expect(screen.queryByText(/60 giây/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Gửi lại email xác thực' }).hasAttribute('disabled')).toBe(false);
+    // Ant Design có thể giữ icon loading trong accessible name sau khi submit hoàn tất.
+    // Tìm nút theo phần tên ổn định, nhưng vẫn xác nhận nó được bật lại.
+    await waitFor(() => {
+      const resendButton = screen.getByRole('button', { name: /Gửi lại email xác thực/ });
+      expect(resendButton.hasAttribute('disabled')).toBe(false);
+    });
     expect(body).toContain('reader@example.com');
   });
 });
