@@ -42,6 +42,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -103,10 +104,17 @@ class AuthResendVerificationIntegrationTests {
     @MockitoBean
     private JavaMailSender javaMailSender;
 
+    @MockitoBean(name = "verificationMailExecutor")
+    private TaskExecutor mailExecutor;
+
     private final java.util.Set<String> testEmails = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @BeforeEach
     void resetTestClock() {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(mailExecutor).execute(any(Runnable.class));
         resendTestClock.reset();
     }
 

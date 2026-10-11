@@ -4,6 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 
 @Service
 public class ResendVerificationService {
@@ -13,19 +16,35 @@ public class ResendVerificationService {
     private final InMemoryVerificationRateLimiter rateLimiter;
     private final ResendVerificationTransactionService transactionService;
     private final RegistrationMailSender mailSender;
+    private final TaskExecutor mailExecutor;
 
     public ResendVerificationService(
             InMemoryVerificationRateLimiter rateLimiter,
             ResendVerificationTransactionService transactionService,
-            RegistrationMailSender mailSender
+            RegistrationMailSender mailSender,
+            @Qualifier("verificationMailExecutor") TaskExecutor mailExecutor
     ) {
         this.rateLimiter = rateLimiter;
         this.transactionService = transactionService;
         this.mailSender = mailSender;
+        this.mailExecutor = mailExecutor;
     }
 
-    /** Giữ thao tác cùng email tuần tự nhưng chỉ mở transaction DB trong lúc ghi/khôi phục ứng viên. */
+    /**
+     * Luôn tiếp nhận yêu cầu nhanh, không phân biệt email có tồn tại hay đã xác thực.
+     * Đẩy cả bước tra DB và SMTP vào worker để không lộ trạng thái tài khoản qua thời gian HTTP.
+     */
     public void resend(String email) {
+        try {
+            mailExecutor.execute(() -> performResend(email));
+        } catch (TaskRejectedException exception) {
+            // Khi hàng đợi đầy vẫn giữ cùng response chung; không tiết lộ email hoặc trạng thái.
+            logger.warn("Hàng đợi gửi email xác thực đang bận");
+        }
+    }
+
+    /** Khóa theo email; giữ transaction DB ngắn và xử lý SMTP failure trong worker. */
+    private void performResend(String email) {
         try (var permit = rateLimiter.lockEmailOperation(email)) {
             if (!permit.canSendEmail()) {
                 return;

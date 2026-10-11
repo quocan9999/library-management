@@ -232,13 +232,13 @@ describe('public registration and verification routes', () => {
     expect(screen.getByRole('link', { name: 'Quay lại đăng nhập' })).toBeTruthy();
   });
 
-  it('recovers the email from sessionStorage and shows the resend cooldown', () => {
+  it('recovers email and allows resend even when initial SMTP delivery may have failed', () => {
     window.sessionStorage.setItem('registrationEmail', 'reader@example.com');
     renderApp('/check-email');
 
     expect(screen.getByText('reader@example.com')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Gửi lại/ }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByText(/60 giây/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Gửi lại/ }).hasAttribute('disabled')).toBe(false);
+    expect(screen.queryByText(/60 giây/)).toBeNull();
     expect(screen.getByRole('link', { name: 'Quay lại đăng nhập' })).toBeTruthy();
   });
 
@@ -355,7 +355,7 @@ describe('public registration and verification routes', () => {
     expect(await screen.findByText(/chờ 23 giây/)).toBeTruthy();
   });
 
-  it('shows the generic resend confirmation and starts the local cooldown', async () => {
+  it('shows a generic resend confirmation without assuming SMTP succeeded', async () => {
     const user = userEvent.setup();
     let body = '';
     apiClient.defaults.adapter = (async (config) => {
@@ -368,7 +368,8 @@ describe('public registration and verification routes', () => {
     await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
 
     expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
-    expect(screen.getByText(/60 giây/)).toBeTruthy();
+    expect(screen.queryByText(/60 giây/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Gửi lại email xác thực' }).hasAttribute('disabled')).toBe(false);
     expect(body).toContain('reader@example.com');
   });
 });

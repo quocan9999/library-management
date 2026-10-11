@@ -63,7 +63,6 @@ export function ResendVerificationForm({
     try {
       await authApi.resendVerification(email);
       setRequested(true);
-      setCooldownSeconds(60);
       onRequested?.(email);
     } catch (error) {
       const fieldErrors = mapResendValidationErrors(error);
