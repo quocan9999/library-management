@@ -33,6 +33,13 @@ public class EffectivePermissionService {
                 .toList();
     }
 
+    public List<String> resolveCurrentRoleCode(String roleCode) {
+        if (ROLE_SUPER_ADMIN.equals(roleCode)) {
+            return allPermissionCodes();
+        }
+        return permissionRepository.findPermissionCodesByRoleCode(roleCode);
+    }
+
     public List<String> allPermissionCodes() {
         return permissionRepository.findAllByOrderByCodeAsc().stream()
                 .map(Permission::getCode)

@@ -24,6 +24,9 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
     @Query("select account from Account account where account.id = :accountId")
     Optional<Account> findByIdForUpdate(@Param("accountId") Integer accountId);
 
+    @Query("select role.code from Account account join account.role role where account.id = :accountId")
+    Optional<String> findRoleCodeByAccountId(@Param("accountId") Integer accountId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select account from Account account where lower(account.email) = lower(:email)")
     Optional<Account> findByEmailForUpdate(@Param("email") String email);
