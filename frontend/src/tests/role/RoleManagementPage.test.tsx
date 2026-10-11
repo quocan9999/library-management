@@ -13,6 +13,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { apiClient } from '../../auth/api';
 import type { ApiEnvelope } from '../../auth/types';
 import { RoleManagementPage } from '../../role/RoleManagementPage';
+import type { RolePermissions } from '../../role/types';
 
 const mocks = vi.hoisted(() => ({
   refreshCapabilities: vi.fn(),
@@ -75,10 +76,12 @@ function configureRoleApi(options: {
   version?: number;
   visibleSuperAdmin?: boolean;
   userCanEdit?: boolean;
+  deferPatch?: boolean;
 } = {}) {
   const requests: Array<{ method: string; url: string; body: unknown }> = [];
   let detailReads = 0;
   let roleCodes: string[] = [];
+  let resolvePendingPatch: ((result: RolePermissions) => void) | undefined;
   apiClient.defaults.adapter = (async (config) => {
     requests.push({ method: config.method ?? '', url: config.url ?? '', body: config.data });
     if (config.url === '/api/v1/roles') {
@@ -124,6 +127,11 @@ function configureRoleApi(options: {
     }
     if (config.url === '/api/v1/roles/ROLE_USER/permissions' && config.method === 'patch') {
       if (options.patchStatus) failure(config, options.patchStatus, options.patchCode ?? 'PERMISSION_DENIED');
+      if (options.deferPatch) {
+        return await new Promise((resolve) => {
+          resolvePendingPatch = (result) => resolve(response(config, success('ROLE_PERMISSIONS_UPDATED', result)));
+        });
+      }
       return response(config, success('ROLE_PERMISSIONS_UPDATED', {
         roleCode: 'ROLE_USER',
         version: (options.version ?? 7) + 1,
@@ -135,7 +143,12 @@ function configureRoleApi(options: {
     }
     throw new Error(`Unexpected request: ${config.method} ${config.url}`);
   }) satisfies AxiosAdapter;
-  return { requests, get detailReads() { return detailReads; }, get roleCodes() { return roleCodes; } };
+  return {
+    requests,
+    resolvePendingPatch: (result: RolePermissions) => resolvePendingPatch?.(result),
+    get detailReads() { return detailReads; },
+    get roleCodes() { return roleCodes; },
+  };
 }
 
 beforeEach(() => {
@@ -293,5 +306,41 @@ describe('RoleManagementPage', () => {
     await user.click(screen.getByRole('button', { name: 'Xác nhận tải lại' }));
     await waitFor(() => expect(api.detailReads).toBe(2));
     expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('locks the role target and preview close actions while a save is pending', async () => {
+    const user = userEvent.setup();
+    Object.assign(mocks.currentUser, {
+      id: 1,
+      username: 'root',
+      email: null,
+      role: 'ROLE_SUPER_ADMIN',
+      permissions: ['role:read', 'role:update'],
+    });
+    const api = configureRoleApi({ deferPatch: true, visibleSuperAdmin: true });
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() => expect(api.requests.filter(({ method }) => method === 'patch')).toHaveLength(1));
+
+    expect((document.getElementById('role-target-select') as HTMLInputElement).disabled).toBe(true);
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+
+    api.resolvePendingPatch?.({
+      roleCode: 'ROLE_USER',
+      version: 8,
+      assignedPermissions: ['book:read', 'book:create', 'book:delete'],
+      effectivePermissions: ['book:read', 'book:create', 'book:delete'],
+      editablePermissions: ['book:read', 'book:create', 'book:import', 'member:read'],
+      editable: true,
+    });
+
+    expect(await screen.findByRole('status')).toBeTruthy();
+    expect(screen.getByText('Đã cập nhật quyền cho vai trò.')).toBeTruthy();
+    expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
   });
 });

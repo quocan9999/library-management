@@ -61,6 +61,11 @@ class RoleReadApiIntegrationTests {
     private SpringLiquibase springLiquibase;
 
     @Test
+    void testProfileUsesAnExplicitLiquibaseContextForBootstrapData() {
+        assertThat(springLiquibase.getContexts()).isEqualTo("test");
+    }
+
+    @Test
     void authMeRequiresAuthenticationAndRejectsInvalidAccessTokens() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized())

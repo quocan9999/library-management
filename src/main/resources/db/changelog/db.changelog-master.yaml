@@ -94,3 +94,7 @@ databaseChangeLog:
   - include:
       file: changes/024-seed-super-admin-account.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/025-disable-public-super-admin-seed.yaml
+      relativeToChangelogFile: true

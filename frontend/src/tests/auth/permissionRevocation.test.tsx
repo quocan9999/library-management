@@ -11,7 +11,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../../app/App';
 import { apiClient } from '../../auth/api';
-import { AuthProvider } from '../../auth/AuthContext';
+import { AuthProvider, useAuth } from '../../auth/AuthContext';
 import type { ApiEnvelope } from '../../auth/types';
 import { setAccessToken } from '../../auth/tokenStore';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -60,6 +60,11 @@ function DeniedRequestProbe() {
   return <button onClick={() => { void apiClient.get('/api/v1/probe').catch(() => undefined); }}>
     Gọi endpoint bị từ chối
   </button>;
+}
+
+function CurrentPermissionProbe() {
+  const { permissions } = useAuth();
+  return <output aria-label="current permissions">{permissions.join(',')}</output>;
 }
 
 afterEach(() => {
@@ -130,5 +135,76 @@ describe('permission revocation synchronization', () => {
     expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
     await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
     expect(deniedRequests).toBe(1);
+  });
+
+  it('starts a fresh /auth/me after 403 even when an older same-token request is still pending', async () => {
+    const user = userEvent.setup();
+    let meRequests = 0;
+    let forbiddenRequestStarted = false;
+    let freshMeStartedAfterForbidden = false;
+    let resolveInitialMe: ((result: AxiosResponse<ApiEnvelope<{
+      id: number;
+      username: string;
+      email: string;
+      role: string;
+      permissions: string[];
+    }>>) => void) | undefined;
+    let initialMeConfig: InternalAxiosRequestConfig | undefined;
+
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') {
+        return response(config, success('AUTH_TOKEN_REFRESHED', {
+          accessToken: 'admin-smoke-token', tokenType: 'Bearer', accessTokenExpiresIn: 900,
+        }));
+      }
+      if (config.url === '/api/v1/auth/me') {
+        meRequests += 1;
+        if (forbiddenRequestStarted) freshMeStartedAfterForbidden = true;
+        if (meRequests === 1) {
+          return await new Promise((resolve) => {
+            initialMeConfig = config;
+            resolveInitialMe = resolve;
+          });
+        }
+        return response(config, success('AUTH_ME_SUCCESS', {
+          id: 5,
+          username: 'admin',
+          email: 'admin@example.com',
+          role: 'ROLE_ADMIN',
+          permissions: ['book:read'],
+        }));
+      }
+      if (config.url === '/api/v1/probe') {
+        forbiddenRequestStarted = true;
+        forbidden(config);
+      }
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(
+      <MemoryRouter initialEntries={['/admin/roles']}>
+        <AuthProvider><App /><DeniedRequestProbe /><LocationProbe /><CurrentPermissionProbe /></AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(meRequests).toBe(1));
+    await user.click(screen.getByRole('button', { name: 'Gọi endpoint bị từ chối' }));
+    await waitFor(() => expect(meRequests).toBe(2), { timeout: 500 });
+    expect(freshMeStartedAfterForbidden).toBe(true);
+
+    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
+    await waitFor(() => expect(screen.getByLabelText('current permissions').textContent).toContain('book:read'));
+    expect(screen.getByLabelText('current permissions').textContent).not.toContain('role:read');
+
+    resolveInitialMe?.(response(initialMeConfig!, success('AUTH_ME_SUCCESS', {
+      id: 5,
+      username: 'admin',
+      email: 'admin@example.com',
+      role: 'ROLE_ADMIN',
+      permissions: ['role:read', 'role:update'],
+    })));
+    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
+    expect(screen.getByLabelText('current permissions').textContent).not.toContain('role:read');
   });
 });

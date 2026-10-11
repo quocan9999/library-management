@@ -14,7 +14,7 @@ interface AuthContextValue {
   role: string | null;
   permissions: string[];
   capabilityStatus: CapabilityStatus;
-  refreshCapabilities: () => Promise<void>;
+  refreshCapabilities: (options?: { force?: boolean }) => Promise<void>;
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const requestGeneration = useRef(0);
   const capabilityTokenRef = useRef<string | null>(null);
 
-  const refreshCapabilities = useCallback((): Promise<void> => {
+  const refreshCapabilities = useCallback((options: { force?: boolean } = {}): Promise<void> => {
     const token = getAccessToken();
     if (!token) {
       requestGeneration.current += 1;
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return Promise.resolve();
     }
 
-    if (capabilityRequest.current?.token === token) return capabilityRequest.current.promise;
+    if (!options.force && capabilityRequest.current?.token === token) return capabilityRequest.current.promise;
 
     const generation = ++requestGeneration.current;
     if (capabilityTokenRef.current !== token) setCapabilityState('loading');
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshCapabilities]);
 
   useEffect(() => subscribeToCapabilityRefresh(() => {
-    if (getAccessToken()) void refreshCapabilities().catch(() => undefined);
+    if (getAccessToken()) void refreshCapabilities({ force: true }).catch(() => undefined);
   }), [refreshCapabilities]);
 
   const login = useCallback(async (credentials: LoginCredentials) => {

@@ -3,6 +3,7 @@ databaseChangeLog:
       id: 024-seed-super-admin-account
       author: codex
       comment: "Tạo tài khoản SUPER_ADMIN cục bộ"
+      context: "@local,@test,@training"
       preConditions:
         - onFail: HALT
         - onError: HALT

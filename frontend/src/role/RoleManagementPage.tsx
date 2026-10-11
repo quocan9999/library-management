@@ -56,6 +56,7 @@ export function RoleManagementPage() {
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);
   const detailsGeneration = useRef(0);
+  const roleCodeRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     let mounted = true;
@@ -68,6 +69,7 @@ export function RoleManagementPage() {
         const initialRole = roleList.find(({ code }) => code === 'ROLE_USER')
           ?? roleList.find(({ canEdit }) => canEdit)
           ?? roleList[0];
+        roleCodeRef.current = initialRole?.code;
         setRoleCode(initialRole?.code);
         if (!initialRole) return;
         setIsLoadingDetails(true);
@@ -164,15 +166,24 @@ export function RoleManagementPage() {
 
   const saveChanges = async () => {
     if (!roleCode || !rolePermissions || !canEdit || !hasChanges || isSaving) return;
+    const targetRoleCode = roleCode;
+    const targetGeneration = detailsGeneration.current;
+    const isCurrentTarget = () => detailsGeneration.current === targetGeneration
+      && roleCodeRef.current === targetRoleCode;
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
     try {
-      const result = await roleApi.updatePermissions(roleCode, {
+      const result = await roleApi.updatePermissions(targetRoleCode, {
         expectedVersion: rolePermissions.version,
         addPermissions: additions,
         removePermissions: removals,
       });
+      if (!isCurrentTarget()) return;
+      if (result.roleCode !== targetRoleCode) {
+        setErrorMessage('Phản hồi không khớp vai trò đang lưu. Dữ liệu chưa được áp dụng.');
+        return;
+      }
       setRolePermissions(result);
       setDraft(new Set(result.assignedPermissions));
       setPreviewOpen(false);
@@ -180,12 +191,14 @@ export function RoleManagementPage() {
       setSuccessMessage('Đã cập nhật quyền cho vai trò.');
     } catch (error) {
       if (getStatus(error) === 403 && getErrorCode(error) === 'PERMISSION_DENIED') {
-        setErrorMessage('Quyền quản trị đã thay đổi. Đang đồng bộ phiên; thay đổi chưa được gửi lại.');
+        if (isCurrentTarget()) {
+          setErrorMessage('Quyền quản trị đã thay đổi. Đang đồng bộ phiên; thay đổi chưa được gửi lại.');
+        }
         void refreshCapabilities().catch(() => undefined);
-      } else if (getStatus(error) === 409 && getErrorCode(error) === 'ROLE_VERSION_CONFLICT') {
+      } else if (isCurrentTarget() && getStatus(error) === 409 && getErrorCode(error) === 'ROLE_VERSION_CONFLICT') {
         setHasConflict(true);
         setErrorMessage('Vai trò đã được thay đổi ở nơi khác. Các chỉnh sửa của bạn vẫn còn và chưa được lưu.');
-      } else {
+      } else if (isCurrentTarget()) {
         setErrorMessage('Không thể lưu thay đổi. Vui lòng kiểm tra và thử lại.');
       }
     } finally {
@@ -200,6 +213,8 @@ export function RoleManagementPage() {
   };
 
   const selectRole = (nextRoleCode: string) => {
+    if (isSaving) return;
+    roleCodeRef.current = nextRoleCode;
     setRolePermissions(null);
     setDraft(new Set());
     setIsLoadingDetails(true);
@@ -208,6 +223,7 @@ export function RoleManagementPage() {
   };
 
   const handleRoleChange = (nextRoleCode: string) => {
+    if (isSaving) return;
     if (hasChanges) {
       Modal.confirm({
         title: 'Bỏ các chỉnh sửa chưa lưu?',
@@ -244,6 +260,7 @@ export function RoleManagementPage() {
                 aria-label="Vai trò"
                 virtual={false}
                 value={roleCode}
+                disabled={isSaving}
                 onChange={handleRoleChange}
                 options={roles.map((role) => ({
                   value: role.code,
@@ -335,11 +352,13 @@ export function RoleManagementPage() {
       <Modal
         title="Xác nhận thay đổi quyền"
         open={previewOpen}
-        onCancel={() => setPreviewOpen(false)}
+        onCancel={() => { if (!isSaving) setPreviewOpen(false); }}
         onOk={() => void saveChanges()}
         okText="Lưu thay đổi"
         cancelText="Hủy"
         confirmLoading={isSaving}
+        closable={!isSaving}
+        keyboard={!isSaving}
         okButtonProps={{ disabled: !hasChanges || isSaving }}
         cancelButtonProps={{ disabled: isSaving }}
         mask={{ closable: !isSaving }}
