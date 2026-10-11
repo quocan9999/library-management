@@ -8,7 +8,7 @@ const rootEnvDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function parsePort(rawPort: string, name: string): number {
   const port = Number(rawPort);
-  if (!/^\\d+$/.test(rawPort) || !Number.isInteger(port) || port < 1 || port > 65535) {
+  if (!/^\d+$/.test(rawPort) || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error(`${name} phải là cổng hợp lệ từ 1 đến 65535.`);
   }
   return port;
