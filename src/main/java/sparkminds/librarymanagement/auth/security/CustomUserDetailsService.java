@@ -13,9 +13,14 @@ import java.util.Locale;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final AccountRepository accountRepository;
+    private final EffectivePermissionService effectivePermissionService;
 
-    public CustomUserDetailsService(AccountRepository accountRepository) {
+    public CustomUserDetailsService(
+            AccountRepository accountRepository,
+            EffectivePermissionService effectivePermissionService
+    ) {
         this.accountRepository = accountRepository;
+        this.effectivePermissionService = effectivePermissionService;
     }
 
     @Override
@@ -30,7 +35,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 : accountRepository.findByUsernameOrEmail(identifier, identifier);
 
         return account
-                .map(CustomUserPrincipal::from)
+                .map(value -> CustomUserPrincipal.from(value, effectivePermissionService.resolve(value)))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 }

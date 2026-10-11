@@ -1,0 +1,39 @@
+databaseChangeLog:
+  - changeSet:
+      id: 024-seed-super-admin-account
+      author: codex
+      comment: "Tạo tài khoản SUPER_ADMIN cục bộ"
+      preConditions:
+        - onFail: HALT
+        - onError: HALT
+        - sqlCheck:
+            expectedResult: "1"
+            sql: SELECT COUNT(*) FROM roles WHERE code = 'ROLE_SUPER_ADMIN'
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM accounts WHERE username = 'superadmin'
+
+      changes:
+        - insert:
+            tableName: accounts
+            columns:
+              - column:
+                  name: username
+                  value: superadmin
+              - column:
+                  name: password_hash
+                  value: "$2a$12$vJDoN7He1X6/9Y7zAMQuQOrrCk7WxfB6eTOhcwCSU9CaTM2FKQa3W"
+              - column:
+                  name: role_id
+                  valueComputed: "(SELECT id FROM roles WHERE code = 'ROLE_SUPER_ADMIN')"
+              - column:
+                  name: email_verified
+                  valueBoolean: true
+              - column:
+                  name: enabled
+                  valueBoolean: true
+
+      rollback:
+        - delete:
+            tableName: accounts
+            where: username = 'superadmin'
