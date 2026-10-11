@@ -36,7 +36,15 @@ public class ResendVerificationService {
      */
     public void resend(String email) {
         try {
-            mailExecutor.execute(() -> performResend(email));
+            mailExecutor.execute(() -> {
+                try {
+                    performResend(email);
+                } catch (RuntimeException exception) {
+                    // Worker không in exception message/stacktrace có thể chứa email hoặc token.
+                    logger.error("Lỗi xử lý gửi lại email xác thực; loại lỗi={}",
+                            exception.getClass().getSimpleName());
+                }
+            });
         } catch (TaskRejectedException exception) {
             // Khi hàng đợi đầy vẫn giữ cùng response chung; không tiết lộ email hoặc trạng thái.
             logger.warn("Hàng đợi gửi email xác thực đang bận");
