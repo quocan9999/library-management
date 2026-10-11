@@ -18,6 +18,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final Set<String> SKIPPED_PATHS = Set.of(
             "/api/v1/auth/login",
+            "/api/v1/auth/register",
             "/api/v1/auth/verify-email",
             "/api/v1/auth/resend-verification",
             "/api/v1/auth/refresh",

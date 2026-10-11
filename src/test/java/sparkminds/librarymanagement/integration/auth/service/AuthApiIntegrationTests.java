@@ -11,10 +11,13 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import sparkminds.librarymanagement.auth.entity.Account;
 import sparkminds.librarymanagement.auth.entity.RefreshToken;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.auth.repository.RefreshTokenRepository;
+import sparkminds.librarymanagement.auth.security.jwt.JwtTokenService;
+import sparkminds.librarymanagement.auth.security.jwt.JwtTokenType;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -23,6 +26,10 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,8 +49,15 @@ class AuthApiIntegrationTests {
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
 
+    @MockitoSpyBean
+    private JwtTokenService jwtTokenService;
+
     @Test
     void loginIssuesExactAccessClaimsAndStoresRefreshMetadataOnlyInCookie() throws Exception {
+        Account admin = accountRepository.findByUsername("admin").orElseThrow();
+        admin.setEmailVerified(false);
+        accountRepository.saveAndFlush(admin);
+
         MvcResult result = login("admin", "admin")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("AUTH_LOGIN_SUCCESS"))
@@ -57,7 +71,7 @@ class AuthApiIntegrationTests {
         Map<String, Object> accessClaims = claims(accessToken);
         assertClaimSet(accessClaims);
         assertThat((String) accessClaims.get("sub"))
-                .isEqualTo(accountRepository.findByUsername("admin").orElseThrow().getId().toString());
+                .isEqualTo(admin.getId().toString());
         assertThat((String) accessClaims.get("type")).isEqualTo("ACCESS");
         assertThat(((Number) accessClaims.get("exp")).longValue() - ((Number) accessClaims.get("iat")).longValue())
                 .isEqualTo(900);
@@ -79,7 +93,7 @@ class AuthApiIntegrationTests {
         assertThat(((Number) refreshClaims.get("exp")).longValue() - ((Number) refreshClaims.get("iat")).longValue())
                 .isEqualTo(604800);
         RefreshToken metadata = refreshTokenRepository.findByJti((String) refreshClaims.get("jti")).orElseThrow();
-        assertThat(metadata.getAccount().getId()).isEqualTo(accountRepository.findByUsername("admin").orElseThrow().getId());
+        assertThat(metadata.getAccount().getId()).isEqualTo(admin.getId());
         assertThat(result.getResponse().getContentAsString()).doesNotContain(refreshToken);
     }
 
@@ -92,6 +106,37 @@ class AuthApiIntegrationTests {
         login("user@gmail.com", "user")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("AUTH_LOGIN_SUCCESS"));
+    }
+
+    @Test
+    void loginNormalizesEmailIdentifier() throws Exception {
+        login("  USER@GMAIL.COM  ", "user")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("AUTH_LOGIN_SUCCESS"))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
+    }
+
+    @Test
+    void unverifiedUserMustVerifyAfterCorrectPasswordWithoutCreatingTokens() throws Exception {
+        Account user = accountRepository.findByUsername("user").orElseThrow();
+        user.setEmailVerified(false);
+        accountRepository.saveAndFlush(user);
+        long refreshCountBefore = refreshTokenRepository.count();
+
+        login("user@gmail.com", "wrong-password")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+
+        MvcResult result = login("user@gmail.com", "user")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.data.accessToken").doesNotExist())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Set-Cookie")).isNull();
+        assertThat(refreshTokenRepository.count()).isEqualTo(refreshCountBefore);
+        verify(jwtTokenService, never()).issue(anyInt(), any(JwtTokenType.class));
     }
 
     @Test

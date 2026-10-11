@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
 
+import java.util.Locale;
+
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
@@ -23,7 +25,11 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("User not found");
         }
 
-        return accountRepository.findByUsernameOrEmail(identifier, identifier)
+        var account = identifier.contains("@")
+                ? accountRepository.findByEmailIgnoreCase(identifier.trim().toLowerCase(Locale.ROOT))
+                : accountRepository.findByUsernameOrEmail(identifier, identifier);
+
+        return account
                 .map(CustomUserPrincipal::from)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }

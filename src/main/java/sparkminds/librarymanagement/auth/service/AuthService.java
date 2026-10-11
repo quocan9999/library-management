@@ -22,6 +22,7 @@ import sparkminds.librarymanagement.common.api.BusinessException;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Locale;
 
 @Service
 public class AuthService {
@@ -48,7 +49,8 @@ public class AuthService {
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
-                    UsernamePasswordAuthenticationToken.unauthenticated(request.identifier(), request.password())
+                    UsernamePasswordAuthenticationToken.unauthenticated(
+                            normalizeEmailIdentifier(request.identifier()), request.password())
             );
         } catch (DisabledException exception) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "AUTH_ACCOUNT_DISABLED", "Tài khoản hiện không thể đăng nhập");
@@ -68,6 +70,14 @@ public class AuthService {
                         "Email/username hoặc mật khẩu không chính xác"
                 ));
 
+        if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN,
+                    "EMAIL_NOT_VERIFIED",
+                    "Email chưa được xác thực. Vui lòng xác thực email trước khi đăng nhập."
+            );
+        }
+
         IssuedJwtToken accessToken = jwtTokenService.issue(account.getId(), JwtTokenType.ACCESS);
         IssuedJwtToken refreshToken = jwtTokenService.issue(account.getId(), JwtTokenType.REFRESH);
 
@@ -83,5 +93,12 @@ public class AuthService {
                 jwtTokenService.expiresInSeconds(JwtTokenType.ACCESS)
         );
         return new LoginResult(response, refreshToken.value());
+    }
+
+    private static String normalizeEmailIdentifier(String identifier) {
+        if (!identifier.contains("@")) {
+            return identifier;
+        }
+        return identifier.trim().toLowerCase(Locale.ROOT);
     }
 }

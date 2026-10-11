@@ -182,6 +182,7 @@ class AuthRegistrationIntegrationTests {
         trackedEmails.add(normalizedEmail);
         String suppliedEmail = "  " + normalizedEmail.toUpperCase(java.util.Locale.ROOT) + "  ";
         MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+                        .header("Authorization", "Bearer malformed")
                         .contentType(APPLICATION_JSON)
                         .content("{\"email\":\"" + suppliedEmail + "\",\"password\":\"Strong1!\"}"))
                 .andExpect(status().isCreated())
