@@ -1,0 +1,55 @@
+package sparkminds.librarymanagement.auth.web;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+import sparkminds.librarymanagement.auth.service.InMemoryVerificationRateLimiter;
+import sparkminds.librarymanagement.common.api.ApiResponse;
+
+import tools.jackson.databind.ObjectMapper;
+
+@Component
+public class ResendRateLimitInterceptor implements HandlerInterceptor {
+
+    private final InMemoryVerificationRateLimiter rateLimiter;
+    private final ObjectMapper objectMapper;
+
+    public ResendRateLimitInterceptor(
+            InMemoryVerificationRateLimiter rateLimiter,
+            ObjectMapper objectMapper
+    ) {
+        this.rateLimiter = rateLimiter;
+        this.objectMapper = objectMapper;
+    }
+
+    /** Chạy trước khi MVC đọc/validate body để cả request sai định dạng cũng tính vào quota IP. */
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        var result = rateLimiter.consumeResendIpRequest(request.getRemoteAddr());
+        if (result.allowed()) {
+            return true;
+        }
+
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(result.retryAfterSeconds()));
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        objectMapper.writeValue(response.getOutputStream(), ApiResponse.error(
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "RESEND_RATE_LIMITED",
+                "Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau.",
+                null
+        ));
+        return false;
+    }
+}

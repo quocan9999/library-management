@@ -12,10 +12,14 @@ import sparkminds.librarymanagement.auth.dto.LoginRequest;
 import sparkminds.librarymanagement.auth.dto.LoginResponse;
 import sparkminds.librarymanagement.auth.dto.RegisterRequest;
 import sparkminds.librarymanagement.auth.dto.RegisterResponse;
+import sparkminds.librarymanagement.auth.dto.ResendVerificationRequest;
+import sparkminds.librarymanagement.auth.dto.VerifyEmailRequest;
 import sparkminds.librarymanagement.auth.service.AuthService;
+import sparkminds.librarymanagement.auth.service.EmailVerificationService;
 import sparkminds.librarymanagement.auth.service.LoginResult;
 import sparkminds.librarymanagement.auth.service.RegistrationService;
 import sparkminds.librarymanagement.auth.service.RefreshCookieFactory;
+import sparkminds.librarymanagement.auth.service.ResendVerificationService;
 import sparkminds.librarymanagement.common.api.ApiResponse;
 
 @RestController
@@ -24,15 +28,21 @@ public class AuthController {
 
     private final AuthService authService;
     private final RegistrationService registrationService;
+    private final EmailVerificationService emailVerificationService;
+    private final ResendVerificationService resendVerificationService;
     private final RefreshCookieFactory refreshCookieFactory;
 
     public AuthController(
             AuthService authService,
             RegistrationService registrationService,
+            EmailVerificationService emailVerificationService,
+            ResendVerificationService resendVerificationService,
             RefreshCookieFactory refreshCookieFactory
     ) {
         this.authService = authService;
         this.registrationService = registrationService;
+        this.emailVerificationService = emailVerificationService;
+        this.resendVerificationService = resendVerificationService;
         this.refreshCookieFactory = refreshCookieFactory;
     }
 
@@ -46,6 +56,30 @@ public class AuthController {
                 response
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        emailVerificationService.verify(request.token());
+        return ResponseEntity.ok(ApiResponse.success(
+                HttpStatus.OK.value(),
+                "EMAIL_VERIFIED",
+                "Xác thực email thành công. Bạn có thể đăng nhập.",
+                null
+        ));
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<ApiResponse<Void>> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request
+    ) {
+        resendVerificationService.resend(request.email());
+        return ResponseEntity.ok(ApiResponse.success(
+                HttpStatus.OK.value(),
+                "VERIFICATION_EMAIL_REQUESTED",
+                "Nếu email chưa được xác thực, hướng dẫn xác thực sẽ được gửi đến hộp thư.",
+                null
+        ));
     }
 
     @PostMapping("/login")
