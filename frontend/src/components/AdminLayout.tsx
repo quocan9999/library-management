@@ -1,0 +1,211 @@
+import { Alert } from 'antd';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import { getLogoutErrorMessage } from '../auth/messages';
+import { PermissionGate } from '../auth/permissions';
+import { BrandMark } from './BrandMark';
+
+function OverviewIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <rect x="3.5" y="3.5" width="7" height="7" rx="1" />
+    <rect x="13.5" y="3.5" width="7" height="7" rx="1" />
+    <rect x="3.5" y="13.5" width="7" height="7" rx="1" />
+    <rect x="13.5" y="13.5" width="7" height="7" rx="1" />
+  </svg>;
+}
+
+function RolesIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <path d="M12 3.5 19 6v5.2c0 4.1-2.8 7.5-7 9.3-4.2-1.8-7-5.2-7-9.3V6l7-2.5Z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>;
+}
+
+function ProfileIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <circle cx="12" cy="8" r="3.25" />
+    <path d="M5.5 20c.4-3.5 2.8-5.5 6.5-5.5s6.1 2 6.5 5.5" />
+  </svg>;
+}
+
+function LogoutIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <path d="M10 4.5H5.5v15H10M14 8l4 4-4 4M18 12H9" />
+  </svg>;
+}
+
+function MenuIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </svg>;
+}
+
+function CloseIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <path d="m6 6 12 12M18 6 6 18" />
+  </svg>;
+}
+
+function roleLabel(role: string | null): string {
+  if (!role) return 'Đang tải vai trò';
+  const labels: Record<string, string> = {
+    ROLE_SUPER_ADMIN: 'Siêu quản trị viên',
+    ROLE_ADMIN: 'Quản trị viên',
+    ROLE_USER: 'Người dùng',
+  };
+  return labels[role] ?? role.replace(/^ROLE_/, '').replaceAll('_', ' ');
+}
+
+export function AdminLayout() {
+  const { currentUser, role, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  const closeMobileMenu = useCallback(() => {
+    if (!mobileMenuOpen) return;
+    setMobileMenuOpen(false);
+    window.requestAnimationFrame(() => menuButtonRef.current?.focus());
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined;
+    sidebarRef.current?.querySelector<HTMLElement>('.admin-shell__nav a')?.focus();
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') closeMobileMenu();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [mobileMenuOpen, closeMobileMenu]);
+
+  const handleSidebarKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!mobileMenuOpen || event.key !== 'Tab') return;
+    const focusable = sidebarRef.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)');
+    if (!focusable?.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    setLogoutError(null);
+    try {
+      await logout();
+    } catch (error) {
+      setLogoutError(getLogoutErrorMessage(error));
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const displayName = currentUser?.username?.trim()
+    || currentUser?.email?.trim()
+    || (currentUser ? `Tài khoản ${currentUser.id}` : 'Đang đồng bộ hồ sơ');
+  const email = currentUser?.email ?? 'Thông tin phiên đăng nhập';
+
+  return (
+    <div className="admin-shell">
+      {mobileMenuOpen && (
+        <button
+          className="admin-shell__backdrop"
+          type="button"
+          aria-label="Đóng menu điều hướng"
+          onClick={closeMobileMenu}
+        />
+      )}
+
+      <aside
+        ref={sidebarRef}
+        id="admin-sidebar"
+        className={`admin-shell__sidebar${mobileMenuOpen ? ' admin-shell__sidebar--open' : ''}`}
+        aria-label="Điều hướng quản trị"
+        role={mobileMenuOpen ? 'dialog' : undefined}
+        aria-modal={mobileMenuOpen || undefined}
+        onKeyDown={handleSidebarKeyDown}
+      >
+        <header className="admin-shell__brand">
+          <BrandMark compact />
+          <button
+            className="admin-shell__close-button"
+            type="button"
+            aria-label="Đóng menu"
+            onClick={closeMobileMenu}
+          ><CloseIcon /></button>
+        </header>
+
+        <p className="admin-shell__section-label">KHÔNG GIAN QUẢN TRỊ</p>
+        <nav className="admin-shell__nav" aria-label="Chính">
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+            onClick={closeMobileMenu}
+          >
+            <OverviewIcon />
+            <span>Tổng quan</span>
+          </NavLink>
+          <PermissionGate permission="role:read" fallback={null}>
+            <NavLink
+              to="/admin/roles"
+              className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <RolesIcon />
+              <span>Quản lý vai trò</span>
+            </NavLink>
+          </PermissionGate>
+        </nav>
+
+        <footer className="admin-shell__footer">
+          {logoutError && <Alert type="error" showIcon role="alert" title={logoutError} />}
+          <section className="admin-shell__profile" aria-label="Tài khoản đang đăng nhập">
+            <span className="admin-shell__profile-icon"><ProfileIcon /></span>
+            <span className="admin-shell__profile-copy">
+              <strong title={displayName}>{displayName}</strong>
+              <span title={email}>{email}</span>
+              <span className="admin-shell__profile-role">{roleLabel(role)}</span>
+            </span>
+          </section>
+          <button
+            className="admin-shell__logout"
+            type="button"
+            onClick={() => void handleLogout()}
+            disabled={isLoggingOut}
+          >
+            <LogoutIcon />
+            <span>{isLoggingOut ? 'Đang đăng xuất…' : 'Đăng xuất'}</span>
+          </button>
+        </footer>
+      </aside>
+
+      <div className="admin-shell__main">
+        <header className="admin-shell__mobile-header">
+          <button
+            ref={menuButtonRef}
+            className="admin-shell__menu-button"
+            type="button"
+            aria-label="Mở menu điều hướng"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="admin-sidebar"
+            onClick={() => setMobileMenuOpen(true)}
+          ><MenuIcon /></button>
+          <span>Quản lý Thư viện</span>
+        </header>
+        <div className="admin-shell__content">
+          <Outlet />
+        </div>
+      </div>
+    </div>
+  );
+}

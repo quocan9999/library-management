@@ -1,8 +1,6 @@
 import { Alert, Button, Checkbox, Modal, Select, Spin, Tooltip } from 'antd';
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { BrandMark } from '../components/BrandMark';
 import { useAuth } from '../auth/AuthContext';
 import { roleApi } from './api';
 import type {
@@ -43,7 +41,7 @@ function groupLabel(prefix: string): string {
 }
 
 export function RoleManagementPage() {
-  const { currentUser, refreshCapabilities } = useAuth();
+  const { refreshCapabilities } = useAuth();
   const [roles, setRoles] = useState<RoleSummary[]>([]);
   const [catalog, setCatalog] = useState<PermissionCatalogEntry[]>([]);
   const [roleCode, setRoleCode] = useState<string>();
@@ -225,11 +223,6 @@ export function RoleManagementPage() {
 
   return (
     <main className="role-stage">
-      <header className="role-header">
-        <BrandMark compact />
-        <Link className="role-home-link" to="/">Về trang chủ</Link>
-      </header>
-
       <section className="role-workspace" aria-labelledby="role-title">
         <div className="role-heading">
           <div>
@@ -237,10 +230,6 @@ export function RoleManagementPage() {
             <h1 id="role-title">Quản lý vai trò</h1>
             <p className="role-intro">Xem và cập nhật quyền hiệu lực theo từng vai trò.</p>
           </div>
-          {currentUser && <div className="role-actor">
-            <span>Đang đăng nhập</span>
-            <strong>{currentUser.username ?? currentUser.email ?? `Tài khoản ${currentUser.id}`}</strong>
-          </div>}
         </div>
 
         {errorMessage && <Alert type="error" showIcon role="alert" title={errorMessage} />}

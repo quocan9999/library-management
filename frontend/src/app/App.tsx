@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth, useOptionalAuth } from '../auth/AuthContext';
 import { RequirePermission } from '../auth/permissions';
+import { AdminLayout } from '../components/AdminLayout';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
@@ -72,23 +73,19 @@ export function App() {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/403" element={<ForbiddenPage />} />
         <Route
-          path="/admin/roles"
-          element={
-            <RequireAuthentication>
+          path="/"
+          element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
+        >
+          <Route index element={<HomePage />} />
+          <Route
+            path="admin/roles"
+            element={
               <RequirePermission permission="role:read" allowedRoles={['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']}>
                 <RoleManagementPage />
               </RequirePermission>
-            </RequireAuthentication>
-          }
-        />
-        <Route
-          path="/"
-          element={
-            <RequireAuthentication>
-              <HomePage />
-            </RequireAuthentication>
-          }
-        />
+            }
+          />
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
