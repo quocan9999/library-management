@@ -7,7 +7,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiClient, authApi } from '../../auth/api';
 import { setAccessToken } from '../../auth/tokenStore';
-import type { ApiEnvelope, LoginData } from '../../auth/types';
+import type { ApiEnvelope, LoginData, RegisterData } from '../../auth/types';
 
 const originalAdapter = apiClient.defaults.adapter;
 
@@ -222,6 +222,58 @@ describe('authenticated API client', () => {
 
     expect(logoutConfig?.withCredentials).toBe(true);
     expect(logoutConfig?.headers.get('Authorization')).toBe('Bearer explicit-access-token');
+  });
+
+  it('sends register, verify, and resend as public requests without cookies or access tokens', async () => {
+    const captured: Array<{
+      url: string;
+      data: unknown;
+      withCredentials: boolean | undefined;
+      authorization: string | undefined;
+    }> = [];
+    setAccessToken('stale-access-token');
+    apiClient.defaults.adapter = (async (config) => {
+      captured.push({
+        url: config.url ?? '',
+        data: config.data,
+        withCredentials: config.withCredentials,
+        authorization: config.headers.get('Authorization')?.toString(),
+      });
+
+      if (config.url === '/api/v1/auth/register') {
+        const data: RegisterData = {
+          email: 'reader@example.com',
+          emailVerificationRequired: true,
+        };
+        return response(config, {
+          success: true, status: 201, code: 'REGISTER_SUCCESS',
+          message: 'Created.', data, timestamp: new Date().toISOString(),
+        } satisfies ApiEnvelope<RegisterData>, 201);
+      }
+      if (config.url === '/api/v1/auth/verify-email') {
+        return response(config, {
+          success: true, status: 200, code: 'EMAIL_VERIFIED',
+          message: 'Verified.', data: null, timestamp: new Date().toISOString(),
+        } satisfies ApiEnvelope<null>);
+      }
+      return response(config, {
+        success: true, status: 200, code: 'VERIFICATION_EMAIL_REQUESTED',
+        message: 'Requested.', data: null, timestamp: new Date().toISOString(),
+      } satisfies ApiEnvelope<null>);
+    }) satisfies AxiosAdapter;
+
+    await authApi.register({ email: 'reader@example.com', password: 'Strong1!' });
+    await authApi.verifyEmail('one-time-raw-token');
+    await authApi.resendVerification('reader@example.com');
+
+    expect(captured.map(({ url }) => url)).toEqual([
+      '/api/v1/auth/register',
+      '/api/v1/auth/verify-email',
+      '/api/v1/auth/resend-verification',
+    ]);
+    expect(captured.every(({ withCredentials, authorization }) =>
+      withCredentials === false && authorization === undefined)).toBe(true);
+    expect(JSON.stringify(captured[0]?.data)).not.toContain('confirmPassword');
   });
 
   it('does not enable credentials on protected API requests', async () => {

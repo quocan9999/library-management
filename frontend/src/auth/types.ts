@@ -18,3 +18,13 @@ export interface LoginData {
   tokenType: 'Bearer';
   accessTokenExpiresIn: number;
 }
+
+export interface RegisterCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterData {
+  email: string;
+  emailVerificationRequired: true;
+}

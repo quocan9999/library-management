@@ -4,7 +4,13 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import { getAccessToken, setAccessToken } from './tokenStore';
-import type { ApiEnvelope, LoginCredentials, LoginData } from './types';
+import type {
+  ApiEnvelope,
+  LoginCredentials,
+  LoginData,
+  RegisterCredentials,
+  RegisterData,
+} from './types';
 
 type AuthRequestConfig = InternalAxiosRequestConfig & {
   skipAccessToken?: boolean;
@@ -12,6 +18,10 @@ type AuthRequestConfig = InternalAxiosRequestConfig & {
 };
 
 type AuthApiRequestConfig = AxiosRequestConfig & {
+  skipAccessToken: true;
+};
+
+type PublicAuthRequestConfig = AxiosRequestConfig & {
   skipAccessToken: true;
 };
 
@@ -97,9 +107,54 @@ const authRequestConfig: AuthApiRequestConfig = {
   skipAccessToken: true,
 };
 
+const publicAuthRequestConfig: PublicAuthRequestConfig = {
+  withCredentials: false,
+  skipAccessToken: true,
+};
+
+function readRequiredData<T>(envelope: ApiEnvelope<T>, expectedCode: string): T {
+  if (!envelope.success || envelope.code !== expectedCode || envelope.data === null) {
+    throw new Error('The authentication response was incomplete.');
+  }
+  return envelope.data;
+}
+
+function assertSuccess(envelope: ApiEnvelope<unknown>, expectedCode: string): void {
+  if (!envelope.success || envelope.code !== expectedCode) {
+    throw new Error('The authentication response was incomplete.');
+  }
+}
+
 let sessionRestore: Promise<LoginData> | null = null;
 
 export const authApi = {
+  async register(credentials: RegisterCredentials): Promise<RegisterData> {
+    const response = await apiClient.post<ApiEnvelope<RegisterData>>(
+      '/api/v1/auth/register',
+      credentials,
+      publicAuthRequestConfig,
+    );
+    return readRequiredData(response.data, 'REGISTER_SUCCESS');
+  },
+
+  async verifyEmail(rawToken: string): Promise<void> {
+    const response = await apiClient.post<ApiEnvelope<null>>(
+      '/api/v1/auth/verify-email',
+      { token: rawToken },
+      publicAuthRequestConfig,
+    );
+    assertSuccess(response.data, 'EMAIL_VERIFIED');
+  },
+
+  async resendVerification(email: string): Promise<void> {
+    const response = await apiClient.post<ApiEnvelope<null>>(
+      '/api/v1/auth/resend-verification',
+      { email },
+      publicAuthRequestConfig,
+    );
+    assertSuccess(response.data, 'VERIFICATION_EMAIL_REQUESTED');
+  },
+
   async login(credentials: LoginCredentials): Promise<LoginData> {
     const response = await apiClient.post<ApiEnvelope<LoginData>>(
       '/api/v1/auth/login',

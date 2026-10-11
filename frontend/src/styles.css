@@ -285,6 +285,10 @@ input:focus-visible,
   margin: auto 0;
 }
 
+.auth-flow-content {
+  width: min(100%, 420px);
+}
+
 .login-content h1 {
   margin: 0;
   color: var(--navy);
@@ -363,6 +367,130 @@ input:focus-visible,
   color: var(--error);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.field-hint {
+  margin: -2px 0 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.password-rules,
+.field-error-list {
+  display: grid;
+  gap: 3px;
+  margin: -4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.password-rules {
+  color: #667085;
+}
+
+.field-error-list {
+  color: var(--error);
+}
+
+.auth-alternate {
+  margin: 18px 0 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.auth-alternate a,
+.login-alert a {
+  color: var(--navy);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.login-resend {
+  margin-top: 14px;
+}
+
+.resend-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin-top: 17px;
+}
+
+.resend-panel--compact {
+  margin-top: 0;
+}
+
+.resend-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.resend-cooldown {
+  margin: -2px 0 0;
+  color: #735700;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.check-email-address {
+  margin: -10px 0 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+  border-radius: 4px;
+  color: #566072;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.check-email-address strong {
+  color: var(--navy);
+  font-weight: 650;
+}
+
+.auth-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0;
+  color: #566072;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.auth-state p {
+  margin: 0;
+}
+
+.auth-action-link {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18px;
+  border-radius: 4px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.auth-action-link:hover {
+  background: #2a3f66;
+  color: #fff;
+}
+
+.auth-action-link:active {
+  transform: scale(0.99);
 }
 
 .login-submit.ant-btn {

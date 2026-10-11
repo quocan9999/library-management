@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
+import { RegisterPage } from '../pages/RegisterPage';
+import { CheckEmailPage } from '../pages/CheckEmailPage';
+import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 
 function SessionBootstrap() {
   return (
@@ -35,6 +38,9 @@ export function App() {
           </RedirectSignedInUser>
         }
       />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/check-email" element={<CheckEmailPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route
         path="/"
         element={

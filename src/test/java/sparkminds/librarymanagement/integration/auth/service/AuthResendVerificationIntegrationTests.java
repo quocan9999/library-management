@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -63,6 +64,7 @@ import sparkminds.librarymanagement.auth.service.VerificationTokenService;
 class AuthResendVerificationIntegrationTests {
 
     private static final Instant TEST_INSTANT = Instant.parse("2026-10-11T12:00:00Z");
+    private static final AtomicInteger NEXT_TEST_IP = new AtomicInteger(1);
 
     @Autowired
     private MockMvc mockMvc;
@@ -352,7 +354,7 @@ class AuthResendVerificationIntegrationTests {
     }
 
     private String uniqueRemoteAddress() {
-        return "203.0.113." + (1 + Math.floorMod(UUID.randomUUID().hashCode(), 250));
+        return "203.0.113." + NEXT_TEST_IP.getAndIncrement();
     }
 
     @TestConfiguration

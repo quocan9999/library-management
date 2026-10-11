@@ -8,7 +8,11 @@ import { describe, expect, it } from 'vitest';
 import {
   getLoginError,
   getLogoutErrorMessage,
+  getRegisterError,
+  getResendError,
+  getVerificationError,
   mapLoginValidationErrors,
+  mapRegisterValidationErrors,
 } from '../../auth/messages';
 import type { ApiEnvelope } from '../../auth/types';
 
@@ -16,6 +20,7 @@ function apiError(
   status: number,
   code: string,
   errors?: Record<string, string>,
+  headers?: Record<string, string>,
 ): AxiosError<ApiEnvelope<unknown>> {
   const config = { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
   const response: AxiosResponse<ApiEnvelope<unknown>> = {
@@ -30,7 +35,7 @@ function apiError(
     },
     status,
     statusText: 'Request failed',
-    headers: new AxiosHeaders(),
+    headers: new AxiosHeaders(headers),
     config,
   };
 
@@ -69,6 +74,46 @@ describe('authentication error messages', () => {
     expect(getLoginError(apiError(403, 'AUTH_ACCOUNT_DISABLED')).description).toBe(
       'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.',
     );
+  });
+
+  it('maps an unverified login to a distinct safe message and code', () => {
+    expect(getLoginError(apiError(403, 'EMAIL_NOT_VERIFIED'))).toEqual({
+      title: 'Email chưa được xác thực',
+      description: 'Hãy xác thực email trước khi đăng nhập. Bạn có thể gửi lại hướng dẫn ngay bên dưới.',
+      code: 'EMAIL_NOT_VERIFIED',
+    });
+  });
+
+  it('maps registration duplicate states to actionable safe copy', () => {
+    expect(getRegisterError(apiError(409, 'EMAIL_ALREADY_REGISTERED')).code)
+      .toBe('EMAIL_ALREADY_REGISTERED');
+    expect(getRegisterError(apiError(409, 'EMAIL_NOT_VERIFIED_REGISTERED')).description)
+      .toContain('chưa xác thực');
+  });
+
+  it('maps registration server validation fields without showing backend details', () => {
+    expect(mapRegisterValidationErrors(apiError(422, 'VALIDATION_ERROR', {
+      email: 'must be an email',
+      password: 'must contain a digit',
+      internalField: 'SQL exception',
+    }))).toEqual({
+      email: 'Vui lòng nhập địa chỉ email hợp lệ.',
+      password: 'Mật khẩu chưa đáp ứng yêu cầu.',
+    });
+  });
+
+  it.each([
+    ['VERIFICATION_TOKEN_INVALID', 'invalid'],
+    ['VERIFICATION_TOKEN_EXPIRED', 'expired'],
+    ['VERIFICATION_TOKEN_USED', 'used'],
+    ['VERIFICATION_TOKEN_REVOKED', 'revoked'],
+  ])('maps verification code %s to the %s state', (code, expectedState) => {
+    expect(getVerificationError(apiError(400, code))).toBe(expectedState);
+  });
+
+  it('reads a positive Retry-After value for resend rate limits', () => {
+    expect(getResendError(apiError(429, 'RATE_LIMITED', undefined, { 'Retry-After': '17' })))
+      .toMatchObject({ retryAfterSeconds: 17 });
   });
 
   it('maps backend login validation by field without showing backend messages', () => {
