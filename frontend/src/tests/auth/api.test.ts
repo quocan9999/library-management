@@ -6,7 +6,7 @@ import {
 } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiClient, authApi } from '../../auth/api';
-import { setAccessToken } from '../../auth/tokenStore';
+import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
 import type { ApiEnvelope, LoginData, RegisterData } from '../../auth/types';
 
 const originalAdapter = apiClient.defaults.adapter;
@@ -169,6 +169,131 @@ describe('authenticated API client', () => {
     });
     expect(refreshAttempts).toBe(1);
     expect(protectedAttempts).toBe(2);
+  });
+
+  it('does not retry a denied mutation and requests one capability sync for PERMISSION_DENIED', async () => {
+    const { subscribeToCapabilityRefresh } = await import('../../auth/capabilityEvents');
+    let syncEvents = 0;
+    let mutationAttempts = 0;
+    const unsubscribe = subscribeToCapabilityRefresh(() => { syncEvents += 1; });
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/roles/ROLE_USER/permissions') {
+        mutationAttempts += 1;
+        const body: ApiEnvelope<null> = {
+          success: false,
+          status: 403,
+          code: 'PERMISSION_DENIED',
+          message: 'Forbidden.',
+          data: null,
+          timestamp: new Date().toISOString(),
+        };
+        throw new AxiosError(
+          'Request failed with status code 403',
+          AxiosError.ERR_BAD_REQUEST,
+          config,
+          undefined,
+          response(config, body, 403),
+        );
+      }
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    try {
+      await expect(apiClient.patch('/api/v1/roles/ROLE_USER/permissions', {
+        expectedVersion: 0,
+        addPermissions: ['book:read'],
+        removePermissions: [],
+      })).rejects.toMatchObject({ response: { status: 403, data: { code: 'PERMISSION_DENIED' } } });
+    } finally {
+      unsubscribe();
+    }
+
+    expect(mutationAttempts).toBe(1);
+    expect(syncEvents).toBe(1);
+  });
+
+  it('loads /auth/me from its envelope without decoding the access token', async () => {
+    let requestedUrl = '';
+    let authorization = '';
+    setAccessToken('opaque-access-token');
+    apiClient.defaults.adapter = (async (config) => {
+      requestedUrl = config.url ?? '';
+      authorization = config.headers.get('Authorization')?.toString() ?? '';
+      return response(config, {
+        success: true,
+        status: 200,
+        code: 'AUTH_ME_SUCCESS',
+        message: 'Current account.',
+        data: {
+          id: 21,
+          username: null,
+          email: 'admin@example.com',
+          role: 'ROLE_ADMIN',
+          permissions: ['role:read', 'role:update'],
+        },
+        timestamp: new Date().toISOString(),
+      } satisfies ApiEnvelope<{
+        id: number;
+        username: string | null;
+        email: string | null;
+        role: string;
+        permissions: string[];
+      }>);
+    }) satisfies AxiosAdapter;
+
+    const current = await authApi.getMe();
+
+    expect(requestedUrl).toBe('/api/v1/auth/me');
+    expect(authorization).toBe('Bearer opaque-access-token');
+    expect(current).toEqual({
+      id: 21,
+      username: null,
+      email: 'admin@example.com',
+      role: 'ROLE_ADMIN',
+      permissions: ['role:read', 'role:update'],
+    });
+  });
+
+  it('does not recursively request capability sync when /auth/me itself is denied', async () => {
+    const { subscribeToCapabilityRefresh } = await import('../../auth/capabilityEvents');
+    let syncEvents = 0;
+    setAccessToken('opaque-access-token');
+    const unsubscribe = subscribeToCapabilityRefresh(() => { syncEvents += 1; });
+    apiClient.defaults.adapter = (async (config) => {
+      const body: ApiEnvelope<null> = {
+        success: false,
+        status: 403,
+        code: 'PERMISSION_DENIED',
+        message: 'Forbidden.',
+        data: null,
+        timestamp: new Date().toISOString(),
+      };
+      throw new AxiosError(
+        'Request failed with status code 403', AxiosError.ERR_BAD_REQUEST, config, undefined,
+        response(config, body, 403),
+      );
+    }) satisfies AxiosAdapter;
+
+    try {
+      await expect(authApi.getMe()).rejects.toMatchObject({
+        response: { status: 403, data: { code: 'PERMISSION_DENIED' } },
+      });
+    } finally {
+      unsubscribe();
+    }
+
+    expect(syncEvents).toBe(0);
+  });
+
+  it('clears the active token after the backend rejects it as invalid', async () => {
+    setAccessToken('invalid-access-token');
+    apiClient.defaults.adapter = (async (config) => unauthorized(config, 'AUTH_TOKEN_INVALID')) satisfies AxiosAdapter;
+
+    await expect(apiClient.get('/api/v1/books')).rejects.toMatchObject({
+      response: { status: 401, data: { code: 'AUTH_TOKEN_INVALID' } },
+    });
+
+    expect(getAccessToken()).toBeNull();
   });
 
   it('clears the in-memory token when refresh fails', async () => {

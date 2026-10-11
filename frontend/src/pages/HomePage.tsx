@@ -2,7 +2,9 @@ import { Alert, Button } from 'antd';
 import { useState } from 'react';
 import { getLogoutErrorMessage } from '../auth/messages';
 import { useAuth } from '../auth/AuthContext';
+import { PermissionGate } from '../auth/permissions';
 import { BrandMark } from '../components/BrandMark';
+import { Link } from 'react-router-dom';
 
 export function HomePage() {
   const { logout } = useAuth();
@@ -45,6 +47,9 @@ export function HomePage() {
         />
       )}
       <h1 className="home-greeting">Chào mừng đến với hệ thống quản lý thư viện</h1>
+      <PermissionGate permission="role:read">
+        <Link className="home-role-link" to="/admin/roles">Quản lý vai trò</Link>
+      </PermissionGate>
     </main>
   );
 }

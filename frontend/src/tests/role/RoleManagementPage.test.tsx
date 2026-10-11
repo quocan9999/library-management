@@ -1,0 +1,297 @@
+// @vitest-environment jsdom
+import {
+  AxiosError,
+  AxiosHeaders,
+  type AxiosAdapter,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import { apiClient } from '../../auth/api';
+import type { ApiEnvelope } from '../../auth/types';
+import { RoleManagementPage } from '../../role/RoleManagementPage';
+
+const mocks = vi.hoisted(() => ({
+  refreshCapabilities: vi.fn(),
+  currentUser: {
+    id: 2,
+    username: 'admin',
+    email: 'admin@example.com',
+    role: 'ROLE_ADMIN',
+    permissions: ['role:read', 'role:update', 'book:read', 'book:import', 'member:read'],
+  },
+}));
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({
+    currentUser: mocks.currentUser,
+    refreshCapabilities: mocks.refreshCapabilities,
+  }),
+}));
+
+const originalAdapter = apiClient.defaults.adapter;
+
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+function response<T>(config: InternalAxiosRequestConfig, data: T, status = 200): AxiosResponse<T> {
+  return { data, status, statusText: status === 200 ? 'OK' : 'Forbidden', headers: new AxiosHeaders(), config };
+}
+
+function success<T>(code: string, data: T): ApiEnvelope<T> {
+  return {
+    success: true,
+    status: 200,
+    code,
+    message: 'Success.',
+    data,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function failure(config: InternalAxiosRequestConfig, status: number, code: string): never {
+  const body: ApiEnvelope<null> = {
+    success: false,
+    status,
+    code,
+    message: 'Private server message.',
+    data: null,
+    timestamp: new Date().toISOString(),
+  };
+  throw new AxiosError(
+    'Request failed', AxiosError.ERR_BAD_REQUEST, config, undefined,
+    response(config, body, status),
+  );
+}
+
+function configureRoleApi(options: {
+  patchStatus?: number;
+  patchCode?: string;
+  version?: number;
+  visibleSuperAdmin?: boolean;
+  userCanEdit?: boolean;
+} = {}) {
+  const requests: Array<{ method: string; url: string; body: unknown }> = [];
+  let detailReads = 0;
+  let roleCodes: string[] = [];
+  apiClient.defaults.adapter = (async (config) => {
+    requests.push({ method: config.method ?? '', url: config.url ?? '', body: config.data });
+    if (config.url === '/api/v1/roles') {
+      const superAdmin = options.visibleSuperAdmin ?? mocks.currentUser.role === 'ROLE_SUPER_ADMIN';
+      const roleList = [
+        ...(superAdmin ? [{ code: 'ROLE_SUPER_ADMIN', description: 'Siêu quản trị viên', version: 1, canEdit: false }] : []),
+        { code: 'ROLE_ADMIN', description: 'Quản trị viên', version: 3, canEdit: superAdmin },
+        { code: 'ROLE_USER', description: 'Người dùng', version: options.version ?? 7, canEdit: options.userCanEdit ?? true },
+      ];
+      roleCodes = roleList.map(({ code }) => code);
+      return response(config, success('ROLE_LIST_SUCCESS', roleList));
+    }
+    if (config.url === '/api/v1/permissions') {
+      return response(config, success('PERMISSION_LIST_SUCCESS', [
+        { code: 'role:read', description: 'Xem vai trò', manageableByActor: true },
+        { code: 'role:update', description: 'Cập nhật quyền', manageableByActor: true },
+        { code: 'book:read', description: 'Xem sách', manageableByActor: true },
+        { code: 'book:create', description: 'Tạo sách', manageableByActor: true },
+        { code: 'book:delete', description: 'Xóa sách', manageableByActor: false },
+        { code: 'book:import', description: 'Nhập sách', manageableByActor: true },
+        { code: 'member:read', description: 'Xem thành viên', manageableByActor: true },
+        { code: 'future:review', description: 'Xem nghiệp vụ mới', manageableByActor: false },
+      ]));
+    }
+    if (config.url?.startsWith('/api/v1/roles/') && config.url.endsWith('/permissions') && config.method === 'get') {
+      detailReads += 1;
+      const targetRoleCode = config.url.split('/')[4] ?? 'ROLE_USER';
+      const ownSuperAdmin = targetRoleCode === 'ROLE_SUPER_ADMIN';
+      const assigned = ownSuperAdmin
+        ? ['role:read', 'role:update', 'book:read', 'book:create', 'book:delete', 'book:import', 'member:read']
+        : targetRoleCode === 'ROLE_ADMIN' ? ['role:read', 'role:update'] : ['book:read', 'book:delete'];
+      return response(config, success('ROLE_PERMISSIONS_SUCCESS', {
+        roleCode: targetRoleCode,
+        version: targetRoleCode === 'ROLE_USER' ? options.version ?? 7 : 3,
+        assignedPermissions: assigned,
+        effectivePermissions: assigned,
+        editablePermissions: ownSuperAdmin ? [] : targetRoleCode === 'ROLE_ADMIN'
+          ? ['role:read', 'role:update']
+          : options.userCanEdit === false ? [] : ['book:read', 'book:create', 'book:import', 'member:read'],
+        editable: !ownSuperAdmin && (targetRoleCode !== 'ROLE_ADMIN' || mocks.currentUser.role === 'ROLE_SUPER_ADMIN')
+          && (targetRoleCode !== 'ROLE_USER' || options.userCanEdit !== false),
+      }));
+    }
+    if (config.url === '/api/v1/roles/ROLE_USER/permissions' && config.method === 'patch') {
+      if (options.patchStatus) failure(config, options.patchStatus, options.patchCode ?? 'PERMISSION_DENIED');
+      return response(config, success('ROLE_PERMISSIONS_UPDATED', {
+        roleCode: 'ROLE_USER',
+        version: (options.version ?? 7) + 1,
+        assignedPermissions: ['book:read', 'book:delete'],
+        effectivePermissions: ['book:read', 'book:delete'],
+        editablePermissions: ['book:read', 'book:create', 'book:import', 'member:read'],
+        editable: true,
+      }));
+    }
+    throw new Error(`Unexpected request: ${config.method} ${config.url}`);
+  }) satisfies AxiosAdapter;
+  return { requests, get detailReads() { return detailReads; }, get roleCodes() { return roleCodes; } };
+}
+
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  mocks.refreshCapabilities.mockResolvedValue(undefined);
+  Object.assign(mocks.currentUser, {
+    id: 2,
+    username: 'admin',
+    email: 'admin@example.com',
+    role: 'ROLE_ADMIN',
+    permissions: ['role:read', 'role:update', 'book:read', 'book:import', 'member:read'],
+  });
+  const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => nativeGetComputedStyle(element));
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  apiClient.defaults.adapter = originalAdapter;
+  mocks.refreshCapabilities.mockReset();
+});
+
+describe('RoleManagementPage', () => {
+  it('selects only editable permissions in a group and preserves assigned locked rights', async () => {
+    const user = userEvent.setup();
+    configureRoleApi();
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    const locked = await screen.findByRole('checkbox', { name: /book:delete/ });
+    const group = screen.getByRole('checkbox', { name: /Chọn tất cả quyền nhóm Sách/ });
+    expect((locked as HTMLInputElement).checked).toBe(true);
+    expect((locked as HTMLInputElement).disabled).toBe(true);
+    expect((group as HTMLInputElement).indeterminate).toBe(true);
+
+    await user.click(group);
+
+    expect((screen.getByRole('checkbox', { name: /book:read/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('checkbox', { name: /book:import/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('checkbox', { name: /book:delete/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('region', { name: 'Nhóm future' })).toBeTruthy();
+  });
+
+  it('keeps edits and does not retry a denied PATCH while syncing current capabilities', async () => {
+    const user = userEvent.setup();
+    const api = configureRoleApi({ patchStatus: 403, patchCode: 'PERMISSION_DENIED' });
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    await waitFor(() => expect(mocks.refreshCapabilities).toHaveBeenCalledTimes(1));
+    expect(api.requests.filter(({ method }) => method === 'patch')).toHaveLength(1);
+    expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
+    expect(await screen.findByRole('alert')).toBeTruthy();
+  });
+
+  it('canceling the preview retains the draft and sends no PATCH', async () => {
+    const user = userEvent.setup();
+    const api = configureRoleApi();
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    await user.click(screen.getByRole('button', { name: 'Hủy' }));
+
+    expect(api.requests.filter(({ method }) => method === 'patch')).toHaveLength(0);
+    expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText('1 thêm · 0 gỡ')).toBeTruthy();
+  });
+
+  it('lets an Admin view both permitted targets and keeps its own role read-only', async () => {
+    const user = userEvent.setup();
+    configureRoleApi();
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await screen.findByRole('checkbox', { name: /book:read/ });
+    const selector = await screen.findByRole('combobox', { name: 'Vai trò' });
+    await user.click(selector);
+    expect(screen.queryByRole('option', { name: 'Siêu quản trị viên' })).toBeNull();
+    expect(screen.getByRole('option', { name: 'Quản trị viên' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Người dùng' })).toBeTruthy();
+    await user.click(screen.getByRole('option', { name: 'Quản trị viên' }));
+
+    const ownPermission = await screen.findByRole('checkbox', { name: /role:read/ });
+    expect((ownPermission as HTMLInputElement).checked).toBe(true);
+    expect((ownPermission as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText('Vai trò này chỉ được xem trong phiên quản trị hiện tại.')).toBeTruthy();
+  });
+
+  it('shows all three roles to SuperAdmin while keeping SuperAdmin permissions immutable', async () => {
+    const user = userEvent.setup();
+    Object.assign(mocks.currentUser, {
+      id: 1,
+      username: 'root',
+      email: null,
+      role: 'ROLE_SUPER_ADMIN',
+      permissions: ['role:read', 'role:update'],
+    });
+    const api = configureRoleApi({ visibleSuperAdmin: true });
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    const selector = await screen.findByRole('combobox', { name: 'Vai trò' });
+    await waitFor(() => expect(api.roleCodes).toEqual(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']));
+    await user.click(selector);
+    const ownRole = screen.getByRole('option', { name: 'Siêu quản trị viên' });
+    expect(ownRole).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Quản trị viên' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Người dùng' })).toBeTruthy();
+    await user.click(ownRole);
+
+    const immutablePermission = await screen.findByRole('checkbox', { name: /role:read/ });
+    expect((immutablePermission as HTMLInputElement).checked).toBe(true);
+    expect((immutablePermission as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText('Vai trò này chỉ được xem trong phiên quản trị hiện tại.')).toBeTruthy();
+
+    await user.click(selector);
+    await user.click(await screen.findByRole('option', { name: 'Quản trị viên' }));
+    const removablePermission = await screen.findByRole('checkbox', { name: /role:read/ });
+    expect((removablePermission as HTMLInputElement).disabled).toBe(false);
+    await user.click(removablePermission);
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    expect(await screen.findByText('Gỡ quyền quản lý vai trò có thể làm mất khả năng truy cập màn hình này.')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Hủy' }));
+  });
+
+  it('keeps USER read-only when an Admin has role:read but lacks role:update', async () => {
+    Object.assign(mocks.currentUser, { permissions: ['role:read'] });
+    configureRoleApi({ userCanEdit: false });
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    const assignment = await screen.findByRole('checkbox', { name: /book:create/ });
+    expect((assignment as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('preserves pending edits after 409 until the user confirms a refresh', async () => {
+    const user = userEvent.setup();
+    const api = configureRoleApi({ patchStatus: 409, patchCode: 'ROLE_VERSION_CONFLICT' });
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(api.detailReads).toBe(1);
+    expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Tải lại quyền' }));
+    expect(api.detailReads).toBe(1);
+    expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Xác nhận tải lại' }));
+    await waitFor(() => expect(api.detailReads).toBe(2));
+    expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(false);
+  });
+});

@@ -19,6 +19,14 @@ export interface LoginData {
   accessTokenExpiresIn: number;
 }
 
+export interface AuthMeData {
+  id: number;
+  username: string | null;
+  email: string | null;
+  role: string;
+  permissions: string[];
+}
+
 export interface RegisterCredentials {
   email: string;
   password: string;
