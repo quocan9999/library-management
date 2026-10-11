@@ -206,6 +206,63 @@ class AuthRegistrationIntegrationTests {
     }
 
     @Test
+    void registrationVerificationAndLoginWorkAsOnePublicApiJourney() throws Exception {
+        String email = uniqueEmail();
+        trackedEmails.add(email);
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"Strong1!\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("REGISTER_SUCCESS"));
+
+        var mailEvent = eventListener.events().get(0);
+        var sentMessage = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(javaMailSender, times(1)).send(sentMessage.capture());
+        assertThat(sentMessage.getValue().getText())
+                .contains("http://localhost:5174/verify-email?token=" + mailEvent.rawToken());
+
+        Account account = accountRepository.findByEmailIgnoreCase(email).orElseThrow();
+        assertThat(account.isEmailVerified()).isFalse();
+        assertThat(roleRepository.findById(account.getRole().getId()).orElseThrow().getCode()).isEqualTo("ROLE_USER");
+        Member member = memberRepository.findByAccountId(account.getId()).orElseThrow();
+        assertThat(member.getMemberCode()).matches("M[0-9]{6,}");
+        var tokens = verificationTokenRepository.findAllByAccountId(account.getId());
+        assertThat(tokens).hasSize(1);
+        assertThat(tokens.get(0).getTokenHash()).matches("[a-f0-9]{64}")
+                .isEqualTo(verificationTokenService.hash(mailEvent.rawToken()));
+
+        MvcResult unverifiedLogin = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"identifier\":\"" + email + "\",\"password\":\"Strong1!\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"))
+                .andExpect(jsonPath("$.data.accessToken").doesNotExist())
+                .andReturn();
+        assertThat(unverifiedLogin.getResponse().getHeader("Set-Cookie")).isNull();
+
+        MvcResult verification = mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"token\":\"" + mailEvent.rawToken() + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFIED"))
+                .andReturn();
+        assertThat(verification.getResponse().getContentAsString()).doesNotContain(mailEvent.rawToken());
+        assertThat(accountRepository.findById(account.getId()).orElseThrow().isEmailVerified()).isTrue();
+        assertThat(verificationTokenRepository.findByTokenHash(tokens.get(0).getTokenHash()).orElseThrow().getUsedAt())
+                .isNotNull();
+
+        MvcResult verifiedLogin = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"identifier\":\"" + email + "\",\"password\":\"Strong1!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("AUTH_LOGIN_SUCCESS"))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                .andReturn();
+        assertThat(verifiedLogin.getResponse().getHeader("Set-Cookie")).contains("refreshToken=");
+    }
+
+    @Test
     void invalidRegistrationRequestReturnsFieldLevel422WithoutPersistence() throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(APPLICATION_JSON)
@@ -297,7 +354,7 @@ class AuthRegistrationIntegrationTests {
     }
 
     @Test
-    void concurrentCaseOnlyRegistrationCreatesOneAccountAndMember() throws Exception {
+    void concurrentCaseOnlyRegistrationCreatesOneAccountAndMember(CapturedOutput output) throws Exception {
         String email = uniqueEmail();
         trackedEmails.add(email);
         CountDownLatch ready = new CountDownLatch(2);
@@ -324,6 +381,8 @@ class AuthRegistrationIntegrationTests {
             assertThat(memberCountForEmail(email)).isEqualTo(1);
             assertThat(eventListener.events()).hasSize(1);
             verify(javaMailSender, times(1)).send(any(SimpleMailMessage.class));
+            assertThat(output.toString().toLowerCase(java.util.Locale.ROOT))
+                    .doesNotContain(email.toLowerCase(java.util.Locale.ROOT));
         } finally {
             start.countDown();
             executor.shutdownNow();

@@ -14,8 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -24,10 +26,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -91,12 +95,20 @@ class AuthResendVerificationIntegrationTests {
     private VerificationTokenService tokenService;
 
     @Autowired
+    private MutableResendTestClock resendTestClock;
+
+    @Autowired
     private RegistrationService registrationService;
 
     @MockitoBean
     private JavaMailSender javaMailSender;
 
     private final java.util.Set<String> testEmails = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    @BeforeEach
+    void resetTestClock() {
+        resendTestClock.reset();
+    }
 
     @AfterEach
     void removeOnlyRowsCreatedByThisTest() {
@@ -199,6 +211,29 @@ class AuthResendVerificationIntegrationTests {
                 .andExpect(jsonPath("$.success").value(true));
 
         verify(javaMailSender, times(1)).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    void initialRegistrationMailCountsTowardFiveSuccessfulSendsPerHour() throws Exception {
+        String email = uniqueEmail();
+        testEmails.add(email);
+        registrationService.register(new RegisterRequest(email, "Strong1!"));
+
+        for (int send = 1; send < 5; send++) {
+            resendTestClock.advance(Duration.ofMinutes(1));
+            resend(email, uniqueRemoteAddress())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("VERIFICATION_EMAIL_REQUESTED"));
+        }
+
+        resendTestClock.advance(Duration.ofMinutes(1));
+        resend(email, uniqueRemoteAddress())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("VERIFICATION_EMAIL_REQUESTED"));
+
+        verify(javaMailSender, times(5)).send(any(SimpleMailMessage.class));
+        Account account = accountRepository.findByEmailIgnoreCase(email).orElseThrow();
+        assertThat(tokenRepository.findAllByAccountId(account.getId())).hasSize(5);
     }
 
     @Test
@@ -361,8 +396,45 @@ class AuthResendVerificationIntegrationTests {
     static class ResendClockConfiguration {
         @Bean
         @org.springframework.context.annotation.Primary
-        Clock resendTestClock() {
-            return Clock.fixed(TEST_INSTANT, ZoneOffset.UTC);
+        MutableResendTestClock resendTestClock() {
+            return new MutableResendTestClock();
+        }
+    }
+
+    static class MutableResendTestClock extends Clock {
+        private final AtomicReference<Instant> current;
+        private final ZoneId zone;
+
+        MutableResendTestClock() {
+            this(new AtomicReference<>(TEST_INSTANT), ZoneOffset.UTC);
+        }
+
+        private MutableResendTestClock(AtomicReference<Instant> current, ZoneId zone) {
+            this.current = current;
+            this.zone = zone;
+        }
+
+        void reset() {
+            current.set(TEST_INSTANT);
+        }
+
+        void advance(Duration duration) {
+            current.updateAndGet(instant -> instant.plus(duration));
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableResendTestClock(current, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return current.get();
         }
     }
 }

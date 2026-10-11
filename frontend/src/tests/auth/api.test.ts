@@ -62,6 +62,12 @@ afterEach(() => {
   setAccessToken(null);
 });
 
+describe('API base URL configuration', () => {
+  it('targets the Spring Boot backend on port 8082', () => {
+    expect(apiClient.defaults.baseURL).toBe('http://localhost:8082');
+  });
+});
+
 describe('authenticated API client', () => {
   it('refreshes only an expired access token and retries the protected request once', async () => {
     let protectedAttempts = 0;
