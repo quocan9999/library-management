@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 021-update-accounts-username-length
+      author: quocan9999
+      comment: "Giới hạn username 3-20 ký tự, chỉ cho phép chữ, số và dấu gạch dưới"
+
+      changes:
+        # Giảm độ dài username từ 50 xuống 20
+        - modifyDataType:
+            tableName: accounts
+            columnName: username
+            newDataType: VARCHAR(20)
+
+        # Chặn dữ liệu username không đúng định dạng ở database
+        - sql:
+            dbms: mysql
+            sql: |
+              ALTER TABLE accounts
+              ADD CONSTRAINT chk_accounts_username_format
+              CHECK (username REGEXP '^[a-zA-Z0-9_]{3,20}$');
+
+      rollback:
+        # Xóa CHECK CONSTRAINT
+        - sql:
+            dbms: mysql
+            sql: |
+              ALTER TABLE accounts
+              DROP CHECK chk_accounts_username_format;
+
+        # Khôi phục độ dài username
+        - modifyDataType:
+            tableName: accounts
+            columnName: username
+            newDataType: VARCHAR(50)

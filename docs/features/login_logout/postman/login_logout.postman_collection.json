@@ -1,0 +1,210 @@
+{
+  "info": {
+    "_postman_id": "5b8351b8-28ef-4fb3-bd4b-bb94c02a86f1",
+    "name": "Library Management — Login, Refresh, Logout",
+    "description": "Local contract checks for login/logout. The access token is kept only in the collection runner's transient variables; the refresh cookie is managed by the runner cookie jar.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "accessToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "CORS preflight accepts the frontend origin and credentials",
+      "request": {
+        "method": "OPTIONS",
+        "header": [
+          { "key": "Origin", "value": "http://localhost:5173" },
+          { "key": "Access-Control-Request-Method", "value": "POST" },
+          { "key": "Access-Control-Request-Headers", "value": "content-type" }
+        ],
+        "url": "{{baseUrl}}/api/v1/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('preflight succeeds', function () { pm.expect(pm.response.code === 200 || pm.response.code === 204).to.be.true; });",
+              "pm.test('CORS allows the frontend origin', function () { pm.expect(pm.response.headers.get('Access-Control-Allow-Origin') === 'http://localhost:5173').to.be.true; });",
+              "pm.test('CORS allows credentials', function () { pm.expect(pm.response.headers.get('Access-Control-Allow-Credentials') === 'true').to.be.true; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invalid login returns normalized credentials error",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"no-such-user\",\n  \"password\": \"incorrect\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/api/v1/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('invalid credentials are rejected', function () { pm.expect(pm.response.code).to.equal(401); });",
+              "pm.test('invalid credentials use the frozen error code', function () { pm.expect(pm.response.json().code).to.equal('AUTH_INVALID_CREDENTIALS'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin login issues access token and HttpOnly refresh cookie",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"admin\",\n  \"password\": \"admin\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/api/v1/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const accessToken = String(body.data && body.data.accessToken || '');",
+              "pm.test('admin login succeeds', function () { pm.expect(pm.response.code === 200 && body.code === 'AUTH_LOGIN_SUCCESS').to.be.true; });",
+              "pm.test('response contains only the access-token contract', function () { pm.expect(body.data && body.data.tokenType === 'Bearer' && body.data.accessTokenExpiresIn === 900 && !Object.prototype.hasOwnProperty.call(body.data, 'refreshToken')).to.be.true; });",
+              "pm.test('access token has a plausible JWT shape', function () { pm.expect(accessToken.split('.').length === 3 && accessToken.length > 32).to.be.true; });",
+              "const setCookie = String(pm.response.headers.get('Set-Cookie') || '').toLowerCase();",
+              "pm.test('refresh cookie follows the local policy', function () { pm.expect(setCookie.includes('httponly') && setCookie.includes('samesite=strict') && setCookie.includes('path=/api/v1/auth') && setCookie.includes('max-age=604800') && !/(^|;\\s*)secure(?:;|$)/i.test(setCookie)).to.be.true; });",
+              "pm.collectionVariables.set('accessToken', accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Refresh rotates the cookie and issues a new access token",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/auth/refresh"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const previousToken = pm.collectionVariables.get('accessToken');",
+              "const accessToken = String(body.data && body.data.accessToken || '');",
+              "pm.test('refresh succeeds', function () { pm.expect(pm.response.code === 200 && body.code === 'AUTH_TOKEN_REFRESHED').to.be.true; });",
+              "pm.test('refresh issues a different access token without JSON refresh token', function () { pm.expect(accessToken.length > 32 && accessToken !== previousToken && !Object.prototype.hasOwnProperty.call(body.data || {}, 'refreshToken')).to.be.true; });",
+              "const setCookie = String(pm.response.headers.get('Set-Cookie') || '').toLowerCase();",
+              "pm.test('rotation replaces the HttpOnly cookie for seven days', function () { pm.expect(setCookie.includes('httponly') && setCookie.includes('samesite=strict') && setCookie.includes('path=/api/v1/auth') && setCookie.includes('max-age=604800')).to.be.true; });",
+              "pm.collectionVariables.set('accessToken', accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin logout revokes both credentials and clears the cookie",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+        "url": "{{baseUrl}}/api/v1/auth/logout"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const setCookie = String(pm.response.headers.get('Set-Cookie') || '').toLowerCase();",
+              "pm.test('logout succeeds', function () { pm.expect(pm.response.code === 200 && body.code === 'AUTH_LOGOUT_SUCCESS').to.be.true; });",
+              "pm.test('logout clears the refresh cookie', function () { pm.expect(setCookie.includes('httponly') && setCookie.includes('samesite=strict') && setCookie.includes('path=/api/v1/auth') && setCookie.includes('max-age=0')).to.be.true; });",
+              "pm.collectionVariables.unset('accessToken');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Logout remains idempotent without credentials",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/auth/logout"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('credential-free logout remains successful', function () { pm.expect(pm.response.code === 200 && pm.response.json().code === 'AUTH_LOGOUT_SUCCESS').to.be.true; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Demo member login works by username",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"user\",\n  \"password\": \"user\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/api/v1/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const accessToken = String(body.data && body.data.accessToken || '');",
+              "pm.test('demo member login succeeds', function () { pm.expect(pm.response.code === 200 && body.code === 'AUTH_LOGIN_SUCCESS' && accessToken.length > 32).to.be.true; });",
+              "pm.collectionVariables.set('accessToken', accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Demo member logout",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+        "url": "{{baseUrl}}/api/v1/auth/logout"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('demo member session logs out', function () { pm.expect(pm.response.code === 200 && pm.response.json().code === 'AUTH_LOGOUT_SUCCESS').to.be.true; });",
+              "pm.collectionVariables.unset('accessToken');"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

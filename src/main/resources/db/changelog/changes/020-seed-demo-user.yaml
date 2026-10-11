@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-seed-demo-user
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO accounts (username, email, password_hash, role_id, email_verified, enabled)
+              SELECT 'user', 'user@gmail.com', '$2a$12$/M5Q5vbEAyiwGf8VeTm/HO9p0rqZ6sB6PZ2BgoGwdNX8S1qM1zCwq', r.id, TRUE, TRUE
+              FROM roles r
+              WHERE r.code = 'ROLE_USER'
+                AND NOT EXISTS (
+                  SELECT 1 FROM accounts a
+                  WHERE a.username = 'user' OR a.email = 'user@gmail.com'
+                )
