@@ -24,6 +24,7 @@ export function CheckEmailPage() {
         </p>
         <ResendVerificationForm
           initialEmail={email ?? ''}
+          hideEmailField={Boolean(email)}
           onRequested={saveRegistrationEmail}
         />
         <p className="auth-alternate"><Link to="/login">Quay lại đăng nhập</Link></p>

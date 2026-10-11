@@ -21,6 +21,7 @@ type ResendFormValues = z.output<typeof resendSchema>;
 interface ResendVerificationFormProps {
   initialEmail?: string;
   initialCooldownSeconds?: number;
+  hideEmailField?: boolean;
   compact?: boolean;
   onRequested?: (email: string) => void;
 }
@@ -28,6 +29,7 @@ interface ResendVerificationFormProps {
 export function ResendVerificationForm({
   initialEmail = '',
   initialCooldownSeconds = 0,
+  hideEmailField = false,
   compact = false,
   onRequested,
 }: ResendVerificationFormProps) {
@@ -36,6 +38,7 @@ export function ResendVerificationForm({
   const [cooldownSeconds, setCooldownSeconds] = useState(Math.max(0, initialCooldownSeconds));
   const {
     control,
+    register,
     handleSubmit,
     setError,
     trigger,
@@ -100,7 +103,8 @@ export function ResendVerificationForm({
       )}
 
       <form className="resend-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <div className="form-field">
+        {hideEmailField && <input type="hidden" {...register('email')} />}
+        {!hideEmailField && <div className="form-field">
           <label htmlFor="resend-email">Email</label>
           <Controller
             name="email"
@@ -130,7 +134,7 @@ export function ResendVerificationForm({
           {errors.email?.message && (
             <p className="field-error" id="resend-email-error" role="alert">{errors.email.message}</p>
           )}
-        </div>
+        </div>}
 
         {cooldownSeconds > 0 && (
           <p className="resend-cooldown" role="status" aria-live="polite">

@@ -232,13 +232,25 @@ describe('public registration and verification routes', () => {
     expect(screen.getByRole('link', { name: 'Quay lại đăng nhập' })).toBeTruthy();
   });
 
-  it('recovers email and allows resend even when initial SMTP delivery may have failed', () => {
+  it('hides the duplicate email input but resends to the stored registration email', async () => {
+    const user = userEvent.setup();
     window.sessionStorage.setItem('registrationEmail', 'reader@example.com');
+    let requestBody = '';
+    apiClient.defaults.adapter = (async (config) => {
+      requestBody = String(config.data);
+      return response(config, success('VERIFICATION_EMAIL_REQUESTED', null));
+    }) satisfies AxiosAdapter;
+
     renderApp('/check-email');
 
     expect(screen.getByText('reader@example.com')).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
     expect(screen.getByRole('button', { name: /Gửi lại/ }).hasAttribute('disabled')).toBe(false);
     expect(screen.queryByText(/60 giây/)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
+    expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
+    expect(requestBody).toContain('reader@example.com');
     expect(screen.getByRole('link', { name: 'Quay lại đăng nhập' })).toBeTruthy();
   });
 
