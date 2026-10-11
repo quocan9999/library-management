@@ -7,7 +7,7 @@ function SessionBootstrap() {
   return (
     <main className="session-bootstrap" role="status" aria-live="polite">
       <span className="session-bootstrap__mark" aria-hidden="true" />
-      <span>Checking your library session…</span>
+      <span>Đang kiểm tra phiên đăng nhập…</span>
     </main>
   );
 }

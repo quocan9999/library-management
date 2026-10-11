@@ -2,43 +2,17 @@ import { Alert, Button, Input } from 'antd';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../auth/AuthContext';
-import type { ApiEnvelope, LoginCredentials } from '../auth/types';
+import { loginSchema, type LoginForm } from '../auth/loginSchema';
+import { getLoginError, mapLoginValidationErrors } from '../auth/messages';
+import type { LoginCredentials } from '../auth/types';
 import { BrandMark } from '../components/BrandMark';
-
-const loginSchema = z.object({
-  identifier: z.string().trim().min(1, 'Enter your email or username.'),
-  password: z.string().min(1, 'Enter your password.'),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
-
-function loginErrorMessage(error: unknown): string {
-  if (!axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
-    return 'Sign-in is temporarily unavailable. Please try again.';
-  }
-
-  if (!error.response) {
-    return 'We could not reach the library service. Check your connection and try again.';
-  }
-
-  switch (error.response.data?.code) {
-    case 'AUTH_INVALID_CREDENTIALS':
-      return 'That email or username and password do not match.';
-    case 'AUTH_ACCOUNT_DISABLED':
-      return 'This account is currently disabled. Please contact your library administrator.';
-    default:
-      return 'Sign-in is temporarily unavailable. Please try again.';
-  }
-}
 
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [serverError, setServerError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<ReturnType<typeof getLoginError> | null>(null);
   const {
     control,
     handleSubmit,
@@ -57,25 +31,21 @@ export function LoginPage() {
       await login(credentials);
       navigate('/', { replace: true });
     } catch (error) {
-      const response = axios.isAxiosError<ApiEnvelope<unknown>>(error) ? error.response?.data : null;
-      if (response?.code === 'VALIDATION_ERROR' && response.errors) {
-        let hasFieldError = false;
+      const fieldErrors = mapLoginValidationErrors(error);
+      if (fieldErrors) {
         for (const field of ['identifier', 'password'] as const) {
-          const message = response.errors[field];
-          if (message) {
-            setError(field, { type: 'server', message });
-            hasFieldError = true;
-          }
+          const message = fieldErrors[field];
+          if (message) setError(field, { type: 'server', message });
         }
-        if (hasFieldError) return;
+        return;
       }
-      setServerError(loginErrorMessage(error));
+      setServerError(getLoginError(error));
     }
   };
 
   return (
     <main className="auth-stage">
-      <section className="auth-card" aria-label="Library Management sign in">
+      <section className="auth-card" aria-label="Đăng nhập hệ thống quản lý thư viện">
         <aside className="auth-rail">
           <BrandMark />
           <div className="bookplate-art" aria-hidden="true">
@@ -94,20 +64,20 @@ export function LoginPage() {
             </svg>
           </div>
           <div className="rail-copy">
-            <p className="eyebrow eyebrow--light">A QUIETER KIND OF ORDER</p>
-            <h2>Knowledge finds its way home.</h2>
+            <p className="eyebrow eyebrow--light">KHÔNG GIAN LƯU GIỮ TRI THỨC</p>
+            <h2>Tri thức luôn có nơi để trở về.</h2>
             <span className="gold-rule" aria-hidden="true" />
-            <p className="rail-description">A thoughtful space for the stories, ideas, and people in your library.</p>
+            <p className="rail-description">Nơi lưu giữ những câu chuyện, ý tưởng và kết nối bạn đọc.</p>
           </div>
-          <p className="rail-footnote">A READING ROOM FOR EVERY GENERATION</p>
+          <p className="rail-footnote">PHÒNG ĐỌC DÀNH CHO MỌI THẾ HỆ</p>
         </aside>
 
         <div className="auth-main">
           <div className="mobile-brand"><BrandMark compact /></div>
           <div className="login-content">
-            <p className="eyebrow">MEMBER ACCESS</p>
-            <h1>Welcome back</h1>
-            <p className="login-intro">Sign in to open your library workspace.</p>
+            <p className="eyebrow">TRUY CẬP HỆ THỐNG</p>
+            <h1>Chào mừng bạn quay lại</h1>
+            <p className="login-intro">Đăng nhập để tiếp tục sử dụng hệ thống quản lý thư viện.</p>
 
             <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
               {serverError && (
@@ -116,12 +86,13 @@ export function LoginPage() {
                   type="error"
                   showIcon
                   role="alert"
-                  title={serverError}
+                  title={serverError.title}
+                  description={serverError.description}
                 />
               )}
 
               <div className="form-field">
-                <label htmlFor="identifier">Email or username</label>
+                <label htmlFor="identifier">Tên đăng nhập hoặc email</label>
                 <Controller
                   name="identifier"
                   control={control}
@@ -133,7 +104,7 @@ export function LoginPage() {
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
-                      placeholder="you@example.com or username"
+                      placeholder="Nhập email hoặc tên đăng nhập"
                       size="large"
                       status={errors.identifier ? 'error' : undefined}
                       aria-invalid={Boolean(errors.identifier)}
@@ -147,7 +118,7 @@ export function LoginPage() {
               </div>
 
               <div className="form-field">
-                <label htmlFor="password">Password</label>
+                <label htmlFor="password">Mật khẩu</label>
                 <Controller
                   name="password"
                   control={control}
@@ -156,7 +127,7 @@ export function LoginPage() {
                       {...field}
                       id="password"
                       autoComplete="current-password"
-                      placeholder="Enter your password"
+                      placeholder="Nhập mật khẩu"
                       size="large"
                       status={errors.password ? 'error' : undefined}
                       aria-invalid={Boolean(errors.password)}
@@ -178,7 +149,7 @@ export function LoginPage() {
                 loading={isSubmitting}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Signing in…' : 'Sign in'}
+                {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
               </Button>
             </form>
 
@@ -189,10 +160,10 @@ export function LoginPage() {
                   <path d="M6.75 8.5V6.25a3.25 3.25 0 0 1 6.5 0V8.5M10 11.5v2.25" />
                 </svg>
               </span>
-              Your sign-in is protected and private.
+              Thông tin đăng nhập của bạn được bảo vệ và giữ riêng tư.
             </p>
           </div>
-          <p className="auth-footer">LIBRARY MANAGEMENT <span aria-hidden="true">·</span> YOUR READING ROOM, REIMAGINED</p>
+          <p className="auth-footer">HỆ THỐNG QUẢN LÝ THƯ VIỆN <span aria-hidden="true">·</span> TRI THỨC DÀNH CHO MỌI THẾ HỆ</p>
         </div>
       </section>
     </main>

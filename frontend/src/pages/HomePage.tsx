@@ -1,5 +1,6 @@
 import { Alert, Button } from 'antd';
 import { useState } from 'react';
+import { getLogoutErrorMessage } from '../auth/messages';
 import { useAuth } from '../auth/AuthContext';
 import { BrandMark } from '../components/BrandMark';
 
@@ -15,8 +16,8 @@ export function HomePage() {
 
     try {
       await logout();
-    } catch {
-      setLogoutError('We could not sign you out. Please try again.');
+    } catch (error) {
+      setLogoutError(getLogoutErrorMessage(error));
     } finally {
       setIsLoggingOut(false);
     }
@@ -32,7 +33,7 @@ export function HomePage() {
           loading={isLoggingOut}
           disabled={isLoggingOut}
         >
-          Sign out
+          {isLoggingOut ? 'Đang đăng xuất…' : 'Đăng xuất'}
         </Button>
       </header>
       {logoutError && (
@@ -43,7 +44,7 @@ export function HomePage() {
           title={logoutError}
         />
       )}
-      <h1 className="home-greeting">Hello Library Management</h1>
+      <h1 className="home-greeting">Chào mừng đến với hệ thống quản lý thư viện</h1>
     </main>
   );
 }

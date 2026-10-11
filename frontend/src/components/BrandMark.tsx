@@ -10,8 +10,8 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
         </svg>
       </span>
       <span className="brand-mark__text">
-        <span className="brand-mark__title">Library Management</span>
-        {!compact && <span className="brand-mark__subtitle">A place for every story</span>}
+        <span className="brand-mark__title">Quản lý Thư viện</span>
+        {!compact && <span className="brand-mark__subtitle">Mỗi câu chuyện đều có chỗ riêng</span>}
       </span>
     </div>
   );
