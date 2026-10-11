@@ -83,6 +83,14 @@ public class AuthSessionService {
             );
         }
 
+        if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
+            throw new BusinessException(
+                    HttpStatus.FORBIDDEN,
+                    "EMAIL_NOT_VERIFIED",
+                    "Email chưa được xác thực. Vui lòng xác thực email trước khi đăng nhập."
+            );
+        }
+
         current.setRevokedAt(now);
         IssuedJwtToken accessToken = jwtTokenService.issue(account.getId(), JwtTokenType.ACCESS);
         IssuedJwtToken newRefreshToken = jwtTokenService.issue(account.getId(), JwtTokenType.REFRESH);

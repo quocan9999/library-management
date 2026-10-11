@@ -63,8 +63,9 @@ afterEach(() => {
 });
 
 describe('API base URL configuration', () => {
-  it('targets the Spring Boot backend on port 8082', () => {
-    expect(apiClient.defaults.baseURL).toBe('http://localhost:8082');
+  it('uses the configured backend origin or the develop fallback', () => {
+    const expectedUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8081';
+    expect(apiClient.defaults.baseURL).toBe(expectedUrl);
   });
 });
 
