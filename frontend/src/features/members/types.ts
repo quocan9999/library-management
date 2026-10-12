@@ -35,10 +35,10 @@ export interface MemberDetail extends MemberListItem {
 
 export interface MemberProfilePatchInput {
   version: number;
-  fullName?: string;
-  dateOfBirth?: string;
-  phone?: string;
-  address?: string;
+  fullName?: string | null;
+  dateOfBirth?: string | null;
+  phone?: string | null;
+  address?: string | null;
 }
 
 /** Gửi trạng thái đã đọc để backend phát hiện admin khác vừa đổi trạng thái. */

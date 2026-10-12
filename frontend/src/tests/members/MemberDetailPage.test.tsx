@@ -150,18 +150,19 @@ describe('MemberDetailPage', () => {
     expect(historyRequests[2]).toMatchObject({ status: 'RETURNED', page: 0, size: 10 });
   });
 
-  it('shows the profile modal only with member:update and PATCHes only changed nonblank values', async () => {
+  it('shows the profile modal only with member:update and PATCHes only changed fields', async () => {
     authState.permissions = ['member:read', 'member:update'];
     const patchBodies: unknown[] = [];
+    const memberWithAddress = { ...member, address: 'Quận 1, Thành phố Hồ Chí Minh' };
     let detailReads = 0;
-    const updatedMember = { ...member, fullName: 'Nguyễn Bình', version: 1 };
+    const updatedMember = { ...memberWithAddress, fullName: 'Nguyễn Bình', version: 1 };
     const emptyPage: PageResponse<LoanHistoryItem> = {
       content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true,
     };
     apiClient.defaults.adapter = (async (config) => {
       if (config.url === '/api/v1/members/17' && config.method === 'get') {
         detailReads += 1;
-        return response(config, success('MEMBER_DETAIL_SUCCESS', detailReads === 1 ? member : updatedMember));
+        return response(config, success('MEMBER_DETAIL_SUCCESS', detailReads === 1 ? memberWithAddress : updatedMember));
       }
       if (config.url === '/api/v1/members/17/loan-history') {
         return response(config, success('MEMBER_LOAN_HISTORY_SUCCESS', emptyPage));
@@ -186,6 +187,62 @@ describe('MemberDetailPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Chỉnh sửa hồ sơ thành viên' })).toBeNull());
     await waitFor(() => expect(detailReads).toBe(2));
     expect(await screen.findByText('Nguyễn Bình')).toBeTruthy();
+  });
+
+  it('PATCHes null when each populated profile field is cleared', async () => {
+    authState.permissions = ['member:read', 'member:update'];
+    const populatedMember = { ...member, address: 'Quận 1, Thành phố Hồ Chí Minh' };
+    const clearedMember = {
+      ...populatedMember,
+      fullName: null,
+      dateOfBirth: null,
+      phone: null,
+      address: null,
+      version: 1,
+    };
+    const patchBodies: unknown[] = [];
+    let detailReads = 0;
+    const emptyPage: PageResponse<LoanHistoryItem> = {
+      content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true,
+    };
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/members/17' && config.method === 'get') {
+        detailReads += 1;
+        return response(config, success('MEMBER_DETAIL_SUCCESS', detailReads === 1 ? populatedMember : clearedMember));
+      }
+      if (config.url === '/api/v1/members/17/loan-history') {
+        return response(config, success('MEMBER_LOAN_HISTORY_SUCCESS', emptyPage));
+      }
+      if (config.url === '/api/v1/members/17' && config.method === 'patch') {
+        patchBodies.push(JSON.parse(String(config.data)));
+        return response(config, success('MEMBER_PROFILE_UPDATED', clearedMember));
+      }
+      throw new Error(`Unexpected request ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/admin/members/17']}>
+      <Routes><Route path="/admin/members/:id" element={<MemberDetailPage />} /></Routes>
+    </MemoryRouter>);
+    await screen.findByText('M000017');
+    fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }));
+
+    fireEvent.change(await screen.findByLabelText('Họ và tên'), { target: { value: '' } });
+    const datePicker = screen.getByLabelText('Ngày sinh').closest('.ant-picker');
+    const clearDate = datePicker?.querySelector('.ant-picker-clear');
+    expect(clearDate).toBeTruthy();
+    fireEvent.mouseDown(clearDate!);
+    fireEvent.click(clearDate!);
+    fireEvent.change(screen.getByLabelText('Số điện thoại'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Địa chỉ'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    await waitFor(() => expect(patchBodies).toEqual([{
+      version: 0,
+      fullName: null,
+      dateOfBirth: null,
+      phone: null,
+      address: null,
+    }]));
   });
 
   it('confirms status changes on the detail page and warns with the borrowed item count', async () => {

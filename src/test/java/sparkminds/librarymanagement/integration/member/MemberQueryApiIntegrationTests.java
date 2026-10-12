@@ -642,13 +642,100 @@ class MemberQueryApiIntegrationTests {
     }
 
     @Test
+    void patchDistinguishesOmittedFieldsFromExplicitNullAndUpdatesAllProfileFields() throws Exception {
+        String token = login("superadmin", "superadmin");
+        MemberFixture fixture = createMember("MMV8-P03-NULLS", "Original Name", "0370000013",
+                LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+        jdbcTemplate.update("UPDATE members SET address = ? WHERE id = ?", "Original address", fixture.memberId());
+        entityManager.clear();
+
+        MvcResult omitted = patchProfile(token, fixture.memberId(), """
+                {"version":0}
+                """).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(0))
+                .andExpect(jsonPath("$.data.fullName").value("Original Name"))
+                .andExpect(jsonPath("$.data.dateOfBirth").value("1990-01-01"))
+                .andExpect(jsonPath("$.data.phone").value("0370000013"))
+                .andExpect(jsonPath("$.data.address").value("Original address"))
+                .andReturn();
+
+        MvcResult cleared = patchProfile(token, fixture.memberId(), """
+                {"version":0,"fullName":null,"dateOfBirth":null,"phone":null,"address":null}
+                """).andExpect(status().isOk()).andReturn();
+        assertThat(JsonPath.<Object>read(body(cleared), "$.data.fullName")).isNull();
+        assertThat(JsonPath.<Object>read(body(cleared), "$.data.dateOfBirth")).isNull();
+        assertThat(JsonPath.<Object>read(body(cleared), "$.data.phone")).isNull();
+        assertThat(JsonPath.<Object>read(body(cleared), "$.data.address")).isNull();
+        assertThat(JsonPath.<Integer>read(body(cleared), "$.data.version")).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT full_name FROM members WHERE id = ?", String.class,
+                fixture.memberId())).isNull();
+        assertThat(jdbcTemplate.queryForObject("SELECT date_of_birth FROM members WHERE id = ?", LocalDate.class,
+                fixture.memberId())).isNull();
+        assertThat(jdbcTemplate.queryForObject("SELECT phone FROM members WHERE id = ?", String.class,
+                fixture.memberId())).isNull();
+        assertThat(jdbcTemplate.queryForObject("SELECT address FROM members WHERE id = ?", String.class,
+                fixture.memberId())).isNull();
+
+        MvcResult updated = patchProfile(token, fixture.memberId(), """
+                {"version":1,"fullName":"Updated Name","dateOfBirth":"1995-02-03",
+                 "phone":"0388919213","address":"Updated address"}
+                """).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andExpect(jsonPath("$.data.fullName").value("Updated Name"))
+                .andExpect(jsonPath("$.data.dateOfBirth").value("1995-02-03"))
+                .andExpect(jsonPath("$.data.phone").value("0388919213"))
+                .andExpect(jsonPath("$.data.address").value("Updated address"))
+                .andReturn();
+
+        MvcResult partialClear = patchProfile(token, fixture.memberId(), """
+                {"version":2,"fullName":null}
+                """).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(3))
+                .andExpect(jsonPath("$.data.dateOfBirth").value("1995-02-03"))
+                .andExpect(jsonPath("$.data.phone").value("0388919213"))
+                .andExpect(jsonPath("$.data.address").value("Updated address"))
+                .andReturn();
+        assertThat(JsonPath.<Object>read(body(partialClear), "$.data.fullName")).isNull();
+
+        patchProfile(token, fixture.memberId(), """
+                {"version":2,"address":null}
+                """).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER_VERSION_CONFLICT"));
+        assertThat(jdbcTemplate.queryForObject("SELECT version FROM members WHERE id = ?", Long.class,
+                fixture.memberId())).isEqualTo(3L);
+        assertThat(jdbcTemplate.queryForObject("SELECT address FROM members WHERE id = ?", String.class,
+                fixture.memberId())).isEqualTo("Updated address");
+        assertThat(JsonPath.<String>read(body(updated), "$.data.fullName")).isEqualTo("Updated Name");
+        assertThat(JsonPath.<Object>read(body(omitted), "$.data.address")).isEqualTo("Original address");
+    }
+
+    @Test
+    void patchNormalizesBlankOptionalTextFieldsToNullAndKeepsOmittedBirthDate() throws Exception {
+        String token = login("superadmin", "superadmin");
+        MemberFixture fixture = createMember("MMV8-P03-BLANKS", "Original Name", "0370000014",
+                LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+        jdbcTemplate.update("UPDATE members SET address = ? WHERE id = ?", "Original address", fixture.memberId());
+        entityManager.clear();
+
+        MvcResult result = patchProfile(token, fixture.memberId(), """
+                {"version":0,"fullName":"   ","phone":"  ","address":"   "}
+                """).andExpect(status().isOk()).andReturn();
+
+        assertThat(JsonPath.<Object>read(body(result), "$.data.fullName")).isNull();
+        assertThat(JsonPath.<String>read(body(result), "$.data.dateOfBirth")).isEqualTo("1990-01-01");
+        assertThat(JsonPath.<Object>read(body(result), "$.data.phone")).isNull();
+        assertThat(JsonPath.<Object>read(body(result), "$.data.address")).isNull();
+        assertThat(JsonPath.<Integer>read(body(result), "$.data.version")).isEqualTo(1);
+    }
+
+    @Test
     void patchNoOpPreservesVersionButStillRejectsAStaleClientVersion() throws Exception {
         String token = login("superadmin", "superadmin");
         MemberFixture fixture = createMember("MMV8-P03-NOOP", "Original Name", "0370000002",
                 LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
 
         patchProfile(token, fixture.memberId(), """
-                {"version":0,"fullName":"   ","phone":"  ","address":null}
+                {"version":0}
                 """).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.version").value(0));
 

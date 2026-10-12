@@ -51,19 +51,24 @@ function normalizePhone(value: string): string {
   return value.replace(/[.\s-]/g, '');
 }
 
-/** Chỉ gửi giá trị đã đổi để ô trống không bị hiểu thành yêu cầu xóa dữ liệu. */
+/** Chỉ gửi field đã đổi; ô trống chuyển thành null để người dùng chủ động xóa dữ liệu. */
 function buildPatch(member: MemberDetail, values: ProfileFormValues): MemberProfilePatchInput {
   const patch: MemberProfilePatchInput = { version: member.version };
-  const fullName = values.fullName.trim();
-  const address = values.address.trim();
-  const phone = normalizePhone(values.phone.trim());
+  const fullName = values.fullName.trim() || null;
+  const originalFullName = member.fullName?.trim() || null;
+  const dateOfBirth = values.dateOfBirth.trim() || null;
+  const phoneInput = values.phone.trim();
+  const phone = phoneInput ? normalizePhone(phoneInput) : null;
+  const originalPhone = member.phone ? normalizePhone(member.phone) : null;
+  const address = values.address.trim() || null;
+  const originalAddress = member.address?.trim() || null;
 
-  if (fullName && fullName !== (member.fullName ?? '').trim()) patch.fullName = fullName;
-  if (values.dateOfBirth && values.dateOfBirth !== (member.dateOfBirth ?? '')) {
-    patch.dateOfBirth = values.dateOfBirth;
+  if (fullName !== originalFullName) patch.fullName = fullName;
+  if (dateOfBirth !== (member.dateOfBirth ?? null)) {
+    patch.dateOfBirth = dateOfBirth;
   }
-  if (phone && phone !== normalizePhone(member.phone ?? '')) patch.phone = phone;
-  if (address && address !== (member.address ?? '').trim()) patch.address = address;
+  if (phone !== originalPhone) patch.phone = phone;
+  if (address !== originalAddress) patch.address = address;
   return patch;
 }
 

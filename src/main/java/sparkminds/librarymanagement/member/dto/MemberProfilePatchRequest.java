@@ -17,6 +17,12 @@ public final class MemberProfilePatchRequest {
     private String phone;
     private String address;
 
+    /** Tách sự hiện diện khỏi giá trị null để giữ được ngữ nghĩa PATCH cho từng field. */
+    private boolean fullNamePresent;
+    private boolean dateOfBirthPresent;
+    private boolean phonePresent;
+    private boolean addressPresent;
+
     public MemberProfilePatchRequest() {
     }
 
@@ -33,7 +39,12 @@ public final class MemberProfilePatchRequest {
     }
 
     public void setFullName(String fullName) {
+        this.fullNamePresent = true;
         this.fullName = fullName;
+    }
+
+    public boolean hasFullName() {
+        return fullNamePresent;
     }
 
     public LocalDate getDateOfBirth() {
@@ -41,7 +52,12 @@ public final class MemberProfilePatchRequest {
     }
 
     public void setDateOfBirth(LocalDate dateOfBirth) {
+        this.dateOfBirthPresent = true;
         this.dateOfBirth = dateOfBirth;
+    }
+
+    public boolean hasDateOfBirth() {
+        return dateOfBirthPresent;
     }
 
     public String getPhone() {
@@ -49,7 +65,12 @@ public final class MemberProfilePatchRequest {
     }
 
     public void setPhone(String phone) {
+        this.phonePresent = true;
         this.phone = phone;
+    }
+
+    public boolean hasPhone() {
+        return phonePresent;
     }
 
     public String getAddress() {
@@ -57,7 +78,12 @@ public final class MemberProfilePatchRequest {
     }
 
     public void setAddress(String address) {
+        this.addressPresent = true;
         this.address = address;
+    }
+
+    public boolean hasAddress() {
+        return addressPresent;
     }
 
     /** Từ chối trường ngoài whitelist để JSON không âm thầm bỏ qua ý định mass assignment. */

@@ -33,8 +33,8 @@ public class MemberProfileService {
     }
 
     /**
-     * Cập nhật một phần: trường thiếu/rỗng không xóa dữ liệu; version client phải khớp phiên bản đã đọc.
-     * So sánh version trước khi áp dụng trường giúp form cũ không ghi đè thay đổi mới hơn.
+     * Cập nhật các field được gửi, kể cả khi giá trị là null; field vắng mặt được giữ nguyên.
+     * So sánh version trước khi áp dụng giúp form cũ không ghi đè thay đổi mới hơn.
      */
     @Transactional
     public MemberDetailResponse patchProfile(Integer memberId, MemberProfilePatchRequest request) {
@@ -48,46 +48,53 @@ public class MemberProfileService {
             throw versionConflict();
         }
 
-        String fullName = MemberProfileRules.normalizeOptionalText(request.getFullName());
-        if (fullName != null && fullName.length() > 150) {
+        boolean fullNamePresent = request.hasFullName();
+        String fullName = fullNamePresent
+                ? MemberProfileRules.normalizeOptionalText(request.getFullName()) : null;
+        if (fullNamePresent && fullName != null && fullName.length() > 150) {
             throw invalidField("fullName", "Họ và tên không được vượt quá 150 ký tự");
         }
 
-        String address = MemberProfileRules.normalizeOptionalText(request.getAddress());
-        if (address != null && address.length() > 255) {
+        boolean addressPresent = request.hasAddress();
+        String address = addressPresent
+                ? MemberProfileRules.normalizeOptionalText(request.getAddress()) : null;
+        if (addressPresent && address != null && address.length() > 255) {
             throw invalidField("address", "Địa chỉ không được vượt quá 255 ký tự");
         }
 
+        boolean dateOfBirthPresent = request.hasDateOfBirth();
         LocalDate dateOfBirth = request.getDateOfBirth();
-        if (dateOfBirth != null && !MemberProfileRules.isEligibleBirthDate(dateOfBirth, LocalDate.now())) {
+        if (dateOfBirthPresent && dateOfBirth != null
+                && !MemberProfileRules.isEligibleBirthDate(dateOfBirth, LocalDate.now())) {
             throw invalidField("dateOfBirth", "Ngày sinh phải hợp lệ và thành viên đủ 16 tuổi");
         }
 
+        boolean phonePresent = request.hasPhone();
         String phone;
         try {
-            phone = MemberProfileRules.normalizePhone(request.getPhone());
+            phone = phonePresent ? MemberProfileRules.normalizePhone(request.getPhone()) : null;
         } catch (IllegalArgumentException exception) {
             throw invalidField("phone", exception.getMessage());
         }
-        if (phone != null && !Objects.equals(phone, member.getPhone())
+        if (phonePresent && phone != null && !Objects.equals(phone, member.getPhone())
                 && memberRepository.existsByPhoneAndIdNot(phone, memberId)) {
             throw phoneConflict();
         }
 
         boolean changed = false;
-        if (fullName != null && !Objects.equals(fullName, member.getFullName())) {
+        if (fullNamePresent && !Objects.equals(fullName, member.getFullName())) {
             member.setFullName(fullName);
             changed = true;
         }
-        if (dateOfBirth != null && !Objects.equals(dateOfBirth, member.getDateOfBirth())) {
+        if (dateOfBirthPresent && !Objects.equals(dateOfBirth, member.getDateOfBirth())) {
             member.setDateOfBirth(dateOfBirth);
             changed = true;
         }
-        if (phone != null && !Objects.equals(phone, member.getPhone())) {
+        if (phonePresent && !Objects.equals(phone, member.getPhone())) {
             member.setPhone(phone);
             changed = true;
         }
-        if (address != null && !Objects.equals(address, member.getAddress())) {
+        if (addressPresent && !Objects.equals(address, member.getAddress())) {
             member.setAddress(address);
             changed = true;
         }
