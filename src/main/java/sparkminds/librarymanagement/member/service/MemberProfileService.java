@@ -18,13 +18,10 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 @Service
 public class MemberProfileService {
 
-    private static final Pattern VIETNAM_MOBILE = Pattern.compile("^0[35789][0-9]{8}$");
-    private static final Pattern PHONE_FORMAT = Pattern.compile("^[0-9.\\s-]+$");
     private static final String PHONE_UNIQUE_CONSTRAINT = "uk_members_phone";
 
     private final MemberRepository memberRepository;
@@ -51,22 +48,27 @@ public class MemberProfileService {
             throw versionConflict();
         }
 
-        String fullName = normalizeOptionalText(request.getFullName());
+        String fullName = MemberProfileRules.normalizeOptionalText(request.getFullName());
         if (fullName != null && fullName.length() > 150) {
             throw invalidField("fullName", "Họ và tên không được vượt quá 150 ký tự");
         }
 
-        String address = normalizeOptionalText(request.getAddress());
+        String address = MemberProfileRules.normalizeOptionalText(request.getAddress());
         if (address != null && address.length() > 255) {
             throw invalidField("address", "Địa chỉ không được vượt quá 255 ký tự");
         }
 
         LocalDate dateOfBirth = request.getDateOfBirth();
-        if (dateOfBirth != null && !isEligibleBirthDate(dateOfBirth, LocalDate.now())) {
+        if (dateOfBirth != null && !MemberProfileRules.isEligibleBirthDate(dateOfBirth, LocalDate.now())) {
             throw invalidField("dateOfBirth", "Ngày sinh phải hợp lệ và thành viên đủ 16 tuổi");
         }
 
-        String phone = normalizePhone(request.getPhone());
+        String phone;
+        try {
+            phone = MemberProfileRules.normalizePhone(request.getPhone());
+        } catch (IllegalArgumentException exception) {
+            throw invalidField("phone", exception.getMessage());
+        }
         if (phone != null && !Objects.equals(phone, member.getPhone())
                 && memberRepository.existsByPhoneAndIdNot(phone, memberId)) {
             throw phoneConflict();
@@ -110,26 +112,7 @@ public class MemberProfileService {
     }
 
     static boolean isEligibleBirthDate(LocalDate birthDate, LocalDate today) {
-        return !birthDate.isAfter(today) && !birthDate.plusYears(16).isAfter(today);
-    }
-
-    private static String normalizeOptionalText(String value) {
-        if (value == null) return null;
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static String normalizePhone(String value) {
-        String text = normalizeOptionalText(value);
-        if (text == null) return null;
-        if (!PHONE_FORMAT.matcher(text).matches()) {
-            throw invalidField("phone", "Số điện thoại chỉ được chứa chữ số, dấu chấm, gạch ngang hoặc khoảng trắng");
-        }
-        String digits = text.replaceAll("[.\\s-]", "");
-        if (!VIETNAM_MOBILE.matcher(digits).matches()) {
-            throw invalidField("phone", "Số điện thoại phải có 10 chữ số và đầu số di động Việt Nam hợp lệ");
-        }
-        return digits;
+        return MemberProfileRules.isEligibleBirthDate(birthDate, today);
     }
 
     private static boolean isPhoneUniqueConstraint(Throwable exception) {

@@ -173,6 +173,58 @@ describe('member API', () => {
     expect(JSON.parse(String(request.data))).toEqual({ expectedEnabled: true, enabled: false });
   });
 
+  it('creates and deletes a member through the shared API client', async () => {
+    const adminApi = memberApi as unknown as {
+      createMember(input: {
+        email: string;
+        password: string;
+        fullName?: string;
+        dateOfBirth?: string;
+        phone?: string;
+        address?: string;
+      }): Promise<MemberDetail>;
+      deleteMember(id: number): Promise<void>;
+    };
+    const created: MemberDetail = {
+      id: 17,
+      memberCode: 'M000017',
+      fullName: 'Nguyễn An',
+      email: 'an@example.test',
+      phone: null,
+      dateOfBirth: null,
+      createdAt: '2026-10-01T08:30:00',
+      updatedAt: '2026-10-01T08:30:00',
+      address: null,
+      emailVerified: false,
+      enabled: true,
+      version: 0,
+      borrowedItemCount: 0,
+    };
+    const requests: Array<{ method?: string; url?: string; data?: unknown }> = [];
+    apiClient.defaults.adapter = (async (config) => {
+      requests.push({ method: config.method, url: config.url, data: config.data });
+      if (config.method === 'post') {
+        return { ...response(config, envelope('MEMBER_CREATED', created)), status: 201 };
+      }
+      return { ...response(config, null), status: 204 };
+    }) satisfies AxiosAdapter;
+
+    await expect(adminApi.createMember({
+      email: 'an@example.test',
+      password: 'MemberCreate1!',
+      fullName: 'Nguyễn An',
+    })).resolves.toEqual(created);
+    await expect(adminApi.deleteMember(17)).resolves.toBeUndefined();
+    expect(requests).toEqual([
+      {
+        method: 'post',
+        url: '/api/v1/members',
+        data: JSON.stringify({ email: 'an@example.test', password: 'MemberCreate1!', fullName: 'Nguyễn An' }),
+      },
+      { method: 'delete', url: '/api/v1/members/17', data: undefined },
+    ]);
+  });
+
   it('preserves the stale-version envelope for the edit modal', async () => {
     apiClient.defaults.adapter = (async (config) => {
       const conflict: ApiEnvelope<null> = {

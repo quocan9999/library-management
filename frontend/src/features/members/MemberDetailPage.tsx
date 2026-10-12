@@ -3,7 +3,7 @@ import axios from 'axios';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { usePermission } from '../../auth/permissions';
 import { memberApi } from './api';
 import { MemberProfileEditModal } from './MemberProfileEditModal';
@@ -46,11 +46,17 @@ function loanStatusLabel(status: LoanHistoryItem['loanStatus']): string {
 
 export function MemberDetailPage() {
   const { id: rawId } = useParams();
+  const navigate = useNavigate();
   const memberId = rawId && /^\d+$/.test(rawId) ? Number(rawId) : Number.NaN;
   const canUpdateProfile = usePermission('member:update');
   const canUpdateAccountStatus = usePermission('member:status:update');
+  const canDeleteMember = usePermission('member:delete');
   const [editingProfile, setEditingProfile] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [statusActionError, setStatusActionError] = useState<string | null>(null);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
@@ -106,6 +112,28 @@ export function MemberDetailPage() {
       }
     } finally {
       setStatusUpdating(false);
+    }
+  };
+
+  const deleteCurrentMember = async () => {
+    if (!member) return;
+    setDeletePending(true);
+    setDeleteError(null);
+    setDeleteNotice(null);
+    try {
+      await memberApi.deleteMember(member.id);
+      navigate('/admin/members', { replace: true });
+    } catch (error) {
+      if (axios.isAxiosError(error)
+        && error.response?.status === 409
+        && error.response.data?.code === 'MEMBER_HAS_LOAN_HISTORY') {
+        setDeleteDialogOpen(false);
+        setDeleteNotice('Không thể xóa thành viên có lịch sử mượn sách. Hồ sơ và lịch sử vẫn được giữ nguyên.');
+      } else {
+        setDeleteError('Không thể xóa thành viên lúc này. Hãy thử lại.');
+      }
+    } finally {
+      setDeletePending(false);
     }
   };
 
@@ -180,6 +208,14 @@ export function MemberDetailPage() {
                 setStatusDialogOpen(true);
               }}
             >{member.enabled ? 'Vô hiệu hóa tài khoản' : 'Kích hoạt tài khoản'}</Button>}
+            {member && canDeleteMember && <Button
+              danger
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteNotice(null);
+                setDeleteDialogOpen(true);
+              }}
+            >Xóa thành viên</Button>}
             <Link className="member-back-link" to="/admin/members">Quay lại danh sách</Link>
           </div>
         </div>
@@ -192,6 +228,15 @@ export function MemberDetailPage() {
           title={statusNotice}
           closable
           onClose={() => setStatusNotice(null)}
+        />}
+        {deleteNotice && <Alert
+          className="member-alert"
+          type="warning"
+          showIcon
+          role="status"
+          title={deleteNotice}
+          closable
+          onClose={() => setDeleteNotice(null)}
         />}
 
         {memberLoading && <div className="member-loading" role="status"><Spin /> Đang tải hồ sơ thành viên…</div>}
@@ -253,6 +298,30 @@ export function MemberDetailPage() {
               title={`Đang mượn ${member.borrowedItemCount} cuốn sách chưa trả`}
             />}
             {statusActionError && <Alert className="member-alert" type="error" showIcon title={statusActionError} />}
+          </>}
+        </Modal>}
+
+        {deleteDialogOpen && <Modal
+          open
+          title="Xác nhận xóa thành viên"
+          okText="Xóa"
+          cancelText="Hủy"
+          okButtonProps={{ danger: true }}
+          confirmLoading={deletePending}
+          onCancel={() => {
+            if (!deletePending) setDeleteDialogOpen(false);
+          }}
+          onOk={deleteCurrentMember}
+        >
+          {member && <>
+            <p>{`Bạn xác nhận xóa ${member.fullName || member.memberCode} (${member.memberCode}) cùng tài khoản đăng nhập và token liên kết? Thao tác này không thể khôi phục.`}</p>
+            <p>Thành viên có bất kỳ lịch sử mượn nào sẽ không bị xóa.</p>
+            {member.borrowedItemCount > 0 && <Alert
+              type="warning"
+              showIcon
+              title={`Còn ${member.borrowedItemCount} cuốn sách chưa trả; yêu cầu xóa sẽ bị từ chối.`}
+            />}
+            {deleteError && <Alert className="member-alert" type="error" showIcon role="alert" title={deleteError} />}
           </>}
         </Modal>}
 

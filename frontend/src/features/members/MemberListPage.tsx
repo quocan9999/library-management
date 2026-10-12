@@ -3,7 +3,9 @@ import type { TableColumnsType, TableProps } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { usePermission } from '../../auth/permissions';
 import { memberApi } from './api';
+import { MemberCreateModal } from './MemberCreateModal';
 import {
   buildMemberListQuery,
   clearMemberListState,
@@ -45,6 +47,8 @@ function sameFilters(left: MemberListFilters, right: MemberListFilters): boolean
 }
 
 export function MemberListPage() {
+  const canCreateMember = usePermission('member:create');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [viewState, setViewState] = useState<MemberListViewState>(() => readMemberListState());
   const [appliedState, setAppliedState] = useState<MemberListViewState>(() => readMemberListState());
   const [draftFilters, setDraftFilters] = useState<MemberListFilters>(() => readMemberListState().filters);
@@ -184,6 +188,9 @@ export function MemberListPage() {
             <h1 id="member-list-title">Quản lý thành viên</h1>
             <p className="role-intro">Tra cứu hồ sơ và lược sử mượn/trả sách.</p>
           </div>
+          {canCreateMember && <Button type="primary" onClick={() => setCreateModalOpen(true)}>
+            Tạo thành viên
+          </Button>}
         </div>
 
         <section className="member-filter-panel" aria-label="Bộ lọc thành viên">
@@ -280,6 +287,10 @@ export function MemberListPage() {
           />
         </div>}
       </section>
+      {createModalOpen && <MemberCreateModal
+        onCancel={() => setCreateModalOpen(false)}
+        onCreated={() => setReloadKey((previous) => previous + 1)}
+      />}
     </main>
   );
 }

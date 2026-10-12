@@ -47,6 +47,15 @@ export interface MemberAccountStatusInput {
   enabled: boolean;
 }
 
+export interface MemberCreateInput {
+  email: string;
+  password: string;
+  fullName?: string;
+  dateOfBirth?: string;
+  phone?: string;
+  address?: string;
+}
+
 export interface LoanHistoryItem {
   loanItemId: number;
   loanId: number;

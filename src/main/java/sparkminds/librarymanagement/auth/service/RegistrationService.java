@@ -8,6 +8,7 @@ import sparkminds.librarymanagement.auth.dto.RegisterResponse;
 import sparkminds.librarymanagement.auth.entity.Account;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
+import sparkminds.librarymanagement.member.dto.MemberRegistrationProfile;
 
 @Service
 public class RegistrationService {
@@ -24,15 +25,20 @@ public class RegistrationService {
     }
 
     public RegisterResponse register(RegisterRequest request) {
+        registerForAdmin(request, MemberRegistrationProfile.empty());
+        return new RegisterResponse(request.email(), true);
+    }
+
+    /** Dùng chung transaction Register để tài khoản tạo bởi quản trị viên có cùng vòng đời xác thực. */
+    public Integer registerForAdmin(RegisterRequest request, MemberRegistrationProfile profile) {
         accountRepository.findByEmailIgnoreCase(request.email()).ifPresent(this::throwDuplicateEmail);
         try {
-            registrationTransactionService.create(request);
+            return registrationTransactionService.create(request, profile);
         } catch (DataIntegrityViolationException exception) {
             // Bắt lỗi sau khi proxy transaction đã rollback, rồi phân loại theo tài khoản thắng cuộc.
             accountRepository.findByEmailIgnoreCase(request.email()).ifPresent(this::throwDuplicateEmail);
             throw exception;
         }
-        return new RegisterResponse(request.email(), true);
     }
 
     private void throwDuplicateEmail(Account account) {

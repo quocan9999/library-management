@@ -12,6 +12,7 @@ import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.auth.repository.EmailVerificationTokenRepository;
 import sparkminds.librarymanagement.auth.repository.RoleRepositoy;
 import sparkminds.librarymanagement.member.entity.Member;
+import sparkminds.librarymanagement.member.dto.MemberRegistrationProfile;
 import sparkminds.librarymanagement.member.repository.MemberRepository;
 
 @Service
@@ -44,7 +45,12 @@ public class RegistrationTransactionService {
     }
 
     @Transactional
-    public void create(RegisterRequest request) {
+    public Integer create(RegisterRequest request) {
+        return create(request, MemberRegistrationProfile.empty());
+    }
+
+    @Transactional
+    public Integer create(RegisterRequest request, MemberRegistrationProfile profile) {
         Account account = new Account();
         account.setEmail(request.email());
         account.setUsername(null);
@@ -57,6 +63,10 @@ public class RegistrationTransactionService {
 
         Member member = new Member();
         member.setAccount(account);
+        member.setFullName(profile.fullName());
+        member.setDateOfBirth(profile.dateOfBirth());
+        member.setPhone(profile.phone());
+        member.setAddress(profile.address());
         // Gán mã tạm duy nhất để lấy ID; mã M cuối cùng thay thế trước khi transaction có thể commit.
         member.setMemberCode("TMPA" + account.getId());
         memberRepository.saveAndFlush(member);
@@ -68,6 +78,7 @@ public class RegistrationTransactionService {
 
         // Sự kiện nằm trong transaction; listener chỉ gửi email sau khi toàn bộ dữ liệu đã commit.
         eventPublisher.publishEvent(new RegistrationMailRequested(request.email(), issuedToken.rawToken()));
+        return member.getId();
     }
 
     public static String memberCodeForId(int memberId) {

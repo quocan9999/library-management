@@ -6,9 +6,14 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../auth/api';
 import type { ApiEnvelope } from '../../auth/types';
 import { MemberListPage } from '../../features/members/MemberListPage';
-import type { MemberListItem, PageResponse } from '../../features/members/types';
+import type { MemberDetail, MemberListItem, PageResponse } from '../../features/members/types';
 
 const originalAdapter = apiClient.defaults.adapter;
+const authState = vi.hoisted(() => ({ permissions: ['member:read'] as string[] }));
+
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ permissions: authState.permissions, capabilityStatus: 'ready' }),
+}));
 
 beforeAll(() => {
   Object.defineProperty(window, 'matchMedia', {
@@ -61,6 +66,7 @@ afterEach(() => {
   apiClient.defaults.adapter = originalAdapter;
   window.sessionStorage.clear();
   vi.useRealTimers();
+  authState.permissions = ['member:read'];
 });
 
 describe('MemberListPage', () => {
@@ -163,5 +169,95 @@ describe('MemberListPage', () => {
       await Promise.resolve();
     });
     expect(screen.queryByText('Old response')).toBeNull();
+  });
+
+  it('hides Create Member unless the current permission includes member:create', async () => {
+    apiClient.defaults.adapter = (async (config) => response(config, success(page()))) satisfies AxiosAdapter;
+    render(<MemoryRouter><MemberListPage /></MemoryRouter>);
+    await screen.findByText('M000017');
+    expect(screen.queryByRole('button', { name: 'Tạo thành viên' })).toBeNull();
+  });
+
+  it('clears the initial password after a failed Create Member request and keeps safe fields for correction', async () => {
+    authState.permissions = ['member:read', 'member:create'];
+    const requests: Array<{ method?: string; url?: string; body?: Record<string, unknown> }> = [];
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.method === 'post') {
+        requests.push({ method: config.method, url: config.url, body: JSON.parse(String(config.data)) });
+        throw new Error('duplicate fixture');
+      }
+      return response(config, success(page()));
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter><MemberListPage /></MemoryRouter>);
+    await screen.findByText('M000017');
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo thành viên' }));
+    fireEvent.change(screen.getByLabelText('Email thành viên'), { target: { value: 'new-member@example.test' } });
+    fireEvent.change(screen.getByLabelText('Mật khẩu ban đầu'), { target: { value: 'MemberCreate1!' } });
+    const createButtons = screen.getAllByRole('button', { name: 'Tạo thành viên' });
+    fireEvent.click(createButtons[createButtons.length - 1]);
+
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByLabelText('Mật khẩu ban đầu')).toHaveProperty('value', '');
+    expect(screen.getByLabelText('Email thành viên')).toHaveProperty('value', 'new-member@example.test');
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      method: 'post',
+      url: '/api/v1/members',
+      body: { email: 'new-member@example.test', password: 'MemberCreate1!' },
+    });
+    expect(screen.queryByText('MemberCreate1!')).toBeNull();
+  });
+
+  it('submits Create Member through the shared API and reloads the list after success', async () => {
+    authState.permissions = ['member:read', 'member:create'];
+    let listReads = 0;
+    let submittedBody: Record<string, unknown> | null = null;
+    const createdMember: MemberDetail = {
+      id: 22,
+      memberCode: 'M000022',
+      fullName: null,
+      email: 'new-member@example.test',
+      phone: null,
+      dateOfBirth: null,
+      createdAt: '2026-10-12T09:00:00',
+      updatedAt: '2026-10-12T09:00:00',
+      address: null,
+      emailVerified: false,
+      enabled: true,
+      version: 0,
+      borrowedItemCount: 0,
+    };
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.method === 'post') {
+        submittedBody = JSON.parse(String(config.data));
+        return response(config, {
+          success: true,
+          status: 201,
+          code: 'MEMBER_CREATED',
+          message: 'Created.',
+          data: createdMember,
+          timestamp: '2026-10-12T09:00:00Z',
+        } satisfies ApiEnvelope<MemberDetail>);
+      }
+      listReads += 1;
+      return response(config, success(page()));
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter><MemberListPage /></MemoryRouter>);
+    await screen.findByText('M000017');
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo thành viên' }));
+    fireEvent.change(screen.getByLabelText('Email thành viên'), { target: { value: 'new-member@example.test' } });
+    fireEvent.change(screen.getByLabelText('Mật khẩu ban đầu'), { target: { value: 'MemberCreate1!' } });
+    const createButtons = screen.getAllByRole('button', { name: 'Tạo thành viên' });
+    fireEvent.click(createButtons[createButtons.length - 1]);
+
+    await vi.waitFor(() => expect(submittedBody).toEqual({
+      email: 'new-member@example.test',
+      password: 'MemberCreate1!',
+    }));
+    await vi.waitFor(() => expect(listReads).toBe(2));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Tạo thành viên' })).toBeTruthy();
   });
 });

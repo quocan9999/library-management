@@ -5,6 +5,7 @@ import type {
   LoanHistoryQuery,
   MemberDetail,
   MemberAccountStatusInput,
+  MemberCreateInput,
   MemberListItem,
   MemberListQuery,
   MemberProfilePatchInput,
@@ -49,6 +50,15 @@ export const memberApi = {
       input,
     );
     return readRequiredData(response.data, 'MEMBER_ACCOUNT_STATUS_UPDATED');
+  },
+
+  async createMember(input: MemberCreateInput): Promise<MemberDetail> {
+    const response = await apiClient.post<ApiEnvelope<MemberDetail>>('/api/v1/members', input);
+    return readRequiredData(response.data, 'MEMBER_CREATED');
+  },
+
+  async deleteMember(id: number): Promise<void> {
+    await apiClient.delete(`/api/v1/members/${id}`);
   },
 
   async getLoanHistory(

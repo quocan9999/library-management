@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { AxiosError, AxiosHeaders, type AxiosAdapter, type AxiosResponse } from 'axios';
+import { Modal } from 'antd';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -85,6 +86,7 @@ const historyItem: LoanHistoryItem = {
 };
 
 afterEach(() => {
+  Modal.destroyAll();
   cleanup();
   apiClient.defaults.adapter = originalAdapter;
   authState.permissions = ['member:read'];
@@ -335,5 +337,94 @@ describe('MemberDetailPage', () => {
       .toBe('Concurrent edit'));
     expect(screen.queryByText('Thông tin thành viên đã được thay đổi bởi quản trị viên khác')).toBeNull();
     expect(patchCount).toBe(1);
+  });
+
+  it('shows Delete Member only with permission and keeps the record after a loan-history conflict', async () => {
+    authState.permissions = ['member:read', 'member:delete'];
+    const emptyPage: PageResponse<LoanHistoryItem> = {
+      content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true,
+    };
+    let deleteRequest: { method?: string; url?: string } | null = null;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/members/17' && config.method === 'get') {
+        return response(config, success('MEMBER_DETAIL_SUCCESS', member));
+      }
+      if (config.url === '/api/v1/members/17/loan-history') {
+        return response(config, success('MEMBER_LOAN_HISTORY_SUCCESS', emptyPage));
+      }
+      if (config.url === '/api/v1/members/17' && config.method === 'delete') {
+        deleteRequest = { method: config.method, url: config.url };
+        const conflict: ApiEnvelope<null> = {
+          success: false,
+          status: 409,
+          code: 'MEMBER_HAS_LOAN_HISTORY',
+          message: 'Member has loan history.',
+          data: null,
+          timestamp: '2026-10-01T00:00:00Z',
+        };
+        throw new AxiosError('Conflict', 'ERR_BAD_REQUEST', config, undefined, {
+          data: conflict,
+          status: 409,
+          statusText: 'Conflict',
+          headers: new AxiosHeaders(),
+          config,
+        });
+      }
+      throw new Error(`Unexpected request ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/admin/members/17']}>
+      <Routes>
+        <Route path="/admin/members/:id" element={<MemberDetailPage />} />
+        <Route path="/admin/members" element={<div>Danh sách thành viên</div>} />
+      </Routes>
+    </MemoryRouter>);
+    expect(await screen.findByText('M000017')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa thành viên' }));
+    expect(await screen.findByText('Xác nhận xóa thành viên')).toBeTruthy();
+    expect(screen.getByText(/không thể khôi phục/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Xóa$/ }));
+
+    expect(await screen.findByText(/không thể xóa thành viên có lịch sử mượn/i)).toBeTruthy();
+    expect(screen.getByText('M000017')).toBeTruthy();
+    expect(deleteRequest).toEqual({ method: 'delete', url: '/api/v1/members/17' });
+    expect(screen.queryByText('Danh sách thành viên')).toBeNull();
+  });
+
+  it('deletes a member only after confirmation and returns to the list', async () => {
+    authState.permissions = ['member:read', 'member:delete'];
+    const emptyPage: PageResponse<LoanHistoryItem> = {
+      content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true,
+    };
+    let deleteCount = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/members/17' && config.method === 'get') {
+        return response(config, success('MEMBER_DETAIL_SUCCESS', member));
+      }
+      if (config.url === '/api/v1/members/17/loan-history') {
+        return response(config, success('MEMBER_LOAN_HISTORY_SUCCESS', emptyPage));
+      }
+      if (config.url === '/api/v1/members/17' && config.method === 'delete') {
+        deleteCount += 1;
+        return { ...response(config, null), status: 204 };
+      }
+      throw new Error(`Unexpected request ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/admin/members/17']}>
+      <Routes>
+        <Route path="/admin/members/:id" element={<MemberDetailPage />} />
+        <Route path="/admin/members" element={<div>Danh sách thành viên</div>} />
+      </Routes>
+    </MemoryRouter>);
+    await screen.findByText('M000017');
+    expect(deleteCount).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa thành viên' }));
+    expect(await screen.findByText(/không thể khôi phục/i)).toBeTruthy();
+    expect(deleteCount).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: /^Xóa$/ }));
+
+    expect(await screen.findByText('Danh sách thành viên')).toBeTruthy();
+    expect(deleteCount).toBe(1);
   });
 });
