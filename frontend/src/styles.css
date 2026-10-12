@@ -1082,10 +1082,19 @@ input:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  html {
     scroll-behavior: auto !important;
+  }
+
+  /* Giảm chuyển động do ứng dụng khai báo nhưng giữ transition lifecycle của popup Ant Design. */
+  .form-field .ant-input-affix-wrapper,
+  .form-field .ant-input-outlined,
+  .auth-action-link,
+  .login-submit.ant-btn,
+  .admin-shell__nav-link,
+  .admin-shell__logout,
+  .dashboard-shortcut__link,
+  .admin-shell__sidebar {
     transition-duration: 0.01ms !important;
   }
 
