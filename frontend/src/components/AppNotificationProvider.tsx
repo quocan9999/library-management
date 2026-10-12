@@ -15,8 +15,8 @@ interface AppNotificationContextValue {
 }
 
 const fallbackContext: AppNotificationContextValue = {
-  notify: (type, options) => notification[type]({ ...options, placement: 'topRight' }),
-  dismiss: (key) => notification.destroy(key),
+  notify: () => undefined,
+  dismiss: () => undefined,
 };
 
 const AppNotificationContext = createContext(fallbackContext);

@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { apiClient } from '../../auth/api';
 import type { ApiEnvelope } from '../../auth/types';
+import { AppNotificationProvider } from '../../components/AppNotificationProvider';
 import { RoleManagementPage } from '../../role/RoleManagementPage';
 import type { RolePermissions } from '../../role/types';
 
@@ -241,14 +242,14 @@ describe('RoleManagementPage', () => {
   it('blocks saving a base permission removal until all dependent permissions are also removed', async () => {
     const user = userEvent.setup();
     configureRoleApi({ assignedPermissions: ['book:read', 'book:delete', 'member:read', 'member:create'] });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    render(<AppNotificationProvider><MemoryRouter><RoleManagementPage /></MemoryRouter></AppNotificationProvider>);
 
     await user.click(await screen.findByRole('checkbox', { name: /member:read/ }));
-    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(await screen.findByText(/Không thể gỡ quyền cơ sở member:read/)).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Xem thay đổi và lưu' }) as HTMLButtonElement).disabled).toBe(true);
 
     await user.click(screen.getByRole('checkbox', { name: /member:create/ }));
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Xem thay đổi và lưu' }) as HTMLButtonElement).disabled).toBe(false);
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
     expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Quyền được gỡ (2)' })).toBeTruthy();
   });
@@ -415,7 +416,7 @@ describe('RoleManagementPage', () => {
       permissions: ['role:read', 'role:update'],
     });
     const api = configureRoleApi({ deferPatch: true, visibleSuperAdmin: true });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    render(<AppNotificationProvider><MemoryRouter><RoleManagementPage /></MemoryRouter></AppNotificationProvider>);
 
     await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
@@ -436,7 +437,7 @@ describe('RoleManagementPage', () => {
       editable: true,
     });
 
-    expect(await screen.findByRole('status')).toBeTruthy();
+    expect(await screen.findByText('Đã cập nhật quyền cho vai trò.')).toBeTruthy();
     expect(screen.getByText('Đã cập nhật quyền cho vai trò.')).toBeTruthy();
     expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
   });
