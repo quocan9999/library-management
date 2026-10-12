@@ -266,10 +266,9 @@ class RolePermissionMutationIntegrationTests {
 
     @Test
     void superAdminCannotAssignForbiddenPermissionToUserEvenWhenCatalogContainsIt() throws Exception {
-        Permission forbiddenPermission = new Permission();
-        forbiddenPermission.setCode("member:status:update");
-        forbiddenPermission.setDescription("Test-only forbidden permission");
-        permissionRepository.saveAndFlush(forbiddenPermission);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM permissions WHERE code = ?", Integer.class, "member:status:update"))
+                .isEqualTo(1);
         Permission unclassifiedPermission = new Permission();
         unclassifiedPermission.setCode("future:catalog:read");
         unclassifiedPermission.setDescription("Test-only unclassified permission");

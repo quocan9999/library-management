@@ -15,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.transaction.AfterTransaction;
 import org.springframework.test.context.transaction.BeforeTransaction;
@@ -62,6 +63,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE, printOnlyOnFailure = false)
 @Transactional
 class MemberQueryApiIntegrationTests {
@@ -107,8 +109,7 @@ class MemberQueryApiIntegrationTests {
 
     @BeforeTransaction
     void captureMemberDatabaseStateBeforeFixtureTransaction() {
-        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
-                .isEqualTo("library_management_member");
+        assertConfiguredTestDatabase();
         beforeCounts = tableCounts();
         beforeAccountStates = accountStates();
         beforeRefreshTokenStates = refreshTokenStates();
@@ -128,11 +129,9 @@ class MemberQueryApiIntegrationTests {
     }
 
     @Test
-    void integrationContextUsesOnlyTheAuthorizedMemberDatabaseAndLocalSeedContext() {
-        assertThat(datasourceUrl).isEqualTo("jdbc:mysql://localhost:3307/library_management_member");
-        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
-                .isEqualTo("library_management_member");
-        assertThat(springLiquibase.getContexts()).isEqualTo("local");
+    void integrationContextUsesConfiguredTestDatabaseAndTestSeedContext() {
+        assertConfiguredTestDatabase();
+        assertThat(springLiquibase.getContexts()).isEqualTo("test");
     }
 
     @Test
@@ -1347,6 +1346,12 @@ class MemberQueryApiIntegrationTests {
             counts.put(table, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class));
         }
         return counts;
+    }
+
+    private void assertConfiguredTestDatabase() {
+        String database = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        assertThat(database).matches("library_management(?:_[A-Za-z0-9]+)*_test");
+        assertThat(datasourceUrl).endsWith("/" + database);
     }
 
     private List<AccountState> accountStates() {
