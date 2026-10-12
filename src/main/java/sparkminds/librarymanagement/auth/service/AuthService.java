@@ -1,6 +1,8 @@
 package sparkminds.librarymanagement.auth.service;
 
 import org.springframework.http.HttpStatus;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,17 +33,20 @@ public class AuthService {
     private final AccountRepository accountRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenService jwtTokenService;
+    private final EntityManager entityManager;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             AccountRepository accountRepository,
             RefreshTokenRepository refreshTokenRepository,
-            JwtTokenService jwtTokenService
+            JwtTokenService jwtTokenService,
+            EntityManager entityManager
     ) {
         this.authenticationManager = authenticationManager;
         this.accountRepository = accountRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtTokenService = jwtTokenService;
+        this.entityManager = entityManager;
     }
 
     @Transactional
@@ -63,12 +68,18 @@ public class AuthService {
         }
 
         CustomUserPrincipal principal = (CustomUserPrincipal) authentication.getPrincipal();
-        Account account = accountRepository.findById(principal.getAccountId())
+        Account account = accountRepository.findByIdForUpdate(principal.getAccountId())
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.UNAUTHORIZED,
                         "AUTH_INVALID_CREDENTIALS",
                         "Email/username hoặc mật khẩu không chính xác"
                 ));
+        // AuthenticationManager đã nạp Account trước khi khóa; refresh đảm bảo login dùng enabled/version mới nhất từ DB.
+        entityManager.refresh(account, LockModeType.PESSIMISTIC_WRITE);
+
+        if (!account.isEnabled()) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "AUTH_ACCOUNT_DISABLED", "Tài khoản hiện không thể đăng nhập");
+        }
 
         if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
             throw new BusinessException(
@@ -78,8 +89,10 @@ public class AuthService {
             );
         }
 
-        IssuedJwtToken accessToken = jwtTokenService.issue(account.getId(), JwtTokenType.ACCESS);
-        IssuedJwtToken refreshToken = jwtTokenService.issue(account.getId(), JwtTokenType.REFRESH);
+        IssuedJwtToken accessToken = jwtTokenService.issue(
+                account.getId(), account.getSessionVersion(), JwtTokenType.ACCESS);
+        IssuedJwtToken refreshToken = jwtTokenService.issue(
+                account.getId(), account.getSessionVersion(), JwtTokenType.REFRESH);
 
         RefreshToken metadata = new RefreshToken();
         metadata.setAccount(account);

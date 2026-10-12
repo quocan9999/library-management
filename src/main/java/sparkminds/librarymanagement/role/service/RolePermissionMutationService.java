@@ -20,6 +20,7 @@ import sparkminds.librarymanagement.auth.security.EffectivePermissionService;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.role.dto.RolePermissionUpdateRequest;
 import sparkminds.librarymanagement.role.dto.RolePermissionsResponse;
+import sparkminds.librarymanagement.role.policy.PermissionDependencyRegistry;
 import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
 import tools.jackson.databind.JsonNode;
 
@@ -45,6 +46,7 @@ public class RolePermissionMutationService {
     private final PermissionRepository permissionRepository;
     private final EffectivePermissionService effectivePermissionService;
     private final RoleAccessPolicy roleAccessPolicy;
+    private final PermissionDependencyRegistry permissionDependencyRegistry;
     private final JdbcTemplate jdbcTemplate;
     private final EntityManager entityManager;
     private final ApplicationEventPublisher eventPublisher;
@@ -55,6 +57,7 @@ public class RolePermissionMutationService {
             PermissionRepository permissionRepository,
             EffectivePermissionService effectivePermissionService,
             RoleAccessPolicy roleAccessPolicy,
+            PermissionDependencyRegistry permissionDependencyRegistry,
             JdbcTemplate jdbcTemplate,
             EntityManager entityManager,
             ApplicationEventPublisher eventPublisher
@@ -64,6 +67,7 @@ public class RolePermissionMutationService {
         this.permissionRepository = permissionRepository;
         this.effectivePermissionService = effectivePermissionService;
         this.roleAccessPolicy = roleAccessPolicy;
+        this.permissionDependencyRegistry = permissionDependencyRegistry;
         this.jdbcTemplate = jdbcTemplate;
         this.entityManager = entityManager;
         this.eventPublisher = eventPublisher;
@@ -113,6 +117,7 @@ public class RolePermissionMutationService {
         }
 
         List<String> catalogCodes = effectivePermissionService.allPermissionCodes();
+        permissionDependencyRegistry.validateCatalog(catalogCodes);
         Set<String> requestedCodes = new HashSet<>(delta.addPermissions());
         requestedCodes.addAll(delta.removePermissions());
         Set<String> catalogCodeSet = new HashSet<>(catalogCodes);
@@ -122,18 +127,38 @@ public class RolePermissionMutationService {
 
         List<String> editableCodes = roleAccessPolicy.editablePermissions(
                 actorRoleCode, targetRoleCode, actorPermissions, catalogCodes);
-        if (!new HashSet<>(editableCodes).containsAll(requestedCodes)) {
+        Set<String> editableSet = new HashSet<>(editableCodes);
+        if (!editableSet.containsAll(requestedCodes)) {
             throw new AccessDeniedException("Không được phép cấp hoặc thu hồi một số quyền được yêu cầu");
         }
 
         List<String> assignedCodes = effectivePermissionService.resolveCurrentRoleCode(targetRoleCode);
         Set<String> assignedSet = new HashSet<>(assignedCodes);
-        List<String> permissionsToAdd = delta.addPermissions().stream()
+        Set<String> requiredPermissions = permissionDependencyRegistry.requiredPermissionsFor(delta.addPermissions());
+        List<String> unassignableDependencies = requiredPermissions.stream()
+                .filter(code -> !assignedSet.contains(code) && !editableSet.contains(code))
+                .sorted()
+                .toList();
+        if (!unassignableDependencies.isEmpty()) {
+            throw new AccessDeniedException("Không được phép cấp quyền phụ thuộc bắt buộc: "
+                    + String.join(", ", unassignableDependencies));
+        }
+
+        Set<String> finalPermissions = new HashSet<>(assignedSet);
+        finalPermissions.addAll(delta.addPermissions());
+        finalPermissions.addAll(requiredPermissions);
+        finalPermissions.removeAll(delta.removePermissions());
+        Map<String, Set<String>> missingDependencies = permissionDependencyRegistry.missingDependencies(finalPermissions);
+        if (!missingDependencies.isEmpty()) {
+            throw dependencyConflict(missingDependencies);
+        }
+
+        List<String> permissionsToAdd = finalPermissions.stream()
                 .filter(code -> !assignedSet.contains(code))
                 .sorted()
                 .toList();
-        List<String> permissionsToRemove = delta.removePermissions().stream()
-                .filter(assignedSet::contains)
+        List<String> permissionsToRemove = assignedSet.stream()
+                .filter(code -> !finalPermissions.contains(code))
                 .sorted()
                 .toList();
 
@@ -270,6 +295,19 @@ public class RolePermissionMutationService {
 
     private static BusinessException invalidDelta(String message) {
         return new BusinessException(HttpStatus.BAD_REQUEST, "ROLE_PERMISSION_DELTA_INVALID", message);
+    }
+
+    private static BusinessException dependencyConflict(Map<String, Set<String>> missingDependencies) {
+        String details = missingDependencies.entrySet().stream()
+                .map(entry -> entry.getValue().stream()
+                        .map(dependency -> "quyền cơ sở " + dependency + " đang được quyền " + entry.getKey()
+                                + " phụ thuộc")
+                        .sorted()
+                        .collect(java.util.stream.Collectors.joining("; ")))
+                .collect(java.util.stream.Collectors.joining("; "));
+        return new BusinessException(HttpStatus.BAD_REQUEST, "ROLE_PERMISSION_DEPENDENCY_CONFLICT",
+                "Không thể thu hồi quyền cơ sở khi vẫn còn quyền phụ thuộc: " + details
+                        + ". Hãy thu hồi các quyền phụ thuộc trong cùng yêu cầu.");
     }
 
     private static BusinessException versionConflict() {

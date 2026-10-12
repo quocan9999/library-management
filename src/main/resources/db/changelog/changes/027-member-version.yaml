@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 027-member-version
+      author: codex
+      comment: "Version của Member hỗ trợ phát hiện cập nhật hồ sơ cạnh tranh bằng JPA optimistic locking."
+      changes:
+        - addColumn:
+            tableName: members
+            columns:
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: members
+            columnName: version

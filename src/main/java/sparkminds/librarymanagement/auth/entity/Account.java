@@ -38,6 +38,10 @@ public class Account {
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
+    /** Tăng mỗi khi trạng thái tài khoản đổi để vô hiệu hóa JWT đã cấp trước đó. */
+    @Column(name = "session_version", nullable = false)
+    private long sessionVersion;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

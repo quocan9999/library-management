@@ -29,6 +29,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -72,6 +73,7 @@ class AuthApiIntegrationTests {
         String accessToken = JsonPath.read(result.getResponse().getContentAsString(), "$.data.accessToken");
         Map<String, Object> accessClaims = claims(accessToken);
         assertClaimSet(accessClaims);
+        assertThat(((Number) accessClaims.get("sessionVersion")).longValue()).isEqualTo(admin.getSessionVersion());
         assertThat((String) accessClaims.get("sub"))
                 .isEqualTo(admin.getId().toString());
         assertThat((String) accessClaims.get("type")).isEqualTo("ACCESS");
@@ -91,6 +93,7 @@ class AuthApiIntegrationTests {
         String refreshToken = cookie.substring("refreshToken=".length(), cookie.indexOf(';'));
         Map<String, Object> refreshClaims = claims(refreshToken);
         assertClaimSet(refreshClaims);
+        assertThat(((Number) refreshClaims.get("sessionVersion")).longValue()).isEqualTo(admin.getSessionVersion());
         assertThat((String) refreshClaims.get("type")).isEqualTo("REFRESH");
         assertThat(((Number) refreshClaims.get("exp")).longValue() - ((Number) refreshClaims.get("iat")).longValue())
                 .isEqualTo(604800);
@@ -138,7 +141,7 @@ class AuthApiIntegrationTests {
 
         assertThat(result.getResponse().getHeader("Set-Cookie")).isNull();
         assertThat(refreshTokenRepository.count()).isEqualTo(refreshCountBefore);
-        verify(jwtTokenService, never()).issue(anyInt(), any(JwtTokenType.class));
+        verify(jwtTokenService, never()).issue(anyInt(), anyLong(), any(JwtTokenType.class));
     }
 
     @Test
@@ -217,7 +220,8 @@ class AuthApiIntegrationTests {
 
     private void assertClaimSet(Map<String, Object> claims) {
         Set<String> names = new HashSet<>(claims.keySet());
-        assertThat(names).containsExactlyInAnyOrder("sub", "jti", "type", "iat", "exp");
+        assertThat(names).containsExactlyInAnyOrder("sub", "jti", "type", "iat", "exp", "sessionVersion");
+        assertThat(claims.get("sessionVersion")).isInstanceOf(Number.class);
         assertThat((String) claims.get("jti")).isNotBlank();
     }
 }

@@ -1,10 +1,11 @@
-import { Alert } from 'antd';
+import { Alert, Modal } from 'antd';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getLogoutErrorMessage } from '../auth/messages';
 import { PermissionGate } from '../auth/permissions';
 import { BrandMark } from './BrandMark';
+import { clearMemberListState } from '../features/members/listState';
 
 function OverviewIcon() {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
@@ -19,6 +20,13 @@ function RolesIcon() {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
     <path d="M12 3.5 19 6v5.2c0 4.1-2.8 7.5-7 9.3-4.2-1.8-7-5.2-7-9.3V6l7-2.5Z" />
     <path d="m9 12 2 2 4-4" />
+  </svg>;
+}
+
+function MembersIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <circle cx="9" cy="8" r="3" />
+    <path d="M3.5 19c.3-3.2 2.1-5 5.5-5s5.2 1.8 5.5 5M16 5.5a3 3 0 0 1 0 5.8M17 14c2.1.6 3.3 2.2 3.5 5" />
   </svg>;
 }
 
@@ -105,8 +113,21 @@ export function AdminLayout() {
     } catch (error) {
       setLogoutError(getLogoutErrorMessage(error));
     } finally {
+      clearMemberListState();
       setIsLoggingOut(false);
     }
+  };
+
+  const confirmLogout = () => {
+    if (isLoggingOut) return;
+    Modal.confirm({
+      title: 'Xác nhận đăng xuất',
+      content: 'Bạn có chắc muốn đăng xuất khỏi hệ thống?',
+      centered: true,
+      okText: 'Đăng xuất',
+      cancelText: 'Ở lại',
+      onOk: handleLogout,
+    });
   };
 
   const displayName = currentUser?.username?.trim()
@@ -165,6 +186,16 @@ export function AdminLayout() {
               <span>Quản lý vai trò</span>
             </NavLink>
           </PermissionGate>
+          <PermissionGate permission="member:read" fallback={null}>
+            <NavLink
+              to="/admin/members"
+              className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <MembersIcon />
+              <span>Quản lý thành viên</span>
+            </NavLink>
+          </PermissionGate>
         </nav>
 
         <footer className="admin-shell__footer">
@@ -180,7 +211,7 @@ export function AdminLayout() {
           <button
             className="admin-shell__logout"
             type="button"
-            onClick={() => void handleLogout()}
+            onClick={confirmLogout}
             disabled={isLoggingOut}
           >
             <LogoutIcon />

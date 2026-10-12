@@ -97,8 +97,93 @@ class RolePermissionMutationIntegrationTests {
         List<String> assigned = JsonPath.read(response.getResponse().getContentAsString(),
                 "$.data.assignedPermissions");
         assertThat(assigned).contains("member:create", "borrow:create", "borrow:return");
+        assertThat(assigned).contains("member:read");
         assertThat(assigned).doesNotContain("book:read");
         assertThat(roleVersion("ROLE_USER")).isEqualTo(version + 1);
+    }
+
+    @Test
+    void grantingAnOperationAddsItsBasePermissionAutomatically() throws Exception {
+        String token = accessToken("admin", "admin");
+        long version = roleVersion("ROLE_USER");
+        setPermission("ROLE_USER", "member:read", false);
+        setPermission("ROLE_USER", "member:create", false);
+
+        MvcResult response = patchRequest(token, "ROLE_USER",
+                body(version, List.of("member:create"), List.of()));
+
+        assertThat(response.getResponse().getStatus()).isEqualTo(200);
+        assertThat(permissionCount("ROLE_USER", "member:create")).isEqualTo(1);
+        assertThat(permissionCount("ROLE_USER", "member:read")).isEqualTo(1);
+        assertThat(JsonPath.<List<String>>read(response.getResponse().getContentAsString(),
+                "$.data.assignedPermissions")).contains("member:create", "member:read");
+        assertThat(roleVersion("ROLE_USER")).isEqualTo(version + 1);
+    }
+
+    @Test
+    void removingAnOperationKeepsItsBasePermission() throws Exception {
+        String token = accessToken("admin", "admin");
+        long version = roleVersion("ROLE_USER");
+        setPermission("ROLE_USER", "member:read", true);
+        setPermission("ROLE_USER", "member:create", true);
+
+        MvcResult response = patchRequest(token, "ROLE_USER",
+                body(version, List.of(), List.of("member:create")));
+
+        assertThat(response.getResponse().getStatus()).isEqualTo(200);
+        assertThat(permissionCount("ROLE_USER", "member:create")).isZero();
+        assertThat(permissionCount("ROLE_USER", "member:read")).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsRemovingBasePermissionWhileAnOperationStillDependsOnIt() throws Exception {
+        String token = accessToken("admin", "admin");
+        long version = roleVersion("ROLE_USER");
+        setPermission("ROLE_USER", "member:read", true);
+        setPermission("ROLE_USER", "member:create", true);
+
+        MvcResult response = patchRequest(token, "ROLE_USER",
+                body(version, List.of(), List.of("member:read")));
+
+        assertThat(response.getResponse().getStatus()).isEqualTo(400);
+        assertThat(JsonPath.<String>read(response.getResponse().getContentAsString(), "$.code"))
+                .isEqualTo("ROLE_PERMISSION_DEPENDENCY_CONFLICT");
+        assertThat(response.getResponse().getContentAsString()).contains("member:create", "member:read");
+        assertThat(permissionCount("ROLE_USER", "member:create")).isEqualTo(1);
+        assertThat(permissionCount("ROLE_USER", "member:read")).isEqualTo(1);
+        assertThat(roleVersion("ROLE_USER")).isEqualTo(version);
+    }
+
+    @Test
+    void allowsRemovingBaseAndDependentOperationTogether() throws Exception {
+        String token = accessToken("admin", "admin");
+        long version = roleVersion("ROLE_USER");
+        setPermission("ROLE_USER", "member:read", true);
+        setPermission("ROLE_USER", "member:create", true);
+
+        MvcResult response = patchRequest(token, "ROLE_USER",
+                body(version, List.of(), List.of("member:create", "member:read")));
+
+        assertThat(response.getResponse().getStatus()).isEqualTo(200);
+        assertThat(permissionCount("ROLE_USER", "member:create")).isZero();
+        assertThat(permissionCount("ROLE_USER", "member:read")).isZero();
+    }
+
+    @Test
+    void rejectsAutomaticDependencyGrantWhenActorCannotGrantThatPermission() throws Exception {
+        String token = accessToken("admin", "admin");
+        long version = roleVersion("ROLE_USER");
+        setPermission("ROLE_ADMIN", "member:read", false);
+        setPermission("ROLE_USER", "member:read", false);
+        setPermission("ROLE_USER", "member:create", false);
+
+        MvcResult response = patchRequest(token, "ROLE_USER",
+                body(version, List.of("member:create"), List.of()));
+
+        assertThat(response.getResponse().getStatus()).isEqualTo(403);
+        assertThat(permissionCount("ROLE_USER", "member:create")).isZero();
+        assertThat(permissionCount("ROLE_USER", "member:read")).isZero();
+        assertThat(roleVersion("ROLE_USER")).isEqualTo(version);
     }
 
     @Test
@@ -279,6 +364,8 @@ class RolePermissionMutationIntegrationTests {
     void revokedRoleReadIsRecheckedAtSaveAndSameTokenWorksAfterRegrant() throws Exception {
         String token = accessToken("admin", "admin");
         long userVersion = roleVersion("ROLE_USER");
+        boolean hadMemberRead = permissionCount("ROLE_USER", "member:read") == 1;
+        boolean hadMemberCreate = permissionCount("ROLE_USER", "member:create") == 1;
         removePermission("ROLE_ADMIN", "role:read");
 
         try {
@@ -293,7 +380,8 @@ class RolePermissionMutationIntegrationTests {
             assertThat(allowedAfterRegrant.getResponse().getStatus()).isEqualTo(200);
         } finally {
             grantPermission("ROLE_ADMIN", "role:read");
-            removePermission("ROLE_USER", "member:create");
+            setPermission("ROLE_USER", "member:read", hadMemberRead);
+            setPermission("ROLE_USER", "member:create", hadMemberCreate);
             setRoleVersion("ROLE_USER", userVersion);
         }
     }
@@ -303,6 +391,8 @@ class RolePermissionMutationIntegrationTests {
     void revokedRoleUpdateIsRecheckedOnNextRequestAndCanBeRestoredWithoutLogin() throws Exception {
         String token = accessToken("admin", "admin");
         long userVersion = roleVersion("ROLE_USER");
+        boolean hadMemberRead = permissionCount("ROLE_USER", "member:read") == 1;
+        boolean hadMemberCreate = permissionCount("ROLE_USER", "member:create") == 1;
         removePermission("ROLE_ADMIN", "role:update");
 
         try {
@@ -317,7 +407,8 @@ class RolePermissionMutationIntegrationTests {
             assertThat(allowedAfterRegrant.getResponse().getStatus()).isEqualTo(200);
         } finally {
             grantPermission("ROLE_ADMIN", "role:update");
-            removePermission("ROLE_USER", "member:create");
+            setPermission("ROLE_USER", "member:read", hadMemberRead);
+            setPermission("ROLE_USER", "member:create", hadMemberCreate);
             setRoleVersion("ROLE_USER", userVersion);
         }
     }
@@ -364,6 +455,7 @@ class RolePermissionMutationIntegrationTests {
             assertThat(permissionCount("ROLE_USER", "book:read")).isEqualTo(1);
             assertThat(permissionCount("ROLE_USER", "book:create")).isZero();
             assertThat(permissionCount("ROLE_USER", "member:create")).isZero();
+            assertThat(permissionCount("ROLE_USER", "member:read")).isZero();
             assertThat(output.getOut() + output.getErr()).doesNotContain("role-permission-update actorId=");
         } finally {
             testHooks.reset();
@@ -460,6 +552,10 @@ class RolePermissionMutationIntegrationTests {
         String token = accessToken("admin", "admin");
         Integer actorId = accountRepository.findByUsername("admin").orElseThrow().getId();
         long userVersion = roleVersion("ROLE_USER");
+        boolean hadMemberRead = permissionCount("ROLE_USER", "member:read") == 1;
+        boolean hadMemberCreate = permissionCount("ROLE_USER", "member:create") == 1;
+        setPermission("ROLE_USER", "member:read", false);
+        setPermission("ROLE_USER", "member:create", false);
 
         try {
             MvcResult response = patchRequest(token, "ROLE_USER",
@@ -468,11 +564,12 @@ class RolePermissionMutationIntegrationTests {
             assertThat(response.getResponse().getStatus()).isEqualTo(200);
             String logs = output.getOut() + output.getErr();
             assertThat(logs).contains("role-permission-update", "actorId=" + actorId,
-                    "roleCode=ROLE_USER", "addedPermissions=[member:create]", "removedPermissions=[]");
+                    "roleCode=ROLE_USER", "addedPermissions=[member:create, member:read]", "removedPermissions=[]");
             assertThat(logs).doesNotContain(token, "password=", "admin@example");
             assertThat(logs).containsPattern("occurredAt=[^ ]+Z");
         } finally {
-            removePermission("ROLE_USER", "member:create");
+            setPermission("ROLE_USER", "member:read", hadMemberRead);
+            setPermission("ROLE_USER", "member:create", hadMemberCreate);
             setRoleVersion("ROLE_USER", userVersion);
         }
     }

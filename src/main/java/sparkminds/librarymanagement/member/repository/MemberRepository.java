@@ -15,4 +15,8 @@ public interface MemberRepository extends JpaRepository<Member, Integer> {
 
     // Kiểm tra mã thành viên đã tồn tại hay chưa.
     boolean existsByMemberCode(String memberCode);
+
+    boolean existsByPhoneAndIdNot(String phone, Integer id);
+
+    boolean existsByPhone(String phone);
 }

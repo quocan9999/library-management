@@ -122,7 +122,7 @@ class RefreshLogoutIntegrationTests {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_REFRESH_TOKEN_EXPIRED"));
 
-        String wrongType = jwtTokenService.issue(user.getId(), JwtTokenType.ACCESS).value();
+        String wrongType = jwtTokenService.issue(user.getId(), user.getSessionVersion(), JwtTokenType.ACCESS).value();
         refresh(wrongType)
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_REFRESH_TOKEN_INVALID"));

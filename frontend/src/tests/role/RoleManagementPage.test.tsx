@@ -7,11 +7,12 @@ import {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { apiClient } from '../../auth/api';
 import type { ApiEnvelope } from '../../auth/types';
+import { AppNotificationProvider } from '../../components/AppNotificationProvider';
 import { RoleManagementPage } from '../../role/RoleManagementPage';
 import type { RolePermissions } from '../../role/types';
 
@@ -55,12 +56,12 @@ function success<T>(code: string, data: T): ApiEnvelope<T> {
   };
 }
 
-function failure(config: InternalAxiosRequestConfig, status: number, code: string): never {
+function failure(config: InternalAxiosRequestConfig, status: number, code: string, message = 'Private server message.'): never {
   const body: ApiEnvelope<null> = {
     success: false,
     status,
     code,
-    message: 'Private server message.',
+    message,
     data: null,
     timestamp: new Date().toISOString(),
   };
@@ -77,6 +78,9 @@ function configureRoleApi(options: {
   visibleSuperAdmin?: boolean;
   userCanEdit?: boolean;
   deferPatch?: boolean;
+  assignedPermissions?: string[];
+  patchMessage?: string;
+  unmanageableMemberRead?: boolean;
 } = {}) {
   const requests: Array<{ method: string; url: string; body: unknown }> = [];
   let detailReads = 0;
@@ -95,15 +99,20 @@ function configureRoleApi(options: {
       return response(config, success('ROLE_LIST_SUCCESS', roleList));
     }
     if (config.url === '/api/v1/permissions') {
+      const superAdmin = mocks.currentUser.role === 'ROLE_SUPER_ADMIN';
       return response(config, success('PERMISSION_LIST_SUCCESS', [
-        { code: 'role:read', description: 'Xem vai trò', manageableByActor: true },
-        { code: 'role:update', description: 'Cập nhật quyền', manageableByActor: true },
-        { code: 'book:read', description: 'Xem sách', manageableByActor: true },
-        { code: 'book:create', description: 'Tạo sách', manageableByActor: true },
-        { code: 'book:delete', description: 'Xóa sách', manageableByActor: false },
-        { code: 'book:import', description: 'Nhập sách', manageableByActor: true },
-        { code: 'member:read', description: 'Xem thành viên', manageableByActor: true },
-        { code: 'future:review', description: 'Xem nghiệp vụ mới', manageableByActor: false },
+        { code: 'role:read', description: 'Xem vai trò', manageableByActor: true, dependencies: [] },
+        { code: 'role:update', description: 'Cập nhật quyền', manageableByActor: true, dependencies: ['role:read'] },
+        { code: 'book:read', description: 'Xem sách', manageableByActor: true, dependencies: [] },
+        { code: 'book:create', description: 'Tạo sách', manageableByActor: true, dependencies: ['book:read'] },
+        { code: 'book:update', description: 'Cập nhật sách', manageableByActor: true, dependencies: ['book:read'] },
+        { code: 'book:delete', description: 'Xóa sách', manageableByActor: false, dependencies: ['book:read'] },
+        { code: 'book:import', description: 'Nhập sách', manageableByActor: true, dependencies: ['book:read'] },
+        { code: 'member:read', description: 'Xem thành viên', manageableByActor: !options.unmanageableMemberRead, dependencies: [] },
+        { code: 'member:create', description: 'Tạo thành viên', manageableByActor: true, dependencies: ['member:read'] },
+        { code: 'member:update', description: 'Cập nhật thành viên', manageableByActor: superAdmin, dependencies: ['member:read'] },
+        { code: 'member:delete', description: 'Xóa thành viên', manageableByActor: superAdmin, dependencies: ['member:read'] },
+        { code: 'future:review', description: 'Xem nghiệp vụ mới', manageableByActor: false, dependencies: [] },
       ]));
     }
     if (config.url?.startsWith('/api/v1/roles/') && config.url.endsWith('/permissions') && config.method === 'get') {
@@ -112,7 +121,7 @@ function configureRoleApi(options: {
       const ownSuperAdmin = targetRoleCode === 'ROLE_SUPER_ADMIN';
       const assigned = ownSuperAdmin
         ? ['role:read', 'role:update', 'book:read', 'book:create', 'book:delete', 'book:import', 'member:read']
-        : targetRoleCode === 'ROLE_ADMIN' ? ['role:read', 'role:update'] : ['book:read', 'book:delete'];
+        : targetRoleCode === 'ROLE_ADMIN' ? ['role:read', 'role:update'] : options.assignedPermissions ?? ['book:read', 'book:delete'];
       return response(config, success('ROLE_PERMISSIONS_SUCCESS', {
         roleCode: targetRoleCode,
         version: targetRoleCode === 'ROLE_USER' ? options.version ?? 7 : 3,
@@ -120,13 +129,15 @@ function configureRoleApi(options: {
         effectivePermissions: assigned,
         editablePermissions: ownSuperAdmin ? [] : targetRoleCode === 'ROLE_ADMIN'
           ? ['role:read', 'role:update']
-          : options.userCanEdit === false ? [] : ['book:read', 'book:create', 'book:import', 'member:read'],
+          : options.userCanEdit === false ? [] : mocks.currentUser.role === 'ROLE_SUPER_ADMIN'
+            ? ['book:read', 'book:create', 'book:update', 'book:import', 'member:read', 'member:create', 'member:update', 'member:delete']
+            : ['book:read', 'book:create', 'book:update', 'book:import', 'member:read', 'member:create'],
         editable: !ownSuperAdmin && (targetRoleCode !== 'ROLE_ADMIN' || mocks.currentUser.role === 'ROLE_SUPER_ADMIN')
           && (targetRoleCode !== 'ROLE_USER' || options.userCanEdit !== false),
       }));
     }
     if (config.url === '/api/v1/roles/ROLE_USER/permissions' && config.method === 'patch') {
-      if (options.patchStatus) failure(config, options.patchStatus, options.patchCode ?? 'PERMISSION_DENIED');
+      if (options.patchStatus) failure(config, options.patchStatus, options.patchCode ?? 'PERMISSION_DENIED', options.patchMessage);
       if (options.deferPatch) {
         return await new Promise((resolve) => {
           resolvePendingPatch = (result) => resolve(response(config, success('ROLE_PERMISSIONS_UPDATED', result)));
@@ -135,9 +146,9 @@ function configureRoleApi(options: {
       return response(config, success('ROLE_PERMISSIONS_UPDATED', {
         roleCode: 'ROLE_USER',
         version: (options.version ?? 7) + 1,
-        assignedPermissions: ['book:read', 'book:delete'],
-        effectivePermissions: ['book:read', 'book:delete'],
-        editablePermissions: ['book:read', 'book:create', 'book:import', 'member:read'],
+        assignedPermissions: options.assignedPermissions ?? ['book:read', 'book:delete'],
+        effectivePermissions: options.assignedPermissions ?? ['book:read', 'book:delete'],
+        editablePermissions: ['book:read', 'book:create', 'book:update', 'book:import', 'member:read', 'member:create'],
         editable: true,
       }));
     }
@@ -159,7 +170,7 @@ beforeEach(() => {
     username: 'admin',
     email: 'admin@example.com',
     role: 'ROLE_ADMIN',
-    permissions: ['role:read', 'role:update', 'book:read', 'book:import', 'member:read'],
+    permissions: ['role:read', 'role:update', 'book:read', 'book:create', 'book:import', 'member:read', 'member:create'],
   });
   const nativeGetComputedStyle = window.getComputedStyle.bind(window);
   vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => nativeGetComputedStyle(element));
@@ -174,6 +185,92 @@ afterEach(() => {
 });
 
 describe('RoleManagementPage', () => {
+  it('adds permission dependencies when an operation is selected and previews the complete delta', async () => {
+    const user = userEvent.setup();
+    configureRoleApi();
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /member:create/ }));
+
+    expect((screen.getByRole('checkbox', { name: /member:read/ }) as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    const preview = within(screen.getByRole('dialog'));
+    expect(preview.getByText('member:create')).toBeTruthy();
+    expect(preview.getByText('member:read')).toBeTruthy();
+    expect(preview.getByRole('heading', { name: 'Quyền được thêm (2)' })).toBeTruthy();
+  });
+
+  it('applies dependencies when the permission-group checkbox is selected', async () => {
+    const user = userEvent.setup();
+    configureRoleApi();
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /Chọn tất cả quyền nhóm Thành viên/ }));
+
+    expect((screen.getByRole('checkbox', { name: /member:read/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('checkbox', { name: /member:create/ }) as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Quyền được thêm (2)' })).toBeTruthy();
+  });
+
+  it('does not select an operation when the actor cannot grant its missing dependency', async () => {
+    const user = userEvent.setup();
+    configureRoleApi({ unmanageableMemberRead: true });
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /member:create/ }));
+
+    expect((screen.getByRole('checkbox', { name: /member:create/ }) as HTMLInputElement).checked).toBe(false);
+    expect(await screen.findByText(/không được phép cấp quyền đó/)).toBeTruthy();
+  });
+
+  it('keeps base permission when an operation is removed', async () => {
+    const user = userEvent.setup();
+    configureRoleApi({ assignedPermissions: ['book:read', 'book:delete', 'member:read', 'member:create'] });
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /member:create/ }));
+
+    expect((screen.getByRole('checkbox', { name: /member:read/ }) as HTMLInputElement).checked).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    const preview = within(screen.getByRole('dialog'));
+    expect(preview.getByRole('heading', { name: 'Quyền được gỡ (1)' })).toBeTruthy();
+    expect(preview.getByText('member:create')).toBeTruthy();
+    expect(preview.queryByText('member:read')).toBeNull();
+  });
+
+  it('blocks saving a base permission removal until all dependent permissions are also removed', async () => {
+    const user = userEvent.setup();
+    configureRoleApi({ assignedPermissions: ['book:read', 'book:delete', 'member:read', 'member:create'] });
+    render(<AppNotificationProvider><MemoryRouter><RoleManagementPage /></MemoryRouter></AppNotificationProvider>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /member:read/ }));
+    expect(await screen.findByText(/Không thể gỡ quyền cơ sở member:read/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Xem thay đổi và lưu' }) as HTMLButtonElement).disabled).toBe(true);
+
+    await user.click(screen.getByRole('checkbox', { name: /member:create/ }));
+    expect((screen.getByRole('button', { name: 'Xem thay đổi và lưu' }) as HTMLButtonElement).disabled).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Quyền được gỡ (2)' })).toBeTruthy();
+  });
+
+  it('shows a clear API dependency error and keeps the draft when the server rejects it', async () => {
+    const user = userEvent.setup();
+    configureRoleApi({
+      patchStatus: 400,
+      patchCode: 'ROLE_PERMISSION_DEPENDENCY_CONFLICT',
+      patchMessage: 'Không thể thu hồi member:read khi còn member:create.',
+    });
+    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
+    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    expect(await screen.findByText('Không thể thu hồi member:read khi còn member:create.')).toBeTruthy();
+    expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
+  });
+
   it('selects only editable permissions in a group and preserves assigned locked rights', async () => {
     const user = userEvent.setup();
     configureRoleApi();
@@ -272,6 +369,7 @@ describe('RoleManagementPage', () => {
     await user.click(await screen.findByRole('option', { name: 'Quản trị viên' }));
     const removablePermission = await screen.findByRole('checkbox', { name: /role:read/ });
     expect((removablePermission as HTMLInputElement).disabled).toBe(false);
+    await user.click(screen.getByRole('checkbox', { name: /role:update/ }));
     await user.click(removablePermission);
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
     expect(await screen.findByText('Gỡ quyền quản lý vai trò có thể làm mất khả năng truy cập màn hình này.')).toBeTruthy();
@@ -318,7 +416,7 @@ describe('RoleManagementPage', () => {
       permissions: ['role:read', 'role:update'],
     });
     const api = configureRoleApi({ deferPatch: true, visibleSuperAdmin: true });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    render(<AppNotificationProvider><MemoryRouter><RoleManagementPage /></MemoryRouter></AppNotificationProvider>);
 
     await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
@@ -339,7 +437,7 @@ describe('RoleManagementPage', () => {
       editable: true,
     });
 
-    expect(await screen.findByRole('status')).toBeTruthy();
+    expect(await screen.findByText('Đã cập nhật quyền cho vai trò.')).toBeTruthy();
     expect(screen.getByText('Đã cập nhật quyền cho vai trò.')).toBeTruthy();
     expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
   });
