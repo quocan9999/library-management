@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 026-member-phone-unique
-      author: codex
+      author: quocan9999
       comment: "Dừng thay đổi schema nếu phone hiện hữu sai chuẩn hoặc trùng sau chuẩn hóa; không tự sửa dữ liệu thành viên."
       preConditions:
         - onFail: HALT

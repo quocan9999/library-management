@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 025-disable-public-super-admin-seed
-      author: codex
+      author: quocan9999
       comment: "Vô hiệu hóa tài khoản SUPER_ADMIN mặc định cũ ở môi trường triển khai"
       context: "@production"
 

@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 028-seed-member-status-permission
-      author: codex
+      author: quocan9999
       comment: "Quyền đổi trạng thái tài khoản thành viên chỉ được gán mặc định cho ROLE_ADMIN; SUPER_ADMIN có quyền hiệu lực theo resolver hiện tại."
       preConditions:
         - onFail: HALT

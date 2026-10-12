@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 023-seed-role-management-permissions
-      author: codex
+      author: quocan9999
       comment: "Seed SUPER_ADMIN và hai quyền Role Management"
 
       changes:
