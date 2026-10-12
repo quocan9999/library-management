@@ -4,6 +4,7 @@ import type {
   LoanHistoryItem,
   LoanHistoryQuery,
   MemberDetail,
+  MemberAccountStatusInput,
   MemberListItem,
   MemberListQuery,
   MemberProfilePatchInput,
@@ -40,6 +41,14 @@ export const memberApi = {
       input,
     );
     return readRequiredData(response.data, 'MEMBER_PROFILE_UPDATED');
+  },
+
+  async updateAccountStatus(id: number, input: MemberAccountStatusInput): Promise<MemberDetail> {
+    const response = await apiClient.patch<ApiEnvelope<MemberDetail>>(
+      `/api/v1/members/${id}/account-status`,
+      input,
+    );
+    return readRequiredData(response.data, 'MEMBER_ACCOUNT_STATUS_UPDATED');
   },
 
   async getLoanHistory(

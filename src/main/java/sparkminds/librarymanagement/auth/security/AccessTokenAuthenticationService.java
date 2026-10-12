@@ -67,6 +67,10 @@ public class AccessTokenAuthenticationService {
             );
         }
 
+        if (verified.sessionVersion() != account.getSessionVersion()) {
+            throw invalidToken();
+        }
+
         if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
             throw new ApiAuthenticationException(
                     HttpStatus.FORBIDDEN,

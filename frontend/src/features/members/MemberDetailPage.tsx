@@ -1,4 +1,5 @@
-import { Alert, Button, Descriptions, Pagination, Spin, Table, Tag } from 'antd';
+import { Alert, Button, Descriptions, Modal, Pagination, Spin, Table, Tag } from 'antd';
+import axios from 'axios';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
@@ -47,7 +48,12 @@ export function MemberDetailPage() {
   const { id: rawId } = useParams();
   const memberId = rawId && /^\d+$/.test(rawId) ? Number(rawId) : Number.NaN;
   const canUpdateProfile = usePermission('member:update');
+  const canUpdateAccountStatus = usePermission('member:status:update');
   const [editingProfile, setEditingProfile] = useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [statusActionError, setStatusActionError] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [memberReload, setMemberReload] = useState(0);
   const [historyReload, setHistoryReload] = useState(0);
   const [historyStatus, setHistoryStatus] = useState<HistoryStatus>('ALL');
@@ -74,6 +80,34 @@ export function MemberDetailPage() {
   const history = currentHistoryRequest?.status === 'success' ? currentHistoryRequest.data : null;
   const historyLoading = validMemberId && currentHistoryRequest === null;
   const historyError = validMemberId && currentHistoryRequest?.status === 'error';
+
+  /** Giữ dialog hiện tại khi lỗi tạm thời; xung đột CAS đóng dialog rồi đọc lại trạng thái mới. */
+  const updateAccountStatus = async () => {
+    if (!member) return;
+    setStatusUpdating(true);
+    setStatusActionError(null);
+    try {
+      await memberApi.updateAccountStatus(member.id, {
+        expectedEnabled: member.enabled,
+        enabled: !member.enabled,
+      });
+      setStatusDialogOpen(false);
+      setStatusNotice(null);
+      setMemberReload((previous) => previous + 1);
+    } catch (error) {
+      if (axios.isAxiosError(error)
+        && error.response?.status === 409
+        && error.response.data?.code === 'MEMBER_ACCOUNT_STATUS_CONFLICT') {
+        setStatusDialogOpen(false);
+        setStatusNotice('Trạng thái tài khoản đã thay đổi. Hồ sơ đã được tải lại.');
+        setMemberReload((previous) => previous + 1);
+      } else {
+        setStatusActionError('Không thể cập nhật trạng thái tài khoản lúc này. Hãy thử lại.');
+      }
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -138,9 +172,27 @@ export function MemberDetailPage() {
           </div>
           <div className="member-detail-actions">
             {member && canUpdateProfile && <Button onClick={() => setEditingProfile(true)}>Chỉnh sửa hồ sơ</Button>}
+            {member && canUpdateAccountStatus && <Button
+              danger={member.enabled}
+              onClick={() => {
+                setStatusActionError(null);
+                setStatusNotice(null);
+                setStatusDialogOpen(true);
+              }}
+            >{member.enabled ? 'Vô hiệu hóa tài khoản' : 'Kích hoạt tài khoản'}</Button>}
             <Link className="member-back-link" to="/admin/members">Quay lại danh sách</Link>
           </div>
         </div>
+
+        {statusNotice && <Alert
+          className="member-alert"
+          type="warning"
+          showIcon
+          role="status"
+          title={statusNotice}
+          closable
+          onClose={() => setStatusNotice(null)}
+        />}
 
         {memberLoading && <div className="member-loading" role="status"><Spin /> Đang tải hồ sơ thành viên…</div>}
         {memberError && <Alert
@@ -178,6 +230,31 @@ export function MemberDetailPage() {
             setMemberRequest({ key: memberRequestKey, status: 'success', data: latest });
           }}
         />}
+
+        {statusDialogOpen && <Modal
+          open
+          title={member?.enabled ? 'Xác nhận vô hiệu hóa tài khoản' : 'Xác nhận kích hoạt tài khoản'}
+          okText={member?.enabled ? 'Vô hiệu hóa' : 'Kích hoạt'}
+          cancelText="Hủy"
+          okButtonProps={{ danger: member?.enabled }}
+          confirmLoading={statusUpdating}
+          onCancel={() => {
+            if (!statusUpdating) setStatusDialogOpen(false);
+          }}
+          onOk={updateAccountStatus}
+        >
+          {member && <>
+            <p>{member.enabled
+              ? `Bạn xác nhận vô hiệu hóa tài khoản ${member.fullName || member.memberCode} (${member.memberCode})? Tài khoản sẽ không thể đăng nhập sau khi thao tác hoàn tất.`
+              : `Bạn xác nhận kích hoạt tài khoản ${member.fullName || member.memberCode} (${member.memberCode})? Các phiên cũ vẫn hết hiệu lực và thành viên cần đăng nhập lại.`}</p>
+            {member.enabled && member.borrowedItemCount > 0 && <Alert
+              type="warning"
+              showIcon
+              title={`Đang mượn ${member.borrowedItemCount} cuốn sách chưa trả`}
+            />}
+            {statusActionError && <Alert className="member-alert" type="error" showIcon title={statusActionError} />}
+          </>}
+        </Modal>}
 
         <section className="member-history" aria-labelledby="member-history-title">
           <div className="member-history__heading">

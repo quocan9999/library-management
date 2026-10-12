@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 029-account-session-version
+      author: SparkMinds
+      changes:
+        - addColumn:
+            tableName: accounts
+            columns:
+              - column:
+                  name: session_version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false

@@ -145,6 +145,34 @@ describe('member API', () => {
     expect(JSON.parse(String(requests[0]?.data))).toEqual({ version: 2, address: 'New address' });
   });
 
+  it('changes account status through the shared client with compare-and-set state', async () => {
+    const updated = {
+      id: 17,
+      memberCode: 'M000017',
+      fullName: 'Nguyễn An',
+      email: 'an@example.test',
+      phone: '0388919210',
+      dateOfBirth: '2000-01-02',
+      createdAt: '2026-10-01T08:30:00',
+      updatedAt: '2026-10-02T08:30:00',
+      address: null,
+      emailVerified: true,
+      enabled: false,
+      version: 0,
+      borrowedItemCount: 2,
+    } satisfies MemberDetail;
+    let request: { method?: string; url?: string; data?: unknown } = {};
+    apiClient.defaults.adapter = (async (config) => {
+      request = { method: config.method, url: config.url, data: config.data };
+      return response(config, envelope('MEMBER_ACCOUNT_STATUS_UPDATED', updated));
+    }) satisfies AxiosAdapter;
+
+    await expect(memberApi.updateAccountStatus(17, { expectedEnabled: true, enabled: false }))
+      .resolves.toEqual(updated);
+    expect(request).toMatchObject({ method: 'patch', url: '/api/v1/members/17/account-status' });
+    expect(JSON.parse(String(request.data))).toEqual({ expectedEnabled: true, enabled: false });
+  });
+
   it('preserves the stale-version envelope for the edit modal', async () => {
     apiClient.defaults.adapter = (async (config) => {
       const conflict: ApiEnvelope<null> = {

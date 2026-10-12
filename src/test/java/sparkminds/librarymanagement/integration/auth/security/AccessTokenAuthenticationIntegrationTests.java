@@ -104,7 +104,7 @@ class AccessTokenAuthenticationIntegrationTests {
                 Keys.hmacShaKeyFor(new byte[32]));
         String expired = signedToken(user.getId(), JwtTokenType.ACCESS, Instant.now().minusSeconds(120),
                 Instant.now().minusSeconds(60), signingKey());
-        IssuedJwtToken refresh = jwtTokenService.issue(user.getId(), JwtTokenType.REFRESH);
+        IssuedJwtToken refresh = jwtTokenService.issue(user.getId(), user.getSessionVersion(), JwtTokenType.REFRESH);
 
         assertTokenError("not-a-jwt", "AUTH_TOKEN_INVALID");
         assertTokenError(badSignature, "AUTH_TOKEN_INVALID");
@@ -115,7 +115,7 @@ class AccessTokenAuthenticationIntegrationTests {
     @Test
     void rejectsRevokedTokensAndAccountsDisabledAfterIssuance() throws Exception {
         Account user = accountRepository.findByUsername("user").orElseThrow();
-        IssuedJwtToken revoked = jwtTokenService.issue(user.getId(), JwtTokenType.ACCESS);
+        IssuedJwtToken revoked = jwtTokenService.issue(user.getId(), user.getSessionVersion(), JwtTokenType.ACCESS);
         RevokedAccessToken revocation = new RevokedAccessToken();
         revocation.setAccount(user);
         revocation.setJti(revoked.jti());
@@ -136,7 +136,7 @@ class AccessTokenAuthenticationIntegrationTests {
     }
 
     private String issueAccessToken(Account account) {
-        return jwtTokenService.issue(account.getId(), JwtTokenType.ACCESS).value();
+        return jwtTokenService.issue(account.getId(), account.getSessionVersion(), JwtTokenType.ACCESS).value();
     }
 
     private void assertTokenError(String token, String code) throws Exception {

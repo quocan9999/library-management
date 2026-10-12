@@ -110,3 +110,7 @@ databaseChangeLog:
   - include:
       file: changes/028-seed-member-status-permission.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/029-account-session-version.yaml
+      relativeToChangelogFile: true

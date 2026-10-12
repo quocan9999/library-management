@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import {
   AxiosError,
   AxiosHeaders,
@@ -5,7 +6,7 @@ import {
   type AxiosResponse,
 } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
-import { apiClient, authApi } from '../../auth/api';
+import { ACCOUNT_DISABLED_EVENT, apiClient, authApi } from '../../auth/api';
 import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
 import type { ApiEnvelope, LoginData, RegisterData } from '../../auth/types';
 
@@ -60,6 +61,7 @@ afterEach(() => {
   apiClient.defaults.adapter = originalAdapter;
   delete apiClient.defaults.headers.common.Authorization;
   setAccessToken(null);
+  window.sessionStorage.clear();
 });
 
 describe('API base URL configuration', () => {
@@ -175,6 +177,7 @@ describe('authenticated API client', () => {
     const { subscribeToCapabilityRefresh } = await import('../../auth/capabilityEvents');
     let syncEvents = 0;
     let mutationAttempts = 0;
+    setAccessToken('still-authorized-token');
     const unsubscribe = subscribeToCapabilityRefresh(() => { syncEvents += 1; });
     apiClient.defaults.adapter = (async (config) => {
       if (config.url === '/api/v1/roles/ROLE_USER/permissions') {
@@ -210,6 +213,40 @@ describe('authenticated API client', () => {
 
     expect(mutationAttempts).toBe(1);
     expect(syncEvents).toBe(1);
+    expect(getAccessToken()).toBe('still-authorized-token');
+  });
+
+  it('clears the access token and only the Member search state for a disabled account', async () => {
+    let disabledEvents = 0;
+    const onDisabled = () => { disabledEvents += 1; };
+    setAccessToken('disabled-account-token');
+    window.sessionStorage.setItem('memberManagement:listState:v1', 'member filters');
+    window.sessionStorage.setItem('registrationEmail', 'reader@example.test');
+    window.addEventListener(ACCOUNT_DISABLED_EVENT, onDisabled);
+    apiClient.defaults.adapter = (async (config) => {
+      const body: ApiEnvelope<null> = {
+        success: false,
+        status: 403,
+        code: 'AUTH_ACCOUNT_DISABLED',
+        message: 'Disabled.',
+        data: null,
+        timestamp: new Date().toISOString(),
+      };
+      throw new AxiosError('Forbidden', AxiosError.ERR_BAD_REQUEST, config, undefined, response(config, body, 403));
+    }) satisfies AxiosAdapter;
+
+    try {
+      await expect(apiClient.get('/api/v1/members')).rejects.toMatchObject({
+        response: { status: 403, data: { code: 'AUTH_ACCOUNT_DISABLED' } },
+      });
+    } finally {
+      window.removeEventListener(ACCOUNT_DISABLED_EVENT, onDisabled);
+    }
+
+    expect(getAccessToken()).toBeNull();
+    expect(window.sessionStorage.getItem('memberManagement:listState:v1')).toBeNull();
+    expect(window.sessionStorage.getItem('registrationEmail')).toBe('reader@example.test');
+    expect(disabledEvents).toBe(1);
   });
 
   it('loads /auth/me from its envelope without decoding the access token', async () => {

@@ -41,6 +41,12 @@ export interface MemberProfilePatchInput {
   address?: string;
 }
 
+/** Gửi trạng thái đã đọc để backend phát hiện admin khác vừa đổi trạng thái. */
+export interface MemberAccountStatusInput {
+  expectedEnabled: boolean;
+  enabled: boolean;
+}
+
 export interface LoanHistoryItem {
   loanItemId: number;
   loanId: number;

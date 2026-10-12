@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useOptionalAuth } from '../auth/AuthContext';
+import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
 import { RequirePermission } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
 import { HomePage } from '../pages/HomePage';
@@ -44,6 +45,17 @@ function CapabilityRouteSync() {
   return null;
 }
 
+function DisabledAccountRouteSync() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    // Chuyển state vào trang đăng nhập để thông báo lý do phiên bị thu hồi ngay trong lần điều hướng này.
+    const redirect = () => navigate('/login', { replace: true, state: { accountDisabled: true } });
+    window.addEventListener(ACCOUNT_DISABLED_EVENT, redirect);
+    return () => window.removeEventListener(ACCOUNT_DISABLED_EVENT, redirect);
+  }, [navigate]);
+  return null;
+}
+
 function ForbiddenPage() {
   return (
     <main className="permission-error-page">
@@ -61,6 +73,7 @@ export function App() {
   return (
     <>
       <CapabilityRouteSync />
+      <DisabledAccountRouteSync />
       <Routes>
         <Route
           path="/login"

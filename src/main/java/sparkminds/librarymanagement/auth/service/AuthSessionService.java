@@ -60,6 +60,16 @@ public class AuthSessionService {
             throw refreshError("AUTH_REFRESH_TOKEN_INVALID", "Refresh Token không hợp lệ");
         }
 
+        // Khóa tài khoản trước refresh row để disable và refresh cùng thứ tự khóa, tránh phát hành phiên mới sau khi thu hồi.
+        Account account = accountRepository.findByIdForUpdate(claims.accountId())
+                .orElseThrow(() -> refreshError("AUTH_REFRESH_TOKEN_INVALID", "Refresh Token không hợp lệ"));
+        if (!account.isEnabled()) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "AUTH_ACCOUNT_DISABLED", "Tài khoản hiện không thể đăng nhập");
+        }
+        if (claims.sessionVersion() != account.getSessionVersion()) {
+            throw refreshError("AUTH_REFRESH_TOKEN_REVOKED", "Refresh Token đã bị thu hồi");
+        }
+
         RefreshToken current = refreshTokenRepository.findByJtiForUpdate(claims.jti().toString())
                 .orElseThrow(() -> refreshError("AUTH_REFRESH_TOKEN_INVALID", "Refresh Token không hợp lệ"));
         if (current.getRevokedAt() != null) {
@@ -71,8 +81,7 @@ public class AuthSessionService {
             throw refreshError("AUTH_REFRESH_TOKEN_EXPIRED", "Refresh Token đã hết hạn");
         }
 
-        Account account = current.getAccount();
-        if (!account.getId().equals(claims.accountId())) {
+        if (!account.getId().equals(current.getAccount().getId())) {
             throw refreshError("AUTH_REFRESH_TOKEN_INVALID", "Refresh Token không hợp lệ");
         }
         if (!account.isEnabled()) {
@@ -92,8 +101,10 @@ public class AuthSessionService {
         }
 
         current.setRevokedAt(now);
-        IssuedJwtToken accessToken = jwtTokenService.issue(account.getId(), JwtTokenType.ACCESS);
-        IssuedJwtToken newRefreshToken = jwtTokenService.issue(account.getId(), JwtTokenType.REFRESH);
+        IssuedJwtToken accessToken = jwtTokenService.issue(
+                account.getId(), account.getSessionVersion(), JwtTokenType.ACCESS);
+        IssuedJwtToken newRefreshToken = jwtTokenService.issue(
+                account.getId(), account.getSessionVersion(), JwtTokenType.REFRESH);
         refreshTokenRepository.save(createRefreshMetadata(account, newRefreshToken));
 
         return new RefreshResult(

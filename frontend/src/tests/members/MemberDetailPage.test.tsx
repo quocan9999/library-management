@@ -186,6 +186,96 @@ describe('MemberDetailPage', () => {
     expect(await screen.findByText('Nguyễn Bình')).toBeTruthy();
   });
 
+  it('confirms status changes on the detail page and warns with the borrowed item count', async () => {
+    authState.permissions = ['member:read', 'member:status:update'];
+    let detailReads = 0;
+    let statusBody: unknown;
+    let latestMember = member;
+    const emptyPage: PageResponse<LoanHistoryItem> = {
+      content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true,
+    };
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/members/17' && config.method === 'get') {
+        detailReads += 1;
+        return response(config, success('MEMBER_DETAIL_SUCCESS', latestMember));
+      }
+      if (config.url === '/api/v1/members/17/loan-history') {
+        return response(config, success('MEMBER_LOAN_HISTORY_SUCCESS', emptyPage));
+      }
+      if (config.url === '/api/v1/members/17/account-status' && config.method === 'patch') {
+        statusBody = JSON.parse(String(config.data));
+        latestMember = { ...member, enabled: false };
+        return response(config, success('MEMBER_ACCOUNT_STATUS_UPDATED', latestMember));
+      }
+      throw new Error(`Unexpected request ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/admin/members/17']}>
+      <Routes><Route path="/admin/members/:id" element={<MemberDetailPage />} /></Routes>
+    </MemoryRouter>);
+    expect(await screen.findByText('M000017')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Vô hiệu hóa tài khoản' }));
+    expect(await screen.findByRole('dialog', { name: 'Xác nhận vô hiệu hóa tài khoản' })).toBeTruthy();
+    expect(screen.getByText('Đang mượn 1 cuốn sách chưa trả')).toBeTruthy();
+    expect(screen.getByText(/M000017.*không thể đăng nhập/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Vô hiệu hóa' }));
+
+    await waitFor(() => expect(statusBody).toEqual({ expectedEnabled: true, enabled: false }));
+    await waitFor(() => expect(detailReads).toBe(2));
+    expect(await screen.findByRole('button', { name: 'Kích hoạt tài khoản' })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('closes a conflicted status confirmation and reloads member details without retrying', async () => {
+    authState.permissions = ['member:read', 'member:status:update'];
+    let detailReads = 0;
+    let statusAttempts = 0;
+    const emptyPage: PageResponse<LoanHistoryItem> = {
+      content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true,
+    };
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/members/17' && config.method === 'get') {
+        detailReads += 1;
+        return response(config, success('MEMBER_DETAIL_SUCCESS', detailReads === 1 ? member : { ...member, enabled: false }));
+      }
+      if (config.url === '/api/v1/members/17/loan-history') {
+        return response(config, success('MEMBER_LOAN_HISTORY_SUCCESS', emptyPage));
+      }
+      if (config.url === '/api/v1/members/17/account-status' && config.method === 'patch') {
+        statusAttempts += 1;
+        const conflict: ApiEnvelope<null> = {
+          success: false,
+          status: 409,
+          code: 'MEMBER_ACCOUNT_STATUS_CONFLICT',
+          message: 'Status changed.',
+          data: null,
+          timestamp: '2026-10-01T00:00:00Z',
+        };
+        throw new AxiosError('Conflict', 'ERR_BAD_REQUEST', config, undefined, {
+          data: conflict,
+          status: 409,
+          statusText: 'Conflict',
+          headers: new AxiosHeaders(),
+          config,
+        });
+      }
+      throw new Error(`Unexpected request ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/admin/members/17']}>
+      <Routes><Route path="/admin/members/:id" element={<MemberDetailPage />} /></Routes>
+    </MemoryRouter>);
+    await screen.findByText('M000017');
+    fireEvent.click(screen.getByRole('button', { name: 'Vô hiệu hóa tài khoản' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Vô hiệu hóa' }));
+
+    expect(await screen.findByText('Trạng thái tài khoản đã thay đổi. Hồ sơ đã được tải lại.')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Kích hoạt tài khoản' })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(statusAttempts).toBe(1);
+    expect(detailReads).toBe(2);
+  });
+
   it('keeps stale edits intact until a confirmed reload fetches the new version', async () => {
     authState.permissions = ['member:read', 'member:update'];
     let patchCount = 0;

@@ -3,6 +3,7 @@ package sparkminds.librarymanagement.integration.member;
 import com.jayway.jsonpath.JsonPath;
 import liquibase.integration.spring.SpringLiquibase;
 import jakarta.persistence.EntityManager;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,9 +11,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.transaction.AfterTransaction;
 import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,6 +23,16 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
+import sparkminds.librarymanagement.auth.entity.Account;
+import sparkminds.librarymanagement.auth.entity.RefreshToken;
+import sparkminds.librarymanagement.auth.repository.AccountRepository;
+import sparkminds.librarymanagement.auth.repository.RefreshTokenRepository;
+import sparkminds.librarymanagement.auth.security.jwt.IssuedJwtToken;
+import sparkminds.librarymanagement.auth.security.jwt.JwtTokenService;
+import sparkminds.librarymanagement.auth.security.jwt.JwtTokenType;
+import sparkminds.librarymanagement.auth.service.RefreshCookieFactory;
+import sparkminds.librarymanagement.member.dto.MemberAccountStatusRequest;
+import sparkminds.librarymanagement.member.service.MemberAccountStatusService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,6 +50,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -64,10 +81,27 @@ class MemberQueryApiIntegrationTests {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @MockitoSpyBean
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private JwtTokenService jwtTokenService;
+
+    @Autowired
+    private MemberAccountStatusService memberAccountStatusService;
+
     @Value("${spring.datasource.url}")
     private String datasourceUrl;
 
     private Map<String, Long> beforeCounts;
+    private List<AccountState> beforeAccountStates;
+    private List<RefreshTokenState> beforeRefreshTokenStates;
     private LocalDateTime fixtureStartedAt;
     private final Set<RefreshTokenFixture> issuedRefreshFixtures = new HashSet<>();
 
@@ -76,6 +110,8 @@ class MemberQueryApiIntegrationTests {
         assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
                 .isEqualTo("library_management_member");
         beforeCounts = tableCounts();
+        beforeAccountStates = accountStates();
+        beforeRefreshTokenStates = refreshTokenStates();
         fixtureStartedAt = LocalDateTime.now().minusSeconds(2);
         issuedRefreshFixtures.clear();
     }
@@ -87,6 +123,8 @@ class MemberQueryApiIntegrationTests {
                     fixture.id(), fixture.accountId(), fixture.jti());
         }
         assertThat(tableCounts()).isEqualTo(beforeCounts);
+        assertThat(accountStates()).isEqualTo(beforeAccountStates);
+        assertThat(refreshTokenStates()).isEqualTo(beforeRefreshTokenStates);
     }
 
     @Test
@@ -131,6 +169,204 @@ class MemberQueryApiIntegrationTests {
                 SELECT COUNT(*) FROM DATABASECHANGELOG
                 WHERE ID IN ('026-member-phone-unique', '027-member-version', '028-seed-member-status-permission')
                 """, Integer.class)).isEqualTo(3);
+    }
+
+    @Test
+    void migrationAddsDefaultedAccountSessionVersion() {
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'accounts'
+                  AND column_name = 'session_version' AND data_type = 'bigint'
+                  AND is_nullable = 'NO' AND column_default = '0'
+                """, Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM DATABASECHANGELOG WHERE ID = '029-account-session-version'
+                """, Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void accountStatusEndpointRequiresStatusPermissionAndRevokesMemberAccess() throws Exception {
+        String adminToken = login("admin", "admin");
+        String userToken = login("user", "user");
+        MemberFixture fixture = createMember("MMV8-P04-STATUS-" + UUID.randomUUID().toString().substring(0, 8),
+                "Status Fixture", "0370000091", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+        String body = "{\"expectedEnabled\":true,\"enabled\":false}";
+
+        mockMvc.perform(patch("/api/v1/members/{id}/account-status", fixture.memberId())
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+
+        mockMvc.perform(patch("/api/v1/members/{id}/account-status", fixture.memberId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("MEMBER_ACCOUNT_STATUS_UPDATED"))
+                .andExpect(jsonPath("$.data.enabled").value(false));
+
+        Integer accountId = jdbcTemplate.queryForObject(
+                "SELECT account_id FROM members WHERE id = ?", Integer.class, fixture.memberId());
+        assertThat(jdbcTemplate.queryForObject("SELECT enabled FROM accounts WHERE id = ?", Boolean.class, accountId))
+                .isFalse();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT session_version FROM accounts WHERE id = ?", Long.class, accountId)).isEqualTo(1L);
+    }
+
+    @Test
+    void accountStatusCompareAndSetRejectsNoopStaleStateAndMissingMember() throws Exception {
+        String adminToken = login("admin", "admin");
+        MemberFixture fixture = createMember("MMV8-P04-CAS-" + UUID.randomUUID().toString().substring(0, 8),
+                "Status CAS Fixture", "0370000096", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+
+        mockMvc.perform(patch("/api/v1/members/{id}/account-status", fixture.memberId())
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"expectedEnabled\":true,\"enabled\":false}"))
+                .andExpect(status().isUnauthorized());
+        patchAccountStatus(adminToken, fixture.memberId(), true, true)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MEMBER_ACCOUNT_STATUS_INVALID"));
+        patchAccountStatus(adminToken, fixture.memberId(), false, true)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER_ACCOUNT_STATUS_CONFLICT"));
+        patchAccountStatus(adminToken, 99999999, true, false)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
+
+        Integer accountId = jdbcTemplate.queryForObject(
+                "SELECT account_id FROM members WHERE id = ?", Integer.class, fixture.memberId());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT enabled FROM accounts WHERE id = ?", Boolean.class, accountId)).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT session_version FROM accounts WHERE id = ?", Long.class, accountId)).isZero();
+    }
+
+    @Test
+    void refreshRevocationFailureRollsBackAccountStatusAndSessionVersionTogether() {
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        MemberFixture fixture = requiresNew.execute(status -> createMember(
+                "MMV8-P04-ROLLBACK-" + UUID.randomUUID().toString().substring(0, 8), "Rollback Fixture",
+                "0370000095", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now()));
+        Integer accountId = requiresNew.execute(status -> jdbcTemplate.queryForObject(
+                "SELECT account_id FROM members WHERE id = ?", Integer.class, fixture.memberId()));
+        Account account = requiresNew.execute(status -> accountRepository.findById(accountId).orElseThrow());
+        IssuedJwtToken issued = jwtTokenService.issue(accountId, account.getSessionVersion(), JwtTokenType.REFRESH);
+        requiresNew.executeWithoutResult(status -> {
+            RefreshToken token = new RefreshToken();
+            token.setAccount(accountRepository.findById(accountId).orElseThrow());
+            token.setJti(issued.jti());
+            token.setExpiresAt(LocalDateTime.ofInstant(issued.expiresAt(), java.time.ZoneOffset.UTC));
+            refreshTokenRepository.saveAndFlush(token);
+        });
+
+        doThrow(new IllegalStateException("fixture revoke failure"))
+                .when(refreshTokenRepository).revokeActiveByAccountId(anyInt(), any(LocalDateTime.class));
+        try {
+            assertThatThrownBy(() -> requiresNew.executeWithoutResult(status ->
+                    memberAccountStatusService.updateStatus(
+                            fixture.memberId(), new MemberAccountStatusRequest(true, false))))
+                    .isInstanceOf(IllegalStateException.class);
+
+            Boolean enabled = requiresNew.execute(status -> jdbcTemplate.queryForObject(
+                    "SELECT enabled FROM accounts WHERE id = ?", Boolean.class, accountId));
+            Long sessionVersion = requiresNew.execute(status -> jdbcTemplate.queryForObject(
+                    "SELECT session_version FROM accounts WHERE id = ?", Long.class, accountId));
+            LocalDateTime revokedAt = requiresNew.execute(status -> jdbcTemplate.queryForObject(
+                    "SELECT revoked_at FROM refresh_tokens WHERE jti = ?", LocalDateTime.class, issued.jti()));
+            assertThat(enabled).isTrue();
+            assertThat(sessionVersion).isZero();
+            assertThat(revokedAt).isNull();
+        } finally {
+            requiresNew.executeWithoutResult(status -> {
+                jdbcTemplate.update("DELETE FROM refresh_tokens WHERE jti = ?", issued.jti());
+                deleteCommittedFixture(fixture.memberId());
+            });
+        }
+    }
+
+    @Test
+    void disablingAndReenablingMemberInvalidatesEveryOldDeviceSession() throws Exception {
+        String memberCode = "MMV8-P04-SESSION-" + UUID.randomUUID().toString().substring(0, 8);
+        jdbcTemplate.update("""
+                INSERT INTO members (account_id, member_code, full_name, date_of_birth, phone, address)
+                SELECT id, ?, 'Session Fixture', '1990-01-01', '0370000092', 'Fixture address'
+                FROM accounts WHERE username = 'user'
+                """, memberCode);
+        Integer memberId = jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE member_code = ?", Integer.class, memberCode);
+        LoginSession firstDevice = loginSessionData("user", "user");
+        LoginSession secondDevice = loginSessionData("user", "user");
+        String adminToken = login("admin", "admin");
+        int userStatusPermission = permissionLinkCount("ROLE_USER", "member:status:update");
+
+        patchAccountStatus(adminToken, memberId, true, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled").value(false));
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM refresh_tokens
+                WHERE account_id = (SELECT id FROM accounts WHERE username = 'user')
+                  AND revoked_at IS NOT NULL
+                """, Integer.class)).isGreaterThanOrEqualTo(2);
+
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + firstDevice.accessToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_DISABLED"));
+        refresh(firstDevice.refreshToken())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_DISABLED"));
+
+        patchAccountStatus(adminToken, memberId, false, true)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled").value(true));
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + secondDevice.accessToken()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_TOKEN_INVALID"));
+        refresh(secondDevice.refreshToken())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_REFRESH_TOKEN_REVOKED"));
+
+        LoginSession freshDevice = loginSessionData("user", "user");
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + freshDevice.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("AUTH_ME_SUCCESS"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT session_version FROM accounts WHERE username = 'user'", Long.class)).isEqualTo(2L);
+        assertThat(permissionLinkCount("ROLE_USER", "member:status:update")).isEqualTo(userStatusPermission);
+    }
+
+    @Test
+    void disableCountsBorrowedItemsAcrossLoansWithoutChangingLoanHistory() throws Exception {
+        String token = login("admin", "admin");
+        MemberFixture fixture = createMember("MMV8-P04-COUNT-" + UUID.randomUUID().toString().substring(0, 8),
+                "Borrow Count Fixture", "0370000093", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+        int firstBook = createBook("MMV8-P04-B1-" + UUID.randomUUID().toString().substring(0, 6),
+                "Borrowed one", "978-0-00-000001-1");
+        int secondBook = createBook("MMV8-P04-B2-" + UUID.randomUUID().toString().substring(0, 6),
+                "Borrowed two", "978-0-00-000002-8");
+        int thirdBook = createBook("MMV8-P04-B3-" + UUID.randomUUID().toString().substring(0, 6),
+                "Borrowed three", "978-0-00-000003-5");
+        LocalDateTime borrowedAt = LocalDateTime.now().minusDays(2);
+        int firstLoan = createLoan(fixture.memberId(), "MMV8-P04-L1-" + UUID.randomUUID().toString().substring(0, 6),
+                borrowedAt, "ACTIVE");
+        int secondLoan = createLoan(fixture.memberId(), "MMV8-P04-L2-" + UUID.randomUUID().toString().substring(0, 6),
+                borrowedAt.plusHours(1), "ACTIVE");
+        createLoanItem(firstLoan, firstBook, "BORROWED", new BigDecimal("25.00"), new BigDecimal("1.50"),
+                BigDecimal.ZERO, null);
+        createLoanItem(firstLoan, secondBook, "BORROWED", new BigDecimal("25.00"), new BigDecimal("1.50"),
+                BigDecimal.ZERO, null);
+        createLoanItem(secondLoan, thirdBook, "BORROWED", new BigDecimal("25.00"), new BigDecimal("1.50"),
+                BigDecimal.ZERO, null);
+
+        patchAccountStatus(token, fixture.memberId(), true, false)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled").value(false))
+                .andExpect(jsonPath("$.data.borrowedItemCount").value(3));
+        history(token, fixture.memberId(), "status", "BORROWED")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(3));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM loans WHERE member_id = ?", Integer.class, fixture.memberId())).isEqualTo(2);
     }
 
     @Test
@@ -543,6 +779,164 @@ class MemberQueryApiIntegrationTests {
     }
 
     @Test
+    void refreshRacingWithDisableCannotLeaveAUsablePostCommitSession() throws Exception {
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        MemberFixture fixture = requiresNew.execute(status -> createLoginableMember("RR"));
+        String adminToken = login("admin", "admin");
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        try {
+            MvcResult initialLogin = executor.submit(() -> fixtureLogin(fixture.email(), "MmV8-TestLogin1!"))
+                    .get(20, TimeUnit.SECONDS);
+            assertThat(initialLogin.getResponse().getStatus()).isEqualTo(200);
+            String originalAccess = JsonPath.read(body(initialLogin), "$.data.accessToken");
+            String originalRefresh = refreshCookie(initialLogin.getResponse().getHeader("Set-Cookie"));
+
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch start = new CountDownLatch(1);
+            Future<MvcResult> refresh = executor.submit(() -> concurrentRefresh(ready, start, originalRefresh));
+            Future<MvcResult> disable = executor.submit(() -> concurrentStatusPatch(
+                    ready, start, adminToken, fixture.memberId()));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            MvcResult refreshResult = refresh.get(20, TimeUnit.SECONDS);
+            MvcResult disableResult = disable.get(20, TimeUnit.SECONDS);
+
+            assertThat(disableResult.getResponse().getStatus()).isEqualTo(200);
+            assertThat(refreshResult.getResponse().getStatus()).isIn(200, 403);
+            if (refreshResult.getResponse().getStatus() == 403) {
+                assertThat(JsonPath.<String>read(body(refreshResult), "$.code")).isEqualTo("AUTH_ACCOUNT_DISABLED");
+            }
+            List<String> accessTokens = new java.util.ArrayList<>(List.of(originalAccess));
+            List<String> refreshTokens = new java.util.ArrayList<>(List.of(originalRefresh));
+            if (refreshResult.getResponse().getStatus() == 200) {
+                accessTokens.add(JsonPath.read(body(refreshResult), "$.data.accessToken"));
+                refreshTokens.add(refreshCookie(refreshResult.getResponse().getHeader("Set-Cookie")));
+            }
+            for (String access : accessTokens) {
+                MvcResult accessAfterCommit = executor.submit(() -> mockMvc.perform(
+                        get("/api/v1/auth/me").header("Authorization", "Bearer " + access)).andReturn())
+                        .get(20, TimeUnit.SECONDS);
+                assertThat(accessAfterCommit.getResponse().getStatus()).isEqualTo(403);
+                assertThat(JsonPath.<String>read(body(accessAfterCommit), "$.code")).isEqualTo("AUTH_ACCOUNT_DISABLED");
+            }
+            for (String refreshToken : refreshTokens) {
+                MvcResult refreshAfterCommit = executor.submit(() -> refresh(refreshToken).andReturn())
+                        .get(20, TimeUnit.SECONDS);
+                assertThat(refreshAfterCommit.getResponse().getStatus()).isEqualTo(403);
+                assertThat(JsonPath.<String>read(body(refreshAfterCommit), "$.code")).isEqualTo("AUTH_ACCOUNT_DISABLED");
+            }
+            Integer activeRefreshes = requiresNew.execute(status -> jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM refresh_tokens r JOIN members m ON m.account_id = r.account_id
+                    WHERE m.id = ? AND r.revoked_at IS NULL
+                    """, Integer.class, fixture.memberId()));
+            assertThat(activeRefreshes).isZero();
+        } finally {
+            executor.shutdownNow();
+            requiresNew.executeWithoutResult(status -> {
+                Integer accountId = jdbcTemplate.queryForObject(
+                        "SELECT account_id FROM members WHERE id = ?", Integer.class, fixture.memberId());
+                jdbcTemplate.update("DELETE FROM refresh_tokens WHERE account_id = ?", accountId);
+                deleteCommittedFixture(fixture.memberId());
+            });
+        }
+    }
+
+    @Test
+    void loginRacingWithDisableCannotLeaveAUsablePostCommitSession() throws Exception {
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        MemberFixture fixture = requiresNew.execute(status -> createLoginableMember("LR"));
+        String adminToken = login("admin", "admin");
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<MvcResult> login = executor.submit(() -> concurrentFixtureLogin(
+                    ready, start, fixture.email(), "MmV8-TestLogin1!"));
+            Future<MvcResult> disable = executor.submit(() -> concurrentStatusPatch(
+                    ready, start, adminToken, fixture.memberId()));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            MvcResult loginResult = login.get(20, TimeUnit.SECONDS);
+            MvcResult disableResult = disable.get(20, TimeUnit.SECONDS);
+
+            assertThat(disableResult.getResponse().getStatus()).isEqualTo(200);
+            assertThat(loginResult.getResponse().getStatus()).isIn(200, 403);
+            if (loginResult.getResponse().getStatus() == 403) {
+                assertThat(JsonPath.<String>read(body(loginResult), "$.code")).isEqualTo("AUTH_ACCOUNT_DISABLED");
+            } else {
+                String accessToken = JsonPath.read(body(loginResult), "$.data.accessToken");
+                String refreshToken = refreshCookie(loginResult.getResponse().getHeader("Set-Cookie"));
+                MvcResult accessAfterCommit = executor.submit(() -> mockMvc.perform(
+                        get("/api/v1/auth/me").header("Authorization", "Bearer " + accessToken)).andReturn())
+                        .get(20, TimeUnit.SECONDS);
+                MvcResult refreshAfterCommit = executor.submit(() -> refresh(refreshToken).andReturn())
+                        .get(20, TimeUnit.SECONDS);
+                assertThat(accessAfterCommit.getResponse().getStatus()).isEqualTo(403);
+                assertThat(JsonPath.<String>read(body(accessAfterCommit), "$.code")).isEqualTo("AUTH_ACCOUNT_DISABLED");
+                assertThat(refreshAfterCommit.getResponse().getStatus()).isEqualTo(403);
+                assertThat(JsonPath.<String>read(body(refreshAfterCommit), "$.code")).isEqualTo("AUTH_ACCOUNT_DISABLED");
+            }
+
+            Boolean enabled = requiresNew.execute(status -> jdbcTemplate.queryForObject("""
+                    SELECT a.enabled FROM accounts a JOIN members m ON m.account_id = a.id WHERE m.id = ?
+                    """, Boolean.class, fixture.memberId()));
+            Long sessionVersion = requiresNew.execute(status -> jdbcTemplate.queryForObject("""
+                    SELECT a.session_version FROM accounts a JOIN members m ON m.account_id = a.id WHERE m.id = ?
+                    """, Long.class, fixture.memberId()));
+            assertThat(enabled).isFalse();
+            assertThat(sessionVersion).isEqualTo(1L);
+        } finally {
+            executor.shutdownNow();
+            requiresNew.executeWithoutResult(status -> {
+                Integer accountId = jdbcTemplate.queryForObject(
+                        "SELECT account_id FROM members WHERE id = ?", Integer.class, fixture.memberId());
+                jdbcTemplate.update("DELETE FROM refresh_tokens WHERE account_id = ?", accountId);
+                deleteCommittedFixture(fixture.memberId());
+            });
+        }
+    }
+
+    @Test
+    void concurrentSameExpectedAccountStatusUpdatesHaveOneWinnerAndOneConflict() throws Exception {
+        String firstAdmin = login("admin", "admin");
+        String secondAdmin = login("admin", "admin");
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        MemberFixture fixture = requiresNew.execute(status -> createMember(
+                "MMV8-P04-RACE-" + UUID.randomUUID().toString().substring(0, 8), "Status Race Fixture",
+                "0370000094", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now()));
+        assertThat(fixture).isNotNull();
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<MvcResult> first = executor.submit(() -> concurrentStatusPatch(
+                    ready, start, firstAdmin, fixture.memberId()));
+            Future<MvcResult> second = executor.submit(() -> concurrentStatusPatch(
+                    ready, start, secondAdmin, fixture.memberId()));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            MvcResult firstResult = first.get(20, TimeUnit.SECONDS);
+            MvcResult secondResult = second.get(20, TimeUnit.SECONDS);
+
+            assertThat(List.of(firstResult.getResponse().getStatus(), secondResult.getResponse().getStatus()))
+                    .containsExactlyInAnyOrder(200, 409);
+            String conflict = firstResult.getResponse().getStatus() == 409 ? body(firstResult) : body(secondResult);
+            assertThat(JsonPath.<String>read(conflict, "$.code")).isEqualTo("MEMBER_ACCOUNT_STATUS_CONFLICT");
+            Long sessionVersion = requiresNew.execute(status -> jdbcTemplate.queryForObject("""
+                    SELECT session_version FROM accounts a JOIN members m ON m.account_id = a.id WHERE m.id = ?
+                    """, Long.class, fixture.memberId()));
+            assertThat(sessionVersion).isEqualTo(1L);
+        } finally {
+            executor.shutdownNow();
+            requiresNew.executeWithoutResult(status -> deleteCommittedFixture(fixture.memberId()));
+        }
+    }
+
+    @Test
     void concurrentHttpUpdatesCannotAssignOnePhoneToTwoMembers() throws Exception {
         String firstAdmin = login("admin", "admin");
         String secondAdmin = login("admin", "admin");
@@ -609,6 +1003,48 @@ class MemberQueryApiIntegrationTests {
         return patchProfile(token, memberId, "{\"version\":0,\"phone\":\"0388.919.222\"}").andReturn();
     }
 
+    private MvcResult concurrentStatusPatch(
+            CountDownLatch ready,
+            CountDownLatch start,
+            String token,
+            Integer memberId
+    ) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent status start timed out.");
+        return patchAccountStatus(token, memberId, true, false).andReturn();
+    }
+
+    private MvcResult concurrentFixtureLogin(
+            CountDownLatch ready,
+            CountDownLatch start,
+            String identifier,
+            String password
+    ) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent login start timed out.");
+        return mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(APPLICATION_JSON)
+                .content("{\"identifier\":\"" + identifier + "\",\"password\":\"" + password + "\"}"))
+                .andReturn();
+    }
+
+    private MvcResult fixtureLogin(String identifier, String password) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(APPLICATION_JSON)
+                .content("{\"identifier\":\"" + identifier + "\",\"password\":\"" + password + "\"}"))
+                .andReturn();
+    }
+
+    private MvcResult concurrentRefresh(
+            CountDownLatch ready,
+            CountDownLatch start,
+            String refreshToken
+    ) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent refresh start timed out.");
+        return refresh(refreshToken).andReturn();
+    }
+
     private void deleteCommittedFixture(Integer memberId) {
         Integer accountId = jdbcTemplate.queryForObject(
                 "SELECT account_id FROM members WHERE id = ?", Integer.class, memberId);
@@ -624,14 +1060,40 @@ class MemberQueryApiIntegrationTests {
         return mockMvc.perform(request);
     }
 
+    private ResultActions patchAccountStatus(String token, Integer memberId, boolean expectedEnabled, boolean enabled)
+            throws Exception {
+        return mockMvc.perform(patch("/api/v1/members/{id}/account-status", memberId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(APPLICATION_JSON)
+                .content("{\"expectedEnabled\":" + expectedEnabled + ",\"enabled\":" + enabled + "}"));
+    }
+
+    private ResultActions refresh(String refreshToken) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/refresh")
+                .cookie(new Cookie(RefreshCookieFactory.NAME, refreshToken)));
+    }
+
     private String login(String identifier, String password) throws Exception {
+        return loginSessionData(identifier, password).accessToken();
+    }
+
+    private LoginSession loginSessionData(String identifier, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(APPLICATION_JSON)
                         .content("{\"identifier\":\"" + identifier + "\",\"password\":\"" + password + "\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
         recordIssuedRefreshFixture(identifier);
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.data.accessToken");
+        return new LoginSession(
+                JsonPath.read(result.getResponse().getContentAsString(), "$.data.accessToken"),
+                refreshCookie(result.getResponse().getHeader("Set-Cookie"))
+        );
+    }
+
+    private static String refreshCookie(String setCookie) {
+        int valueStart = setCookie.indexOf('=') + 1;
+        int valueEnd = setCookie.indexOf(';', valueStart);
+        return setCookie.substring(valueStart, valueEnd);
     }
 
     private void recordIssuedRefreshFixture(String identifier) {
@@ -696,6 +1158,26 @@ class MemberQueryApiIntegrationTests {
                                      created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, 'Fixture address', ?, ?)
                 """, accountId, memberCode, fullName, dateOfBirth, phone, createdAt, createdAt);
+        Integer memberId = jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE member_code = ?", Integer.class, memberCode);
+        return new MemberFixture(memberId, email);
+    }
+
+    private MemberFixture createLoginableMember(String label) {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        String username = "mmv8p04" + suffix;
+        String email = "mmv8.p04." + suffix + "@example.test";
+        jdbcTemplate.update("""
+                INSERT INTO accounts (username, email, password_hash, role_id, email_verified, enabled)
+                SELECT ?, ?, ?, id, true, true FROM roles WHERE code = 'ROLE_USER'
+                """, username, email, passwordEncoder.encode("MmV8-TestLogin1!"));
+        Integer accountId = jdbcTemplate.queryForObject(
+                "SELECT id FROM accounts WHERE username = ?", Integer.class, username);
+        String memberCode = "MMV8-P04-" + label + "-" + suffix;
+        jdbcTemplate.update("""
+                INSERT INTO members (account_id, member_code, full_name, date_of_birth, phone, address)
+                VALUES (?, ?, 'Session Race Fixture', '1990-01-01', ?, 'Fixture address')
+                """, accountId, memberCode, String.format("03%08d", accountId));
         Integer memberId = jdbcTemplate.queryForObject(
                 "SELECT id FROM members WHERE member_code = ?", Integer.class, memberCode);
         return new MemberFixture(memberId, email);
@@ -772,6 +1254,23 @@ class MemberQueryApiIntegrationTests {
         return counts;
     }
 
+    private List<AccountState> accountStates() {
+        return jdbcTemplate.query("""
+                SELECT id, role_id, email_verified, enabled, session_version
+                FROM accounts ORDER BY id
+                """, (result, rowNumber) -> new AccountState(
+                result.getInt("id"), result.getInt("role_id"), result.getBoolean("email_verified"),
+                result.getBoolean("enabled"), result.getLong("session_version")));
+    }
+
+    private List<RefreshTokenState> refreshTokenStates() {
+        return jdbcTemplate.query("""
+                SELECT id, account_id, jti, revoked_at FROM refresh_tokens ORDER BY id
+                """, (result, rowNumber) -> new RefreshTokenState(
+                result.getInt("id"), result.getInt("account_id"), result.getString("jti"),
+                result.getTimestamp("revoked_at") == null ? null : result.getTimestamp("revoked_at").toLocalDateTime()));
+    }
+
     private static String body(MvcResult result) {
         try {
             return result.getResponse().getContentAsString();
@@ -787,6 +1286,15 @@ class MemberQueryApiIntegrationTests {
     private record MemberFixture(Integer memberId, String email) {
     }
 
+    private record LoginSession(String accessToken, String refreshToken) {
+    }
+
     private record RefreshTokenFixture(Integer id, Integer accountId, String jti) {
+    }
+
+    private record AccountState(Integer id, Integer roleId, boolean emailVerified, boolean enabled, long sessionVersion) {
+    }
+
+    private record RefreshTokenState(Integer id, Integer accountId, String jti, LocalDateTime revokedAt) {
     }
 }

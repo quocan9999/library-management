@@ -12,6 +12,7 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -23,7 +24,7 @@ import java.util.UUID;
 @Service
 public class JwtTokenService {
 
-    private static final Set<String> ALLOWED_CLAIMS = Set.of("sub", "jti", "type", "iat", "exp");
+    private static final Set<String> ALLOWED_CLAIMS = Set.of("sub", "jti", "type", "iat", "exp", "sessionVersion");
     private static final String ALGORITHM = "HS256";
 
     private final SecretKey signingKey;
@@ -38,8 +39,8 @@ public class JwtTokenService {
         requirePositive(properties.refreshTokenTtl(), "refresh token TTL");
     }
 
-    public IssuedJwtToken issue(Integer accountId, JwtTokenType type) {
-        if (accountId == null || accountId <= 0 || type == null) {
+    public IssuedJwtToken issue(Integer accountId, long sessionVersion, JwtTokenType type) {
+        if (accountId == null || accountId <= 0 || sessionVersion < 0 || type == null) {
             throw new IllegalArgumentException("A valid account and JWT type are required");
         }
 
@@ -50,6 +51,7 @@ public class JwtTokenService {
                 .subject(accountId.toString())
                 .id(jti)
                 .claim("type", type.name())
+                .claim("sessionVersion", sessionVersion)
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(expiresAt))
                 .signWith(signingKey, Jwts.SIG.HS256)
@@ -83,11 +85,12 @@ public class JwtTokenService {
             JwtTokenType actualType = JwtTokenType.valueOf(claims.get("type", String.class));
             Instant issuedAt = claims.getIssuedAt().toInstant();
             Instant expiresAt = claims.getExpiration().toInstant();
+            long sessionVersion = readSessionVersion(claims.get("sessionVersion"));
             if (accountId <= 0 || issuedAt.isAfter(clock.instant()) || !expiresAt.isAfter(issuedAt)
                     || actualType != expectedType) {
                 throw new InvalidJwtTokenException();
             }
-            return new VerifiedJwtToken(accountId, jti, actualType, issuedAt, expiresAt);
+            return new VerifiedJwtToken(accountId, jti, actualType, issuedAt, expiresAt, sessionVersion);
         } catch (ExpiredJwtException exception) {
             throw new ExpiredJwtTokenException();
         } catch (InvalidJwtTokenException | ExpiredJwtTokenException exception) {
@@ -103,6 +106,21 @@ public class JwtTokenService {
 
     private Duration ttlFor(JwtTokenType type) {
         return type == JwtTokenType.ACCESS ? properties.accessTokenTtl() : properties.refreshTokenTtl();
+    }
+
+    private static long readSessionVersion(Object claim) {
+        if (!(claim instanceof Number)) {
+            throw new InvalidJwtTokenException();
+        }
+        try {
+            long version = new BigDecimal(claim.toString()).longValueExact();
+            if (version < 0) {
+                throw new InvalidJwtTokenException();
+            }
+            return version;
+        } catch (NumberFormatException | ArithmeticException exception) {
+            throw new InvalidJwtTokenException(exception);
+        }
     }
 
     private static SecretKey decodeSigningKey(String encodedSecret) {

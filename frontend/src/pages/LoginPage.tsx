@@ -2,7 +2,7 @@ import { Alert, Button, Input } from 'antd';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { loginSchema, type LoginForm } from '../auth/loginSchema';
 import { getLoginError, mapLoginValidationErrors } from '../auth/messages';
@@ -13,6 +13,8 @@ import { ResendVerificationForm } from './ResendVerificationForm';
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const accountDisabledNotice = (location.state as { accountDisabled?: unknown } | null)?.accountDisabled === true;
   const [serverError, setServerError] = useState<ReturnType<typeof getLoginError> | null>(null);
   const {
     control,
@@ -59,6 +61,15 @@ export function LoginPage() {
         <p className="eyebrow">TRUY CẬP HỆ THỐNG</p>
         <h1>Chào mừng bạn quay lại</h1>
         <p className="login-intro">Đăng nhập để tiếp tục sử dụng hệ thống quản lý thư viện.</p>
+
+        {accountDisabledNotice && <Alert
+          className="login-alert"
+          type="warning"
+          showIcon
+          role="status"
+          title="Phiên đăng nhập đã bị thu hồi"
+          description="Tài khoản thành viên đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hỗ trợ."
+        />}
 
         <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
           {serverError && (

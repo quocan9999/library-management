@@ -13,6 +13,9 @@ import type {
   RegisterData,
 } from './types';
 import { requestCapabilityRefresh } from './capabilityEvents';
+import { clearMemberListState } from '../features/members/listState';
+
+export const ACCOUNT_DISABLED_EVENT = 'auth:account-disabled';
 
 type AuthRequestConfig = InternalAxiosRequestConfig & {
   skipAccessToken?: boolean;
@@ -74,6 +77,14 @@ apiClient.interceptors.response.use(
   async (error: AxiosError<ApiEnvelope<unknown>>) => {
     const config = error.config as AuthRequestConfig | undefined;
     const errorCode = error.response?.data?.code;
+    const isAccountDisabled = error.response?.status === 403 && errorCode === 'AUTH_ACCOUNT_DISABLED';
+    const isRefreshRequest = config?.url?.includes('/api/v1/auth/refresh') === true;
+    if (isAccountDisabled && (isRefreshRequest || (!config?.skipAccessToken && getAccessToken()))) {
+      // Backend xác nhận tài khoản đã khóa; xóa phiên và bộ lọc Member trước khi chuyển về đăng nhập.
+      setAccessToken(null);
+      clearMemberListState();
+      window.dispatchEvent(new Event(ACCOUNT_DISABLED_EVENT));
+    }
     const isPermissionDenied = error.response?.status === 403 && errorCode === 'PERMISSION_DENIED';
     const isCurrentAccountRequest = config?.url?.includes('/api/v1/auth/me');
     if (isPermissionDenied && !isCurrentAccountRequest) requestCapabilityRefresh();
