@@ -9,6 +9,8 @@ import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { RoleManagementPage } from '../role/RoleManagementPage';
+import { MemberDetailPage } from '../features/members/MemberDetailPage';
+import { MemberListPage } from '../features/members/MemberListPage';
 
 function SessionBootstrap() {
   return (
@@ -82,6 +84,22 @@ export function App() {
             element={
               <RequirePermission permission="role:read" allowedRoles={['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']}>
                 <RoleManagementPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="admin/members"
+            element={
+              <RequirePermission permission="member:read">
+                <MemberListPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="admin/members/:id"
+            element={
+              <RequirePermission permission="member:read">
+                <MemberDetailPage />
               </RequirePermission>
             }
           />

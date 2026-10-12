@@ -1,0 +1,47 @@
+import { apiClient } from '../../auth/api';
+import type { ApiEnvelope } from '../../auth/types';
+import type {
+  LoanHistoryItem,
+  LoanHistoryQuery,
+  MemberDetail,
+  MemberListItem,
+  MemberListQuery,
+  PageResponse,
+} from './types';
+
+function readRequiredData<T>(envelope: ApiEnvelope<T>, expectedCode: string): T {
+  if (!envelope.success || envelope.code !== expectedCode || envelope.data === null) {
+    throw new Error('Phản hồi quản lý thành viên không hợp lệ.');
+  }
+  return envelope.data;
+}
+
+export const memberApi = {
+  async getMembers(query: MemberListQuery, signal?: AbortSignal): Promise<PageResponse<MemberListItem>> {
+    const response = await apiClient.get<ApiEnvelope<PageResponse<MemberListItem>>>(
+      '/api/v1/members',
+      { params: query, signal },
+    );
+    return readRequiredData(response.data, 'MEMBER_LIST_SUCCESS');
+  },
+
+  async getMember(id: number, signal?: AbortSignal): Promise<MemberDetail> {
+    const response = await apiClient.get<ApiEnvelope<MemberDetail>>(
+      `/api/v1/members/${id}`,
+      { signal },
+    );
+    return readRequiredData(response.data, 'MEMBER_DETAIL_SUCCESS');
+  },
+
+  async getLoanHistory(
+    id: number,
+    query: LoanHistoryQuery,
+    signal?: AbortSignal,
+  ): Promise<PageResponse<LoanHistoryItem>> {
+    const response = await apiClient.get<ApiEnvelope<PageResponse<LoanHistoryItem>>>(
+      `/api/v1/members/${id}/loan-history`,
+      { params: query, signal },
+    );
+    return readRequiredData(response.data, 'MEMBER_LOAN_HISTORY_SUCCESS');
+  },
+};
