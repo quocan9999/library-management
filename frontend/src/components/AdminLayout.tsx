@@ -1,4 +1,4 @@
-import { Alert } from 'antd';
+import { Alert, Modal } from 'antd';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -118,6 +118,18 @@ export function AdminLayout() {
     }
   };
 
+  const confirmLogout = () => {
+    if (isLoggingOut) return;
+    Modal.confirm({
+      title: 'Xác nhận đăng xuất',
+      content: 'Bạn có chắc muốn đăng xuất khỏi hệ thống?',
+      centered: true,
+      okText: 'Đăng xuất',
+      cancelText: 'Ở lại',
+      onOk: handleLogout,
+    });
+  };
+
   const displayName = currentUser?.username?.trim()
     || currentUser?.email?.trim()
     || (currentUser ? `Tài khoản ${currentUser.id}` : 'Đang đồng bộ hồ sơ');
@@ -199,7 +211,7 @@ export function AdminLayout() {
           <button
             className="admin-shell__logout"
             type="button"
-            onClick={() => void handleLogout()}
+            onClick={confirmLogout}
             disabled={isLoggingOut}
           >
             <LogoutIcon />

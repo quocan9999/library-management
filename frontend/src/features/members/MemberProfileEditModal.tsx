@@ -6,7 +6,9 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import type { ApiEnvelope } from '../../auth/types';
+import { useAppNotification } from '../../components/AppNotificationProvider';
 import { memberApi } from './api';
+import { formatVietnamPhoneInput, normalizeVietnamPhone } from './phone';
 import type { MemberDetail, MemberProfilePatchInput } from './types';
 
 const vietnamMobile = /^0[35789]\d{8}$/;
@@ -27,15 +29,8 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
-function formatPhoneInput(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 10);
-  if (digits.length <= 4) return digits;
-  if (digits.length <= 7) return `${digits.slice(0, 4)}.${digits.slice(4)}`;
-  return `${digits.slice(0, 4)}.${digits.slice(4, 7)}.${digits.slice(7)}`;
-}
-
 function formatPhone(value: string | null): string {
-  return value ? formatPhoneInput(value) : '';
+  return value ? formatVietnamPhoneInput(value) : '';
 }
 
 function toFormValues(member: MemberDetail): ProfileFormValues {
@@ -47,10 +42,6 @@ function toFormValues(member: MemberDetail): ProfileFormValues {
   };
 }
 
-function normalizePhone(value: string): string {
-  return value.replace(/[.\s-]/g, '');
-}
-
 /** Chỉ gửi field đã đổi; ô trống chuyển thành null để người dùng chủ động xóa dữ liệu. */
 function buildPatch(member: MemberDetail, values: ProfileFormValues): MemberProfilePatchInput {
   const patch: MemberProfilePatchInput = { version: member.version };
@@ -58,8 +49,8 @@ function buildPatch(member: MemberDetail, values: ProfileFormValues): MemberProf
   const originalFullName = member.fullName?.trim() || null;
   const dateOfBirth = values.dateOfBirth.trim() || null;
   const phoneInput = values.phone.trim();
-  const phone = phoneInput ? normalizePhone(phoneInput) : null;
-  const originalPhone = member.phone ? normalizePhone(member.phone) : null;
+  const phone = phoneInput ? normalizeVietnamPhone(phoneInput) : null;
+  const originalPhone = member.phone ? normalizeVietnamPhone(member.phone) : null;
   const address = values.address.trim() || null;
   const originalAddress = member.address?.trim() || null;
 
@@ -88,6 +79,7 @@ export function MemberProfileEditModal({
   onSaved: () => void;
   onMemberReloaded: (member: MemberDetail) => void;
 }) {
+  const { notify } = useAppNotification();
   const [editSnapshot, setEditSnapshot] = useState(member);
   const [conflict, setConflict] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -136,6 +128,10 @@ export function MemberProfileEditModal({
     setSaving(true);
     try {
       await memberApi.patchProfile(editSnapshot.id, patch);
+      notify('success', {
+        title: 'Cập nhật hồ sơ thành công',
+        description: 'Hồ sơ thành viên đã được cập nhật.',
+      });
       onSaved();
     } catch (error: unknown) {
       const envelope = responseBody(error);
@@ -199,7 +195,8 @@ export function MemberProfileEditModal({
         render={({ field }) => <DatePicker
           id="member-profile-date-of-birth"
           aria-label="Ngày sinh"
-          format="YYYY/MM/DD"
+          format={['DD/MM/YYYY', 'DDMMYYYY']}
+          placeholder="dd/MM/yyyy"
           value={field.value ? dayjs(field.value) : null}
           disabledDate={(date) => date.isAfter(dayjs(), 'day')}
           onChange={(date) => field.onChange(date?.format('YYYY-MM-DD') ?? '')}
@@ -218,7 +215,7 @@ export function MemberProfileEditModal({
           maxLength={12}
           value={field.value}
           aria-invalid={Boolean(errors.phone)}
-          onChange={(event) => field.onChange(formatPhoneInput(event.target.value))}
+          onChange={(event) => field.onChange(formatVietnamPhoneInput(event.target.value))}
           onBlur={field.onBlur}
         />}
       />

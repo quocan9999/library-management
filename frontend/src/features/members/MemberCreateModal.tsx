@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { Alert, DatePicker, Form, Input, Modal } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
+import { useAppNotification } from '../../components/AppNotificationProvider';
 import { memberApi } from './api';
+import { formatVietnamPhoneInput, normalizeVietnamPhone } from './phone';
 import type { MemberCreateInput } from './types';
 
 interface MemberCreateModalProps {
@@ -38,6 +40,7 @@ function errorMessage(error: unknown): string {
 
 export function MemberCreateModal({ onCancel, onCreated }: MemberCreateModalProps) {
   const [form] = Form.useForm<MemberCreateFormValues>();
+  const { notify } = useAppNotification();
   const [submitting, setSubmitting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
 
@@ -49,7 +52,7 @@ export function MemberCreateModal({ onCancel, onCreated }: MemberCreateModalProp
       password,
       ...(values.fullName?.trim() ? { fullName: values.fullName.trim() } : {}),
       ...(values.dateOfBirth ? { dateOfBirth: values.dateOfBirth.format('YYYY-MM-DD') } : {}),
-      ...(values.phone?.trim() ? { phone: values.phone.trim() } : {}),
+      ...(values.phone?.trim() ? { phone: normalizeVietnamPhone(values.phone.trim()) } : {}),
       ...(values.address?.trim() ? { address: values.address.trim() } : {}),
     };
     form.setFieldValue('password', undefined);
@@ -58,6 +61,10 @@ export function MemberCreateModal({ onCancel, onCreated }: MemberCreateModalProp
     try {
       await memberApi.createMember(input);
       form.resetFields();
+      notify('success', {
+        title: 'Tạo thành viên thành công',
+        description: 'Tài khoản thành viên đã được tạo.',
+      });
       onCreated();
       onCancel();
     } catch (error) {
@@ -98,7 +105,7 @@ export function MemberCreateModal({ onCancel, onCreated }: MemberCreateModalProp
             { max: 255, message: 'Email không được vượt quá 255 ký tự.' },
           ]}
         >
-          <Input autoComplete="email" />
+          <Input autoComplete="email" placeholder="nguyenvana@example.com" />
         </Form.Item>
         <Form.Item
           name="password"
@@ -114,10 +121,10 @@ export function MemberCreateModal({ onCancel, onCreated }: MemberCreateModalProp
             },
           ]}
         >
-          <Input.Password autoComplete="new-password" />
+          <Input.Password autoComplete="new-password" placeholder="Tối thiểu 8 kí tự" />
         </Form.Item>
         <Form.Item name="fullName" label="Họ và tên" rules={[{ max: 150, message: 'Họ tên tối đa 150 ký tự.' }]}>
-          <Input autoComplete="name" />
+          <Input autoComplete="name" placeholder="Nguyễn Văn A" />
         </Form.Item>
         <Form.Item
           name="dateOfBirth"
@@ -133,7 +140,8 @@ export function MemberCreateModal({ onCancel, onCreated }: MemberCreateModalProp
         >
           <DatePicker
             aria-label="Ngày sinh"
-            format="DD/MM/YYYY"
+            format={['DD/MM/YYYY', 'DDMMYYYY']}
+            placeholder="dd/MM/yyyy"
             disabledDate={(date) => date.isAfter(dayjs().subtract(16, 'year'), 'day')}
             style={{ width: '100%' }}
           />
@@ -141,6 +149,7 @@ export function MemberCreateModal({ onCancel, onCreated }: MemberCreateModalProp
         <Form.Item
           name="phone"
           label="Số điện thoại"
+          getValueFromEvent={(event: ChangeEvent<HTMLInputElement>) => formatVietnamPhoneInput(event.target.value)}
           rules={[
             { max: 20, message: 'Số điện thoại tối đa 20 ký tự.' },
             {
@@ -152,10 +161,10 @@ export function MemberCreateModal({ onCancel, onCreated }: MemberCreateModalProp
             },
           ]}
         >
-          <Input autoComplete="tel" />
+          <Input autoComplete="tel" inputMode="tel" maxLength={20} placeholder="03xx.xxx.xxx" />
         </Form.Item>
         <Form.Item name="address" label="Địa chỉ" rules={[{ max: 255, message: 'Địa chỉ tối đa 255 ký tự.' }]}>
-          <Input />
+          <Input placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
         </Form.Item>
       </Modal>
     </Form>

@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { usePermission } from '../../auth/permissions';
+import { useAppNotification } from '../../components/AppNotificationProvider';
 import { memberApi } from './api';
 import { MemberProfileEditModal } from './MemberProfileEditModal';
 import type { HistoryStatus, LoanHistoryItem, MemberDetail, PageResponse } from './types';
@@ -47,6 +48,7 @@ function loanStatusLabel(status: LoanHistoryItem['loanStatus']): string {
 export function MemberDetailPage() {
   const { id: rawId } = useParams();
   const navigate = useNavigate();
+  const { notify } = useAppNotification();
   const memberId = rawId && /^\d+$/.test(rawId) ? Number(rawId) : Number.NaN;
   const canUpdateProfile = usePermission('member:update');
   const canUpdateAccountStatus = usePermission('member:status:update');
@@ -97,6 +99,12 @@ export function MemberDetailPage() {
         expectedEnabled: member.enabled,
         enabled: !member.enabled,
       });
+      notify('success', {
+        title: member.enabled ? 'Đã vô hiệu hóa tài khoản' : 'Đã kích hoạt tài khoản',
+        description: member.enabled
+          ? 'Tài khoản thành viên đã được vô hiệu hóa.'
+          : 'Tài khoản thành viên đã được kích hoạt.',
+      });
       setStatusDialogOpen(false);
       setStatusNotice(null);
       setMemberReload((previous) => previous + 1);
@@ -122,6 +130,10 @@ export function MemberDetailPage() {
     setDeleteNotice(null);
     try {
       await memberApi.deleteMember(member.id);
+      notify('success', {
+        title: 'Xóa thành viên thành công',
+        description: 'Thành viên và tài khoản liên kết đã được xóa.',
+      });
       navigate('/admin/members', { replace: true });
     } catch (error) {
       if (axios.isAxiosError(error)

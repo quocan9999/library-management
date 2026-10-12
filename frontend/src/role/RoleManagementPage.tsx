@@ -2,6 +2,7 @@ import { Alert, Button, Checkbox, Modal, Select, Spin, Tooltip } from 'antd';
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useAppNotification } from '../components/AppNotificationProvider';
 import { roleApi } from './api';
 import {
   findMissingPermissionDependencies,
@@ -52,6 +53,7 @@ function groupLabel(prefix: string): string {
 
 export function RoleManagementPage() {
   const { refreshCapabilities } = useAuth();
+  const { dismiss, notify } = useAppNotification();
   const [roles, setRoles] = useState<RoleSummary[]>([]);
   const [catalog, setCatalog] = useState<PermissionCatalogEntry[]>([]);
   const [roleCode, setRoleCode] = useState<string>();
@@ -61,7 +63,6 @@ export function RoleManagementPage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectionErrorMessage, setSelectionErrorMessage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
@@ -114,7 +115,6 @@ export function RoleManagementPage() {
     setDraft(new Set());
     setErrorMessage(null);
     setSelectionErrorMessage(null);
-    setSuccessMessage(null);
     try {
       const result = await roleApi.getRolePermissions(targetRoleCode);
       if (detailsGeneration.current !== generation) return;
@@ -158,12 +158,25 @@ export function RoleManagementPage() {
     () => findMissingPermissionDependencies(draft, catalog),
     [draft, catalog],
   );
-  const dependencyErrorMessage = dependencyConfigurationError
-    ?? (dependencyIssues.length > 0
-      ? `Không thể gỡ quyền cơ sở ${dependencyIssues[0].dependency} khi vai trò còn quyền phụ thuộc ${dependencyIssues[0].permission}. Hãy gỡ các quyền phụ thuộc trong cùng lần lưu.`
-      : null);
+  const dependencyIssueMessage = dependencyIssues.length > 0
+    ? `Không thể gỡ quyền cơ sở ${dependencyIssues[0].dependency} khi vai trò còn quyền phụ thuộc ${dependencyIssues[0].permission}. Hãy gỡ các quyền phụ thuộc trong cùng lần lưu.`
+    : null;
+  const dependencyErrorMessage = dependencyConfigurationError ?? dependencyIssueMessage;
   const canPreviewChanges = canEdit && hasChanges && !isSaving && !isLoadingDetails
     && !dependencyErrorMessage;
+
+  useEffect(() => {
+    const notificationKey = 'role-permission-dependency';
+    if (dependencyConfigurationError || !dependencyIssueMessage) {
+      dismiss(notificationKey);
+    } else {
+      notify('warning', {
+        title: 'Không thể gỡ quyền cơ sở',
+        description: dependencyIssueMessage,
+        key: notificationKey,
+      });
+    }
+  }, [dependencyConfigurationError, dependencyIssueMessage, dismiss, notify]);
 
   const togglePermission = (code: string, checked: boolean) => {
     if (!canEdit || dependencyConfigurationError || !editablePermissions.has(code)) return;
@@ -185,7 +198,6 @@ export function RoleManagementPage() {
     }
     setDraft(next);
     setSelectionErrorMessage(null);
-    setSuccessMessage(null);
     setErrorMessage(null);
   };
 
@@ -211,7 +223,6 @@ export function RoleManagementPage() {
     }
     setDraft(next);
     setSelectionErrorMessage(selectionError);
-    setSuccessMessage(null);
     setErrorMessage(null);
   };
 
@@ -223,7 +234,6 @@ export function RoleManagementPage() {
       && roleCodeRef.current === targetRoleCode;
     setIsSaving(true);
     setErrorMessage(null);
-    setSuccessMessage(null);
     try {
       const result = await roleApi.updatePermissions(targetRoleCode, {
         expectedVersion: rolePermissions.version,
@@ -239,7 +249,10 @@ export function RoleManagementPage() {
       setDraft(new Set(result.assignedPermissions));
       setPreviewOpen(false);
       setHasConflict(false);
-      setSuccessMessage('Đã cập nhật quyền cho vai trò.');
+      notify('success', {
+        title: 'Cập nhật quyền thành công',
+        description: 'Đã cập nhật quyền cho vai trò.',
+      });
     } catch (error) {
       if (getStatus(error) === 403 && getErrorCode(error) === 'PERMISSION_DENIED') {
         if (isCurrentTarget()) {
@@ -283,6 +296,7 @@ export function RoleManagementPage() {
       Modal.confirm({
         title: 'Bỏ các chỉnh sửa chưa lưu?',
         content: 'Khi chuyển vai trò, các thay đổi hiện tại sẽ bị hủy.',
+        centered: true,
         okText: 'Bỏ chỉnh sửa',
         cancelText: 'Ở lại',
         onOk: () => selectRole(nextRoleCode),
@@ -305,8 +319,7 @@ export function RoleManagementPage() {
 
         {errorMessage && <Alert type="error" showIcon role="alert" title={errorMessage} />}
         {selectionErrorMessage && <Alert type="error" showIcon role="alert" title={selectionErrorMessage} />}
-        {dependencyErrorMessage && <Alert type="error" showIcon role="alert" title={dependencyErrorMessage} />}
-        {successMessage && <Alert type="success" showIcon role="status" title={successMessage} />}
+        {dependencyConfigurationError && <Alert type="error" showIcon role="alert" title={dependencyConfigurationError} />}
 
         {isLoading ? <div className="role-loading" role="status"><Spin /> Đang tải dữ liệu vai trò…</div> : (
           <>
@@ -409,6 +422,7 @@ export function RoleManagementPage() {
       <Modal
         title="Xác nhận thay đổi quyền"
         open={previewOpen}
+        centered
         onCancel={() => { if (!isSaving) setPreviewOpen(false); }}
         onOk={() => void saveChanges()}
         okText="Lưu thay đổi"

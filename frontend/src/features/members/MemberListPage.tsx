@@ -213,7 +213,8 @@ export function MemberListPage() {
                   <RangePicker
                     id="member-birth-range"
                     aria-label="Khoảng ngày sinh"
-                    format="YYYY/MM/DD"
+                    format={['DD/MM/YYYY', 'DDMMYYYY']}
+                    placeholder={['dd/MM/yyyy', 'dd/MM/yyyy']}
                     value={dateRange}
                     onChange={(dates) => {
                       const from = dates?.[0]?.format('YYYY-MM-DD') ?? '';
