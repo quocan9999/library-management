@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 024-seed-super-admin-account
-      author: codex
+      author: quocan9999
       comment: "Tạo tài khoản SUPER_ADMIN cục bộ"
       context: "@local,@test,@training"
       preConditions:

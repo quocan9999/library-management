@@ -14,10 +14,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.mail.MailSendException;
 import sparkminds.librarymanagement.auth.entity.Account;
 import sparkminds.librarymanagement.auth.service.RefreshCookieFactory;
@@ -51,6 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Kiểm tra vòng đời Admin Create qua HTTP và dọn đúng các fixture đã tạo. */
 @SpringBootTest
+@ActiveProfiles("test")
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE, printOnlyOnFailure = false)
 class MemberAdminLifecycleIntegrationTests {
 
@@ -82,10 +84,10 @@ class MemberAdminLifecycleIntegrationTests {
     private final List<RefreshFixture> adminRefreshFixtures = new ArrayList<>();
 
     @BeforeEach
-    void verifyAuthorizedDatabaseAndCaptureBaseline() {
-        assertThat(datasourceUrl).isEqualTo("jdbc:mysql://localhost:3307/library_management_member");
-        assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
-                .isEqualTo("library_management_member");
+    void verifyConfiguredTestDatabaseAndCaptureBaseline() {
+        String database = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        assertThat(database).matches("library_management(?:_[A-Za-z0-9]+)*_test");
+        assertThat(datasourceUrl).endsWith("/" + database);
         beforeCounts = counts();
         createdEmails.clear();
         adminRefreshFixtures.clear();

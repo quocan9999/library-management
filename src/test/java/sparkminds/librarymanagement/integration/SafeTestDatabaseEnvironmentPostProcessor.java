@@ -1,7 +1,7 @@
 package sparkminds.librarymanagement.integration;
 
 import java.net.URI;
-import java.util.Arrays;
+import java.util.regex.Pattern;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.core.Ordered;
@@ -13,6 +13,9 @@ import org.springframework.core.env.ConfigurableEnvironment;
  */
 public final class SafeTestDatabaseEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
 
+    private static final Pattern ALLOWED_TEST_DATABASE =
+            Pattern.compile("library_management(?:_[A-Za-z0-9]+)*_test");
+
     @Override
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE;
@@ -20,9 +23,6 @@ public final class SafeTestDatabaseEnvironmentPostProcessor implements Environme
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
-        if (Arrays.stream(environment.getActiveProfiles()).noneMatch("test"::equals)) {
-            return;
-        }
         String jdbcUrl = environment.getProperty("spring.datasource.url", "");
         String database;
         try {
@@ -38,9 +38,15 @@ public final class SafeTestDatabaseEnvironmentPostProcessor implements Environme
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException("Từ chối chạy integration tests: JDBC URL test không hợp lệ", exception);
         }
-        if (!database.endsWith("_test")) {
+        String applicationDatabase = environment.getProperty("MYSQL_DATABASE");
+        if (database.equals(applicationDatabase)) {
             throw new IllegalStateException(
-                    "Từ chối chạy integration tests/Liquibase trên database không có hậu tố _test: " + database);
+                    "Từ chối chạy integration tests: MYSQL_TEST_DATABASE phải khác MYSQL_DATABASE: " + database);
+        }
+        if (!ALLOWED_TEST_DATABASE.matcher(database).matches()) {
+            throw new IllegalStateException(
+                    "Từ chối chạy integration tests/Liquibase trên database ngoài mẫu "
+                            + "library_management[_<worktree>]_test: " + database);
         }
     }
 }

@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 027-member-version
-      author: codex
+      author: quocan9999
       comment: "Version của Member hỗ trợ phát hiện cập nhật hồ sơ cạnh tranh bằng JPA optimistic locking."
       changes:
         - addColumn:

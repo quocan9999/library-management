@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 029-account-session-version
-      author: SparkMinds
+      author: quocan9999
       changes:
         - addColumn:
             tableName: accounts

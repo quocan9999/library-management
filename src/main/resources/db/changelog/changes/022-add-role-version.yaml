@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 022-add-role-version
-      author: codex
+      author: quocan9999
       comment: "Bổ sung phiên bản lạc quan cho Role Management"
       preConditions:
         - onFail: HALT

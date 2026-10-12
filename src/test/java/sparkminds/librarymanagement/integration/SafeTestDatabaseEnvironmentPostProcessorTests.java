@@ -26,9 +26,47 @@ class SafeTestDatabaseEnvironmentPostProcessorTests {
     }
 
     @Test
+    void rejectsTestSuffixedDatabaseOutsideLibraryManagementNamespace() {
+        assertThatThrownBy(() -> check("payments_test"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Từ chối chạy integration tests");
+    }
+
+    @Test
+    void rejectsNonTestDatabaseEvenWhenNoSpringProfileWasActivated() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setProperty("spring.datasource.url", "jdbc:mysql://localhost:3307/library_management");
+
+        assertThatThrownBy(() -> guard.postProcessEnvironment(
+                environment, new SpringApplication(SafeTestDatabaseEnvironmentPostProcessorTests.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Từ chối chạy integration tests");
+    }
+
+    @Test
     void acceptsIsolatedTestDatabase() {
-        assertThatCode(() -> check("library_management_register_verify_test"))
+        assertThatCode(() -> check("library_management_test"))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsWorktreeSpecificTestDatabase() {
+        assertThatCode(() -> check("library_management_member_management_test"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsTestDatabaseWhenItMatchesTheConfiguredApplicationDatabase() {
+        String database = "library_management_member_management_test";
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("test");
+        environment.setProperty("MYSQL_DATABASE", database);
+        environment.setProperty("spring.datasource.url", "jdbc:mysql://localhost:3308/" + database);
+
+        assertThatThrownBy(() -> guard.postProcessEnvironment(
+                environment, new SpringApplication(SafeTestDatabaseEnvironmentPostProcessorTests.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("phải khác MYSQL_DATABASE");
     }
 
     @Test
