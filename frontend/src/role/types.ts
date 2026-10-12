@@ -9,6 +9,7 @@ export interface PermissionCatalogEntry {
   code: string;
   description: string;
   manageableByActor: boolean;
+  dependencies?: string[];
 }
 
 export interface RolePermissions {

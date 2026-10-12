@@ -15,6 +15,7 @@ import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.role.dto.PermissionCatalogResponse;
 import sparkminds.librarymanagement.role.dto.RolePermissionsResponse;
 import sparkminds.librarymanagement.role.dto.RoleSummaryResponse;
+import sparkminds.librarymanagement.role.policy.PermissionDependencyRegistry;
 import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
 
 import java.util.Collection;
@@ -29,17 +30,20 @@ public class RoleReadService {
     private final PermissionRepository permissionRepository;
     private final EffectivePermissionService effectivePermissionService;
     private final RoleAccessPolicy roleAccessPolicy;
+    private final PermissionDependencyRegistry permissionDependencyRegistry;
 
     public RoleReadService(
             RoleRepositoy roleRepository,
             PermissionRepository permissionRepository,
             EffectivePermissionService effectivePermissionService,
-            RoleAccessPolicy roleAccessPolicy
+            RoleAccessPolicy roleAccessPolicy,
+            PermissionDependencyRegistry permissionDependencyRegistry
     ) {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.effectivePermissionService = effectivePermissionService;
         this.roleAccessPolicy = roleAccessPolicy;
+        this.permissionDependencyRegistry = permissionDependencyRegistry;
     }
 
     @Transactional(readOnly = true)
@@ -62,11 +66,15 @@ public class RoleReadService {
     public List<PermissionCatalogResponse> getPermissionCatalog(CustomUserPrincipal actor) {
         ensureRoleManagementRank(actor);
         Set<String> actorPermissions = permissionCodes(actor);
-        return permissionRepository.findAllByOrderByCodeAsc().stream()
+        List<Permission> permissions = permissionRepository.findAllByOrderByCodeAsc();
+        permissionDependencyRegistry.validateCatalog(
+                permissions.stream().map(Permission::getCode).toList());
+        return permissions.stream()
                 .map(permission -> new PermissionCatalogResponse(
                         permission.getCode(),
                         permission.getDescription(),
-                        actorPermissions.contains(permission.getCode())
+                        actorPermissions.contains(permission.getCode()),
+                        permissionDependencyRegistry.directDependencies(permission.getCode()).stream().sorted().toList()
                 ))
                 .toList();
     }

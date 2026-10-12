@@ -177,11 +177,20 @@ class RoleReadApiIntegrationTests {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
 
-        mockMvc.perform(get("/api/v1/permissions")
+        MvcResult permissionCatalogResponse = mockMvc.perform(get("/api/v1/permissions")
                         .header("Authorization", "Bearer " + superAdminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.code == 'future:catalog:read')]").isNotEmpty())
-                .andExpect(jsonPath("$.data[?(@.code == 'member:status:update')]").isEmpty());
+                .andExpect(jsonPath("$.data[?(@.code == 'member:status:update')]").isNotEmpty())
+                .andReturn();
+        List<Map<String, Object>> permissionCatalog = JsonPath.read(
+                permissionCatalogResponse.getResponse().getContentAsString(), "$.data");
+        assertThat(permissionCatalog).filteredOn(permission -> "member:status:update".equals(permission.get("code")))
+                .singleElement().extracting(permission -> permission.get("dependencies"))
+                .isEqualTo(List.of("member:read"));
+        assertThat(permissionCatalog).filteredOn(permission -> "borrow:create".equals(permission.get("code")))
+                .singleElement().extracting(permission -> permission.get("dependencies"))
+                .isEqualTo(List.of());
 
         mockMvc.perform(get("/api/v1/roles")
                         .header("Authorization", "Bearer " + accessToken("user", "user")))

@@ -3,6 +3,11 @@ import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { roleApi } from './api';
+import {
+  findMissingPermissionDependencies,
+  requiredPermissionsFor,
+  validatePermissionDependencyCatalog,
+} from './permissionDependencies';
 import type {
   PermissionCatalogEntry,
   RolePermissions,
@@ -20,6 +25,11 @@ const GROUP_LABELS: Record<string, string> = {
 function getErrorCode(error: unknown): string | undefined {
   if (!axios.isAxiosError<{ code?: string }>(error)) return undefined;
   return error.response?.data?.code;
+}
+
+function getApiMessage(error: unknown): string | undefined {
+  if (!axios.isAxiosError<{ message?: string }>(error)) return undefined;
+  return error.response?.data?.message;
 }
 
 function getStatus(error: unknown): number | undefined {
@@ -52,6 +62,7 @@ export function RoleManagementPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [selectionErrorMessage, setSelectionErrorMessage] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
   const [hasConflict, setHasConflict] = useState(false);
@@ -102,6 +113,7 @@ export function RoleManagementPage() {
     setRolePermissions(null);
     setDraft(new Set());
     setErrorMessage(null);
+    setSelectionErrorMessage(null);
     setSuccessMessage(null);
     try {
       const result = await roleApi.getRolePermissions(targetRoleCode);
@@ -138,34 +150,73 @@ export function RoleManagementPage() {
     .sort(), [draft, editablePermissions, assignedPermissions]);
   const hasChanges = additions.length > 0 || removals.length > 0;
   const groups = useMemo(() => groupPermissions(catalog), [catalog]);
+  const dependencyConfigurationError = useMemo(
+    () => validatePermissionDependencyCatalog(catalog),
+    [catalog],
+  );
+  const dependencyIssues = useMemo(
+    () => findMissingPermissionDependencies(draft, catalog),
+    [draft, catalog],
+  );
+  const dependencyErrorMessage = dependencyConfigurationError
+    ?? (dependencyIssues.length > 0
+      ? `Không thể gỡ quyền cơ sở ${dependencyIssues[0].dependency} khi vai trò còn quyền phụ thuộc ${dependencyIssues[0].permission}. Hãy gỡ các quyền phụ thuộc trong cùng lần lưu.`
+      : null);
+  const canPreviewChanges = canEdit && hasChanges && !isSaving && !isLoadingDetails
+    && !dependencyErrorMessage;
 
   const togglePermission = (code: string, checked: boolean) => {
-    if (!canEdit || !editablePermissions.has(code)) return;
-    setDraft((previous) => {
-      const next = new Set(previous);
-      if (checked) next.add(code);
-      else next.delete(code);
-      return next;
-    });
+    if (!canEdit || dependencyConfigurationError || !editablePermissions.has(code)) return;
+    const next = new Set(draft);
+    if (checked) {
+      const required = requiredPermissionsFor(code, catalog);
+      const ungrantable = required.find((dependency) =>
+        !assignedPermissions.has(dependency) && !editablePermissions.has(dependency));
+      if (ungrantable) {
+        setSelectionErrorMessage(
+          `Không thể cấp ${code} vì cần quyền ${ungrantable}, nhưng phiên hiện tại không được phép cấp quyền đó.`,
+        );
+        return;
+      }
+      next.add(code);
+      required.forEach((dependency) => next.add(dependency));
+    } else {
+      next.delete(code);
+    }
+    setDraft(next);
+    setSelectionErrorMessage(null);
     setSuccessMessage(null);
+    setErrorMessage(null);
   };
 
   const toggleGroup = (codes: string[], checked: boolean) => {
-    if (!canEdit) return;
-    setDraft((previous) => {
-      const next = new Set(previous);
-      for (const code of codes) {
-        if (!editablePermissions.has(code)) continue;
-        if (checked) next.add(code);
-        else next.delete(code);
+    if (!canEdit || dependencyConfigurationError) return;
+    const next = new Set(draft);
+    let selectionError: string | null = null;
+    for (const code of codes) {
+      if (!editablePermissions.has(code)) continue;
+      if (!checked) {
+        next.delete(code);
+        continue;
       }
-      return next;
-    });
+      const required = requiredPermissionsFor(code, catalog);
+      const ungrantable = required.find((dependency) =>
+        !assignedPermissions.has(dependency) && !editablePermissions.has(dependency));
+      if (ungrantable) {
+        selectionError ??= `Không thể cấp ${code} vì cần quyền ${ungrantable}, nhưng phiên hiện tại không được phép cấp quyền đó.`;
+        continue;
+      }
+      next.add(code);
+      required.forEach((dependency) => next.add(dependency));
+    }
+    setDraft(next);
+    setSelectionErrorMessage(selectionError);
     setSuccessMessage(null);
+    setErrorMessage(null);
   };
 
   const saveChanges = async () => {
-    if (!roleCode || !rolePermissions || !canEdit || !hasChanges || isSaving) return;
+    if (!roleCode || !rolePermissions || !canEdit || !hasChanges || isSaving || dependencyErrorMessage) return;
     const targetRoleCode = roleCode;
     const targetGeneration = detailsGeneration.current;
     const isCurrentTarget = () => detailsGeneration.current === targetGeneration
@@ -198,6 +249,9 @@ export function RoleManagementPage() {
       } else if (isCurrentTarget() && getStatus(error) === 409 && getErrorCode(error) === 'ROLE_VERSION_CONFLICT') {
         setHasConflict(true);
         setErrorMessage('Vai trò đã được thay đổi ở nơi khác. Các chỉnh sửa của bạn vẫn còn và chưa được lưu.');
+      } else if (isCurrentTarget() && getErrorCode(error) === 'ROLE_PERMISSION_DEPENDENCY_CONFLICT') {
+        setErrorMessage(getApiMessage(error)
+          ?? 'Không thể lưu vì quyền cơ sở vẫn đang được quyền khác phụ thuộc.');
       } else if (isCurrentTarget()) {
         setErrorMessage('Không thể lưu thay đổi. Vui lòng kiểm tra và thử lại.');
       }
@@ -217,6 +271,7 @@ export function RoleManagementPage() {
     roleCodeRef.current = nextRoleCode;
     setRolePermissions(null);
     setDraft(new Set());
+    setSelectionErrorMessage(null);
     setIsLoadingDetails(true);
     setRoleCode(nextRoleCode);
     void loadRolePermissions(nextRoleCode);
@@ -249,6 +304,8 @@ export function RoleManagementPage() {
         </div>
 
         {errorMessage && <Alert type="error" showIcon role="alert" title={errorMessage} />}
+        {selectionErrorMessage && <Alert type="error" showIcon role="alert" title={selectionErrorMessage} />}
+        {dependencyErrorMessage && <Alert type="error" showIcon role="alert" title={dependencyErrorMessage} />}
         {successMessage && <Alert type="success" showIcon role="status" title={successMessage} />}
 
         {isLoading ? <div className="role-loading" role="status"><Spin /> Đang tải dữ liệu vai trò…</div> : (
@@ -296,7 +353,7 @@ export function RoleManagementPage() {
                           aria-label={`Chọn tất cả quyền nhóm ${groupLabel(prefix)}`}
                           checked={checked}
                           indeterminate={indeterminate}
-                          disabled={!canEdit || editableCodes.length === 0}
+                          disabled={!canEdit || Boolean(dependencyConfigurationError) || editableCodes.length === 0}
                           onChange={(event) => toggleGroup(editableCodes, event.target.checked)}
                         >Chọn tất cả</Checkbox>
                       </div>
@@ -312,7 +369,7 @@ export function RoleManagementPage() {
                                 <Checkbox
                                   aria-label={`${permission.code} — ${permission.description}`}
                                   checked={draft.has(permission.code)}
-                                  disabled={!editable}
+                                  disabled={!editable || Boolean(dependencyConfigurationError)}
                                   onChange={(event) => togglePermission(permission.code, event.target.checked)}
                                 />
                                 <span className="permission-row__copy">
@@ -340,7 +397,7 @@ export function RoleManagementPage() {
               </div>
               <Button
                 type="primary"
-                disabled={!canEdit || !hasChanges || isSaving || isLoadingDetails}
+                disabled={!canPreviewChanges}
                 loading={isSaving}
                 onClick={() => setPreviewOpen(true)}
               >Xem thay đổi và lưu</Button>
