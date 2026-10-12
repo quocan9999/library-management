@@ -3,10 +3,12 @@ package sparkminds.librarymanagement.common.api;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import sparkminds.librarymanagement.member.exception.MemberProfilePatchException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,6 +19,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException exception) {
         return error(exception.getStatus(), exception.getCode(), exception.getMessage(), null);
+    }
+
+    @ExceptionHandler(MemberProfilePatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMemberProfilePatch(MemberProfilePatchException exception) {
+        return error(exception.getStatus(), exception.getCode(), exception.getMessage(), exception.getFieldErrors());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_BODY", "Nội dung yêu cầu không hợp lệ", null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

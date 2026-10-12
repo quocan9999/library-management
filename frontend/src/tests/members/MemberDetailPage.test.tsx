@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { AxiosHeaders, type AxiosAdapter, type AxiosResponse } from 'axios';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { AxiosError, AxiosHeaders, type AxiosAdapter, type AxiosResponse } from 'axios';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { apiClient } from '../../auth/api';
@@ -9,6 +9,15 @@ import { MemberDetailPage } from '../../features/members/MemberDetailPage';
 import type { LoanHistoryItem, MemberDetail, PageResponse } from '../../features/members/types';
 
 const originalAdapter = apiClient.defaults.adapter;
+
+const authState = vi.hoisted(() => ({
+  permissions: ['member:read'] as string[],
+  capabilityStatus: 'ready' as 'ready' | 'loading' | 'error',
+}));
+
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ permissions: authState.permissions, capabilityStatus: authState.capabilityStatus }),
+}));
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -78,6 +87,8 @@ const historyItem: LoanHistoryItem = {
 afterEach(() => {
   cleanup();
   apiClient.defaults.adapter = originalAdapter;
+  authState.permissions = ['member:read'];
+  authState.capabilityStatus = 'ready';
 });
 
 describe('MemberDetailPage', () => {
@@ -135,5 +146,104 @@ describe('MemberDetailPage', () => {
     fireEvent.change(screen.getByLabelText('Lọc trạng thái sách'), { target: { value: 'RETURNED' } });
     await vi.waitFor(() => expect(historyRequests).toHaveLength(3));
     expect(historyRequests[2]).toMatchObject({ status: 'RETURNED', page: 0, size: 10 });
+  });
+
+  it('shows the profile modal only with member:update and PATCHes only changed nonblank values', async () => {
+    authState.permissions = ['member:read', 'member:update'];
+    const patchBodies: unknown[] = [];
+    let detailReads = 0;
+    const updatedMember = { ...member, fullName: 'Nguyễn Bình', version: 1 };
+    const emptyPage: PageResponse<LoanHistoryItem> = {
+      content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true,
+    };
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/members/17' && config.method === 'get') {
+        detailReads += 1;
+        return response(config, success('MEMBER_DETAIL_SUCCESS', detailReads === 1 ? member : updatedMember));
+      }
+      if (config.url === '/api/v1/members/17/loan-history') {
+        return response(config, success('MEMBER_LOAN_HISTORY_SUCCESS', emptyPage));
+      }
+      if (config.url === '/api/v1/members/17' && config.method === 'patch') {
+        patchBodies.push(JSON.parse(String(config.data)));
+        return response(config, success('MEMBER_PROFILE_UPDATED', updatedMember));
+      }
+      throw new Error(`Unexpected request ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/admin/members/17']}>
+      <Routes><Route path="/admin/members/:id" element={<MemberDetailPage />} /></Routes>
+    </MemoryRouter>);
+    expect(await screen.findByText('M000017')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }));
+    expect(await screen.findByRole('dialog', { name: 'Chỉnh sửa hồ sơ thành viên' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Họ và tên'), { target: { value: 'Nguyễn Bình' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    await waitFor(() => expect(patchBodies).toEqual([{ version: 0, fullName: 'Nguyễn Bình' }]));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Chỉnh sửa hồ sơ thành viên' })).toBeNull());
+    await waitFor(() => expect(detailReads).toBe(2));
+    expect(await screen.findByText('Nguyễn Bình')).toBeTruthy();
+  });
+
+  it('keeps stale edits intact until a confirmed reload fetches the new version', async () => {
+    authState.permissions = ['member:read', 'member:update'];
+    let patchCount = 0;
+    let latestMember = member;
+    const emptyPage: PageResponse<LoanHistoryItem> = {
+      content: [], page: 0, size: 10, totalElements: 0, totalPages: 0, first: true, last: true,
+    };
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/members/17' && config.method === 'get') {
+        return response(config, success('MEMBER_DETAIL_SUCCESS', latestMember));
+      }
+      if (config.url === '/api/v1/members/17/loan-history') {
+        return response(config, success('MEMBER_LOAN_HISTORY_SUCCESS', emptyPage));
+      }
+      if (config.url === '/api/v1/members/17' && config.method === 'patch') {
+        patchCount += 1;
+        latestMember = { ...member, fullName: 'Concurrent edit', version: 1 };
+        const envelope: ApiEnvelope<null> = {
+          success: false,
+          status: 409,
+          code: 'MEMBER_VERSION_CONFLICT',
+          message: 'Thông tin thành viên đã được thay đổi bởi quản trị viên khác',
+          data: null,
+          timestamp: '2026-10-01T00:00:00Z',
+        };
+        throw new AxiosError('Conflict', 'ERR_BAD_REQUEST', config, undefined, {
+          data: envelope,
+          status: 409,
+          statusText: 'Conflict',
+          headers: new AxiosHeaders(),
+          config,
+        });
+      }
+      throw new Error(`Unexpected request ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/admin/members/17']}>
+      <Routes><Route path="/admin/members/:id" element={<MemberDetailPage />} /></Routes>
+    </MemoryRouter>);
+    await screen.findByText('M000017');
+    fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa hồ sơ' }));
+    const fullName = await screen.findByLabelText('Họ và tên');
+    fireEvent.change(fullName, { target: { value: 'Unsaved draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    await waitFor(() => expect(patchCount).toBe(1));
+    expect(await screen.findByText('Thông tin thành viên đã được thay đổi bởi quản trị viên khác')).toBeTruthy();
+    expect((screen.getByLabelText('Họ và tên') as HTMLInputElement).value).toBe('Unsaved draft');
+    fireEvent.click(screen.getByRole('button', { name: 'Tải lại dữ liệu' }));
+    expect(await screen.findByText('Tải dữ liệu mới sẽ bỏ các chỉnh sửa chưa lưu trong biểu mẫu.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Tiếp tục chỉnh sửa' }));
+    expect((screen.getByLabelText('Họ và tên') as HTMLInputElement).value).toBe('Unsaved draft');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tải lại dữ liệu' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tải lại và bỏ thay đổi' }));
+    await waitFor(() => expect((screen.getByLabelText('Họ và tên') as HTMLInputElement).value)
+      .toBe('Concurrent edit'));
+    expect(screen.queryByText('Thông tin thành viên đã được thay đổi bởi quản trị viên khác')).toBeNull();
+    expect(patchCount).toBe(1);
   });
 });

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  AxiosError,
   AxiosHeaders,
   type AxiosAdapter,
   type AxiosResponse,
@@ -115,5 +116,57 @@ describe('member API', () => {
 
     await expect(memberApi.getMembers({ page: 0, size: 10, sort: 'createdAt,desc' }))
       .rejects.toThrow('Phản hồi quản lý thành viên không hợp lệ.');
+  });
+
+  it('patches a profile through the shared client with the captured version', async () => {
+    const detail: MemberDetail = {
+      id: 17,
+      memberCode: 'M000017',
+      fullName: 'Nguyễn An',
+      email: 'an@example.test',
+      phone: '0388919210',
+      dateOfBirth: '2000-01-02',
+      createdAt: '2026-10-01T08:30:00',
+      updatedAt: '2026-10-02T08:30:00',
+      address: null,
+      emailVerified: true,
+      enabled: true,
+      version: 3,
+      borrowedItemCount: 0,
+    };
+    const requests: Array<{ method?: string; url?: string; data?: unknown }> = [];
+    apiClient.defaults.adapter = (async (config) => {
+      requests.push({ method: config.method, url: config.url, data: config.data });
+      return response(config, envelope('MEMBER_PROFILE_UPDATED', detail));
+    }) satisfies AxiosAdapter;
+
+    await expect(memberApi.patchProfile(17, { version: 2, address: 'New address' })).resolves.toEqual(detail);
+    expect(requests[0]).toMatchObject({ method: 'patch', url: '/api/v1/members/17' });
+    expect(JSON.parse(String(requests[0]?.data))).toEqual({ version: 2, address: 'New address' });
+  });
+
+  it('preserves the stale-version envelope for the edit modal', async () => {
+    apiClient.defaults.adapter = (async (config) => {
+      const conflict: ApiEnvelope<null> = {
+        success: false,
+        status: 409,
+        code: 'MEMBER_VERSION_CONFLICT',
+        message: 'Thông tin thành viên đã được thay đổi bởi quản trị viên khác',
+        data: null,
+        timestamp: '2026-10-01T00:00:00Z',
+      };
+      throw new AxiosError('Conflict', 'ERR_BAD_REQUEST', config, undefined, {
+        data: conflict,
+        status: 409,
+        statusText: 'Conflict',
+        headers: new AxiosHeaders(),
+        config,
+      });
+    }) satisfies AxiosAdapter;
+
+    await expect(memberApi.patchProfile(17, { version: 0, fullName: 'Draft' }))
+      .rejects.toMatchObject({
+        response: { status: 409, data: { code: 'MEMBER_VERSION_CONFLICT' } },
+      });
   });
 });

@@ -1568,6 +1568,12 @@ input:focus-visible,
   text-decoration: underline;
 }
 
+.member-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .member-filter-panel,
 .member-detail-card,
 .member-history {
@@ -1684,6 +1690,35 @@ input:focus-visible,
 .member-detail-card .ant-descriptions-item-label {
   color: var(--muted);
   font-weight: 600;
+}
+
+.member-profile-form {
+  display: grid;
+  gap: 8px;
+}
+
+.member-profile-form > label {
+  margin-top: 5px;
+  color: #44474e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.member-profile-form .ant-picker {
+  width: 100%;
+  min-height: 40px;
+}
+
+.member-profile-form__error {
+  color: #b42318;
+  font-size: 12px;
+}
+
+.member-profile-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .member-history {

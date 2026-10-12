@@ -3,7 +3,9 @@ import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { usePermission } from '../../auth/permissions';
 import { memberApi } from './api';
+import { MemberProfileEditModal } from './MemberProfileEditModal';
 import type { HistoryStatus, LoanHistoryItem, MemberDetail, PageResponse } from './types';
 
 const PAGE_SIZE = 10;
@@ -44,6 +46,8 @@ function loanStatusLabel(status: LoanHistoryItem['loanStatus']): string {
 export function MemberDetailPage() {
   const { id: rawId } = useParams();
   const memberId = rawId && /^\d+$/.test(rawId) ? Number(rawId) : Number.NaN;
+  const canUpdateProfile = usePermission('member:update');
+  const [editingProfile, setEditingProfile] = useState(false);
   const [memberReload, setMemberReload] = useState(0);
   const [historyReload, setHistoryReload] = useState(0);
   const [historyStatus, setHistoryStatus] = useState<HistoryStatus>('ALL');
@@ -130,9 +134,12 @@ export function MemberDetailPage() {
           <div>
             <p className="role-eyebrow">HỒ SƠ THÀNH VIÊN</p>
             <h1 id="member-detail-title">Thông tin thành viên</h1>
-            <p className="role-intro">Hồ sơ và lược sử mượn/trả sách ở chế độ chỉ xem.</p>
+            <p className="role-intro">Thông tin hồ sơ và lịch sử mượn/trả sách của thành viên.</p>
           </div>
-          <Link className="member-back-link" to="/admin/members">Quay lại danh sách</Link>
+          <div className="member-detail-actions">
+            {member && canUpdateProfile && <Button onClick={() => setEditingProfile(true)}>Chỉnh sửa hồ sơ</Button>}
+            <Link className="member-back-link" to="/admin/members">Quay lại danh sách</Link>
+          </div>
         </div>
 
         {memberLoading && <div className="member-loading" role="status"><Spin /> Đang tải hồ sơ thành viên…</div>}
@@ -151,13 +158,26 @@ export function MemberDetailPage() {
             <Descriptions.Item label="Số điện thoại">{member.phone || '—'}</Descriptions.Item>
             <Descriptions.Item label="Ngày sinh">{formatDate(member.dateOfBirth)}</Descriptions.Item>
             <Descriptions.Item label="Địa chỉ">{member.address || '—'}</Descriptions.Item>
-            <Descriptions.Item label="Email">{member.emailVerified ? 'Đã xác minh' : 'Chưa xác minh'}</Descriptions.Item>
+            <Descriptions.Item label="Xác minh email">{member.emailVerified ? 'Đã xác minh' : 'Chưa xác minh'}</Descriptions.Item>
             <Descriptions.Item label="Tài khoản">{member.enabled ? 'Đang hoạt động' : 'Đã khóa'}</Descriptions.Item>
             <Descriptions.Item label="Sách đang mượn">{member.borrowedItemCount}</Descriptions.Item>
             <Descriptions.Item label="Ngày tạo">{formatDateTime(member.createdAt)}</Descriptions.Item>
             <Descriptions.Item label="Cập nhật lần cuối">{formatDateTime(member.updatedAt)}</Descriptions.Item>
           </Descriptions>
         </section>}
+
+        {member && editingProfile && <MemberProfileEditModal
+          key={member.id}
+          member={member}
+          onCancel={() => setEditingProfile(false)}
+          onSaved={() => {
+            setEditingProfile(false);
+            setMemberReload((previous) => previous + 1);
+          }}
+          onMemberReloaded={(latest) => {
+            setMemberRequest({ key: memberRequestKey, status: 'success', data: latest });
+          }}
+        />}
 
         <section className="member-history" aria-labelledby="member-history-title">
           <div className="member-history__heading">

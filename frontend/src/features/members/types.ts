@@ -33,6 +33,14 @@ export interface MemberDetail extends MemberListItem {
   borrowedItemCount: number;
 }
 
+export interface MemberProfilePatchInput {
+  version: number;
+  fullName?: string;
+  dateOfBirth?: string;
+  phone?: string;
+  address?: string;
+}
+
 export interface LoanHistoryItem {
   loanItemId: number;
   loanId: number;

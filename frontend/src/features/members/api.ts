@@ -6,6 +6,7 @@ import type {
   MemberDetail,
   MemberListItem,
   MemberListQuery,
+  MemberProfilePatchInput,
   PageResponse,
 } from './types';
 
@@ -31,6 +32,14 @@ export const memberApi = {
       { signal },
     );
     return readRequiredData(response.data, 'MEMBER_DETAIL_SUCCESS');
+  },
+
+  async patchProfile(id: number, input: MemberProfilePatchInput): Promise<MemberDetail> {
+    const response = await apiClient.patch<ApiEnvelope<MemberDetail>>(
+      `/api/v1/members/${id}`,
+      input,
+    );
+    return readRequiredData(response.data, 'MEMBER_PROFILE_UPDATED');
   },
 
   async getLoanHistory(

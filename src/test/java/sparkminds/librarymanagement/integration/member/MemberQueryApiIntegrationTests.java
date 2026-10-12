@@ -10,6 +10,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.transaction.AfterTransaction;
 import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,9 +25,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -51,20 +61,31 @@ class MemberQueryApiIntegrationTests {
     @Autowired
     private SpringLiquibase springLiquibase;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     @Value("${spring.datasource.url}")
     private String datasourceUrl;
 
     private Map<String, Long> beforeCounts;
+    private LocalDateTime fixtureStartedAt;
+    private final Set<RefreshTokenFixture> issuedRefreshFixtures = new HashSet<>();
 
     @BeforeTransaction
     void captureMemberDatabaseStateBeforeFixtureTransaction() {
         assertThat(jdbcTemplate.queryForObject("SELECT DATABASE()", String.class))
                 .isEqualTo("library_management_member");
         beforeCounts = tableCounts();
+        fixtureStartedAt = LocalDateTime.now().minusSeconds(2);
+        issuedRefreshFixtures.clear();
     }
 
     @AfterTransaction
     void verifyDatabaseFixturesWereRolledBack() {
+        for (RefreshTokenFixture fixture : issuedRefreshFixtures) {
+            jdbcTemplate.update("DELETE FROM refresh_tokens WHERE id = ? AND account_id = ? AND jti = ?",
+                    fixture.id(), fixture.accountId(), fixture.jti());
+        }
         assertThat(tableCounts()).isEqualTo(beforeCounts);
     }
 
@@ -338,13 +359,293 @@ class MemberQueryApiIntegrationTests {
                 .andExpect(jsonPath("$.code").value("INVALID_MEMBER_QUERY"));
     }
 
+    @Test
+    void patchUpdatesOnlyChangedProfileFieldsAndIncrementsVersionOnceWithoutChangingHistory() throws Exception {
+        String token = login("superadmin", "superadmin");
+        MemberFixture fixture = createMember("MMV8-P03-UPDATE", "Original Name", "0370000001",
+                LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+        int loanId = createLoan(fixture.memberId(), "MMV8-P03-LOAN",
+                LocalDateTime.of(2026, 10, 1, 9, 0), "ACTIVE");
+        int bookId = createBook("MMV8-P03-BOOK", "Profile history fixture", null);
+        createLoanItem(loanId, bookId, "BORROWED", new BigDecimal("12.34"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, null);
+        MvcResult historyBefore = history(token, fixture.memberId()).andExpect(status().isOk()).andReturn();
+        Integer originalLoanItemId = JsonPath.read(body(historyBefore), "$.data.content[0].loanItemId");
+
+        MvcResult result = patchProfile(token, fixture.memberId(), """
+                {"version":0,"fullName":"  Updated Member  ","dateOfBirth":"%s","address":"  Updated address  "}
+                """.formatted(LocalDate.now().minusYears(16)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("MEMBER_PROFILE_UPDATED"))
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.fullName").value("Updated Member"))
+                .andExpect(jsonPath("$.data.dateOfBirth").value(LocalDate.now().minusYears(16).toString()))
+                .andExpect(jsonPath("$.data.address").value("Updated address"))
+                .andExpect(jsonPath("$.data.phone").value("0370000001"))
+                .andReturn();
+
+        assertThat(JsonPath.<Number>read(body(result), "$.data.version").longValue()).isEqualTo(1L);
+        assertThat(JsonPath.<Integer>read(body(detail(token, fixture.memberId())
+                .andExpect(status().isOk()).andReturn()), "$.data.version")).isEqualTo(1);
+        MvcResult historyResult = history(token, fixture.memberId())
+                .andExpect(status().isOk()).andReturn();
+        assertThat(JsonPath.<Integer>read(body(historyResult), "$.data.totalElements")).isEqualTo(1);
+        assertThat(JsonPath.<Integer>read(body(historyResult), "$.data.content[0].loanItemId"))
+                .isEqualTo(originalLoanItemId);
+        assertThat(decimal(historyResult, "$.data.content[0].borrowFee")).isEqualTo(new BigDecimal("12.34"));
+        assertThat(jdbcTemplate.queryForObject("SELECT version FROM members WHERE id = ?", Long.class,
+                fixture.memberId())).isEqualTo(1L);
+    }
+
+    @Test
+    void patchNoOpPreservesVersionButStillRejectsAStaleClientVersion() throws Exception {
+        String token = login("superadmin", "superadmin");
+        MemberFixture fixture = createMember("MMV8-P03-NOOP", "Original Name", "0370000002",
+                LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+
+        patchProfile(token, fixture.memberId(), """
+                {"version":0,"fullName":"   ","phone":"  ","address":null}
+                """).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(0));
+
+        patchProfile(token, fixture.memberId(), "{\"version\":1,\"address\":\"\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER_VERSION_CONFLICT"));
+        assertThat(jdbcTemplate.queryForObject("SELECT version FROM members WHERE id = ?", Long.class,
+                fixture.memberId())).isZero();
+    }
+
+    @Test
+    void patchUsesCurrentEffectivePermissionAndRejectsUnknownImmutableAndInvalidFields() throws Exception {
+        MemberFixture fixture = createMember("MMV8-P03-GUARD", "Original Name", null,
+                LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+        patchProfile(null, fixture.memberId(), "{\"version\":0,\"fullName\":\"Denied\"}")
+                .andExpect(status().isUnauthorized());
+
+        String userToken = login("user", "user");
+        patchProfile(userToken, fixture.memberId(), "{\"version\":0,\"fullName\":\"Denied\"}")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+
+        String token = login("superadmin", "superadmin");
+        int adminPermissionBaseline = permissionLinkCount("ROLE_ADMIN", "member:update");
+        try {
+            setPermission("ROLE_ADMIN", "member:update", false);
+            patchProfile(login("admin", "admin"), fixture.memberId(),
+                    "{\"version\":0,\"fullName\":\"Admin Denied\"}")
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+        } finally {
+            setPermission("ROLE_ADMIN", "member:update", adminPermissionBaseline > 0);
+        }
+
+        patchProfile(token, fixture.memberId(), "{\"version\":0,\"enabled\":false}")
+                .andExpect(status().isBadRequest());
+        patchProfile(token, fixture.memberId(), "{\"version\":0,\"account\":{\"role\":\"ROLE_ADMIN\"}}")
+                .andExpect(status().isBadRequest());
+        patchProfile(token, fixture.memberId(), "{\"version\":0,\"fullName\":null,\"unknownField\":true}")
+                .andExpect(status().isBadRequest());
+        patchProfile(token, fixture.memberId(), "{\"fullName\":\"Missing version\"}")
+                .andExpect(status().isUnprocessableEntity());
+
+        patchProfile(token, fixture.memberId(), """
+                {"version":0,"fullName":"Would partially save","dateOfBirth":"%s"}
+                """.formatted(LocalDate.now().minusYears(16).plusDays(1)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("MEMBER_PATCH_VALIDATION_ERROR"));
+        patchProfile(token, fixture.memberId(), "{\"version\":0,\"phone\":\"0123.456.789\"}")
+                .andExpect(status().isUnprocessableEntity());
+        patchProfile(token, fixture.memberId(), "{\"version\":0,\"fullName\":\"%s\"}"
+                        .formatted("x".repeat(151)))
+                .andExpect(status().isUnprocessableEntity());
+        patchProfile(token, fixture.memberId(), "{\"version\":0,\"address\":\"%s\"}"
+                        .formatted("x".repeat(256)))
+                .andExpect(status().isUnprocessableEntity());
+        patchProfile(token, fixture.memberId(), "{\"version\":0,\"phone\":\"03AB123456\"}")
+                .andExpect(status().isUnprocessableEntity());
+        patchProfile(token, 99999999, "{\"version\":0,\"fullName\":\"Missing\"}")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT version FROM members WHERE id = ?", Long.class,
+                fixture.memberId())).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT full_name FROM members WHERE id = ?", String.class,
+                fixture.memberId())).isEqualTo("Original Name");
+
+        int userPermissionBaseline = permissionLinkCount("ROLE_USER", "member:update");
+        try {
+            setPermission("ROLE_USER", "member:update", true);
+            patchProfile(userToken, fixture.memberId(), "{\"version\":0,\"fullName\":\"User Allowed\"}")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.fullName").value("User Allowed"))
+                    .andExpect(jsonPath("$.data.version").value(1));
+        } finally {
+            setPermission("ROLE_USER", "member:update", userPermissionBaseline > 0);
+        }
+    }
+
+    @Test
+    void patchNormalizesPhoneAndRejectsDuplicatesEvenWhenTheOtherAccountIsDisabled() throws Exception {
+        String token = login("superadmin", "superadmin");
+        MemberFixture target = createMember("MMV8-P03-PHONE-A", "Target", "0370000003",
+                LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+        createMember("MMV8-P03-PHONE-B", "Disabled duplicate", "0370000004",
+                LocalDate.of(1990, 1, 1), true, false, LocalDateTime.now());
+
+        patchProfile(token, target.memberId(), "{\"version\":0,\"phone\":\" 0388.919.210 \"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.phone").value("0388919210"))
+                .andExpect(jsonPath("$.data.version").value(1));
+        patchProfile(token, target.memberId(), "{\"version\":1,\"phone\":\"0370 000 004\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER_PHONE_DUPLICATED"));
+        assertThat(jdbcTemplate.queryForObject("SELECT phone FROM members WHERE id = ?", String.class,
+                target.memberId())).isEqualTo("0388919210");
+    }
+
+    @Test
+    void concurrentSameVersionHttpPatchesHaveOneWinnerAndOneConflict() throws Exception {
+        String firstAdmin = login("admin", "admin");
+        String secondAdmin = login("admin", "admin");
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        MemberFixture fixture = requiresNew.execute(status -> createMember(
+                "MMV8-P03-RACE-" + UUID.randomUUID().toString().substring(0, 8), "Concurrent Original",
+                "0370000005", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now()));
+        assertThat(fixture).isNotNull();
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<MvcResult> first = executor.submit(() -> concurrentPatch(ready, start, firstAdmin,
+                    fixture.memberId(), "First Winner"));
+            Future<MvcResult> second = executor.submit(() -> concurrentPatch(ready, start, secondAdmin,
+                    fixture.memberId(), "Second Winner"));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            MvcResult firstResult = first.get(20, TimeUnit.SECONDS);
+            MvcResult secondResult = second.get(20, TimeUnit.SECONDS);
+
+            assertThat(List.of(firstResult.getResponse().getStatus(), secondResult.getResponse().getStatus()))
+                    .containsExactlyInAnyOrder(200, 409);
+            assertThat(JsonPath.<String>read(
+                    firstResult.getResponse().getStatus() == 409
+                            ? body(firstResult) : body(secondResult), "$.code"))
+                    .isEqualTo("MEMBER_VERSION_CONFLICT");
+            Long committedVersion = requiresNew.execute(status -> jdbcTemplate.queryForObject(
+                    "SELECT version FROM members WHERE id = ?", Long.class, fixture.memberId()));
+            assertThat(committedVersion).isEqualTo(1L);
+        } finally {
+            executor.shutdownNow();
+            requiresNew.executeWithoutResult(status -> deleteCommittedFixture(fixture.memberId()));
+        }
+    }
+
+    @Test
+    void concurrentHttpUpdatesCannotAssignOnePhoneToTwoMembers() throws Exception {
+        String firstAdmin = login("admin", "admin");
+        String secondAdmin = login("admin", "admin");
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        List<MemberFixture> fixtures = requiresNew.execute(status -> List.of(
+                createMember("MMV8-P03-PHONE-RACE-A-" + UUID.randomUUID().toString().substring(0, 6),
+                        "Phone Race A", "0370000011", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now()),
+                createMember("MMV8-P03-PHONE-RACE-B-" + UUID.randomUUID().toString().substring(0, 6),
+                        "Phone Race B", "0370000012", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now())
+        ));
+        assertThat(fixtures).hasSize(2);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<MvcResult> first = executor.submit(() -> concurrentPhonePatch(
+                    ready, start, firstAdmin, fixtures.get(0).memberId()));
+            Future<MvcResult> second = executor.submit(() -> concurrentPhonePatch(
+                    ready, start, secondAdmin, fixtures.get(1).memberId()));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            MvcResult firstResult = first.get(20, TimeUnit.SECONDS);
+            MvcResult secondResult = second.get(20, TimeUnit.SECONDS);
+
+            assertThat(List.of(firstResult.getResponse().getStatus(), secondResult.getResponse().getStatus()))
+                    .containsExactlyInAnyOrder(200, 409);
+            String duplicateResponse = firstResult.getResponse().getStatus() == 409
+                    ? body(firstResult) : body(secondResult);
+            assertThat(JsonPath.<String>read(duplicateResponse, "$.code")).isEqualTo("MEMBER_PHONE_DUPLICATED");
+            Integer assignments = requiresNew.execute(status -> jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM members WHERE phone = '0388919222'", Integer.class));
+            assertThat(assignments).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+            requiresNew.executeWithoutResult(status -> {
+                for (MemberFixture fixture : fixtures) deleteCommittedFixture(fixture.memberId());
+            });
+        }
+    }
+
+    private MvcResult concurrentPatch(
+            CountDownLatch ready,
+            CountDownLatch start,
+            String token,
+            Integer memberId,
+            String fullName
+    ) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent patch start timed out.");
+        return patchProfile(token, memberId, "{\"version\":0,\"fullName\":\"%s\"}".formatted(fullName))
+                .andReturn();
+    }
+
+    private MvcResult concurrentPhonePatch(
+            CountDownLatch ready,
+            CountDownLatch start,
+            String token,
+            Integer memberId
+    ) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent phone start timed out.");
+        return patchProfile(token, memberId, "{\"version\":0,\"phone\":\"0388.919.222\"}").andReturn();
+    }
+
+    private void deleteCommittedFixture(Integer memberId) {
+        Integer accountId = jdbcTemplate.queryForObject(
+                "SELECT account_id FROM members WHERE id = ?", Integer.class, memberId);
+        jdbcTemplate.update("DELETE FROM members WHERE id = ?", memberId);
+        jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+    }
+
+    private ResultActions patchProfile(String token, Integer memberId, String body) throws Exception {
+        MockHttpServletRequestBuilder request = patch("/api/v1/members/{id}", memberId)
+                .contentType(APPLICATION_JSON)
+                .content(body);
+        if (token != null) request.header("Authorization", "Bearer " + token);
+        return mockMvc.perform(request);
+    }
+
     private String login(String identifier, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(APPLICATION_JSON)
                         .content("{\"identifier\":\"" + identifier + "\",\"password\":\"" + password + "\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
+        recordIssuedRefreshFixture(identifier);
         return JsonPath.read(result.getResponse().getContentAsString(), "$.data.accessToken");
+    }
+
+    private void recordIssuedRefreshFixture(String identifier) {
+        Integer accountId = jdbcTemplate.queryForObject(
+                "SELECT id FROM accounts WHERE username = ?", Integer.class, identifier);
+        List<RefreshTokenFixture> rows = jdbcTemplate.query("""
+                        SELECT id, account_id, jti FROM refresh_tokens
+                        WHERE account_id = ? AND created_at >= ?
+                        ORDER BY id DESC LIMIT 1
+                        """,
+                (result, rowNumber) -> new RefreshTokenFixture(
+                        result.getInt("id"), result.getInt("account_id"), result.getString("jti")),
+                accountId, fixtureStartedAt);
+        if (!rows.isEmpty()) issuedRefreshFixtures.add(rows.get(0));
     }
 
     private ResultActions list(String token, String... parameters) throws Exception {
@@ -484,5 +785,8 @@ class MemberQueryApiIntegrationTests {
     }
 
     private record MemberFixture(Integer memberId, String email) {
+    }
+
+    private record RefreshTokenFixture(Integer id, Integer accountId, String jti) {
     }
 }
