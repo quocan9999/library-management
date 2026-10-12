@@ -413,27 +413,32 @@ class MemberQueryApiIntegrationTests {
     @Test
     void listSearchCombinesFiltersPagesStablyAndIncludesDisabledUnverifiedMembers() throws Exception {
         String token = login("admin", "admin");
+        String fixtureMarker = "MMV8-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String specialMemberCode = fixtureMarker + "-123";
         LocalDateTime firstCreated = LocalDateTime.of(2025, 1, 1, 8, 0);
-        MemberFixture special = createMember("M000123", "Nguyễn Đắc", "0388919210",
+        MemberFixture special = createMember(specialMemberCode, fixtureMarker + " Nguyễn Đắc", "0388919210",
                 LocalDate.of(1990, 2, 3), false, true, firstCreated);
         List<Integer> fixtureIdsByCreation = new java.util.ArrayList<>();
         fixtureIdsByCreation.add(special.memberId());
         for (int index = 1; index < 12; index++) {
-            MemberFixture fixture = createMember("MMV8-PAGE-" + index, "Other Member " + index,
+            MemberFixture fixture = createMember(fixtureMarker + "-PAGE-" + index,
+                    fixtureMarker + " Other Member " + index,
                     "03770000" + String.format("%02d", index),
                     LocalDate.of(1990, 2, 3).plusDays(index), true, index != 5,
                     firstCreated.plusDays(index));
             fixtureIdsByCreation.add(fixture.memberId());
         }
 
-        MvcResult page0 = list(token).andExpect(status().isOk()).andReturn();
+        // Marker riêng giữ phân trang độc lập với Member thật đã có trong DB local.
+        MvcResult page0 = list(token, "fullName", fixtureMarker).andExpect(status().isOk()).andReturn();
         assertThat(JsonPath.<Integer>read(body(page0), "$.data.size")).isEqualTo(10);
         assertThat(JsonPath.<Integer>read(body(page0), "$.data.totalElements")).isEqualTo(12);
         assertThat(JsonPath.<Integer>read(body(page0), "$.data.totalPages")).isEqualTo(2);
         assertThat(JsonPath.<Boolean>read(body(page0), "$.data.first")).isTrue();
         assertThat(JsonPath.<Boolean>read(body(page0), "$.data.last")).isFalse();
 
-        MvcResult page1 = list(token, "page", "1").andExpect(status().isOk()).andReturn();
+        MvcResult page1 = list(token, "fullName", fixtureMarker, "page", "1")
+                .andExpect(status().isOk()).andReturn();
         assertThat(JsonPath.<Integer>read(body(page1), "$.data.content.length()")).isEqualTo(2);
         List<Integer> ids0 = JsonPath.read(body(page0), "$.data.content[*].id");
         List<Integer> ids1 = JsonPath.read(body(page1), "$.data.content[*].id");
@@ -442,24 +447,27 @@ class MemberQueryApiIntegrationTests {
         assertThat(ids0.get(9)).isEqualTo(fixtureIdsByCreation.get(2));
         assertThat(ids1).containsExactly(fixtureIdsByCreation.get(1), special.memberId());
 
-        assertThat(JsonPath.<Integer>read(body(list(token, "fullName", "Nguyen")
+        assertThat(JsonPath.<Integer>read(body(list(token, "fullName", "Nguyen", "email", special.email().substring(5, 11))
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(1);
-        assertThat(JsonPath.<String>read(body(list(token, "fullName", "Dac")
+        assertThat(JsonPath.<String>read(body(list(token, "fullName", "Dac", "email", special.email().substring(5, 11))
                         .andExpect(status().isOk()).andReturn()), "$.data.content[0].memberCode"))
-                .isEqualTo("M000123");
-        assertThat(JsonPath.<Integer>read(body(list(token, "memberCode", "123")
+                .isEqualTo(specialMemberCode);
+        assertThat(JsonPath.<Integer>read(body(list(token, "memberCode", "123", "email", special.email().substring(5, 11))
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(1);
-        assertThat(JsonPath.<Integer>read(body(list(token, "email", special.email().substring(5, 11))
+        assertThat(JsonPath.<Integer>read(body(list(token,
+                        "fullName", fixtureMarker, "email", special.email().substring(5, 11))
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(1);
-        assertThat(JsonPath.<Integer>read(body(list(token, "phone", "0388.919.210")
+        assertThat(JsonPath.<Integer>read(body(list(token, "fullName", fixtureMarker, "phone", "0388.919.210")
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(1);
-        assertThat(JsonPath.<Integer>read(body(list(token, "birthFrom", "1990-02-03", "birthTo", "1990-02-03")
+        assertThat(JsonPath.<Integer>read(body(list(token, "fullName", fixtureMarker,
+                        "birthFrom", "1990-02-03", "birthTo", "1990-02-03")
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(1);
-        assertThat(JsonPath.<Integer>read(body(list(token, "birthFrom", "1990-02-03")
+        assertThat(JsonPath.<Integer>read(body(list(token, "fullName", fixtureMarker, "birthFrom", "1990-02-03")
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(12);
-        assertThat(JsonPath.<Integer>read(body(list(token, "birthTo", "1990-02-03")
+        assertThat(JsonPath.<Integer>read(body(list(token, "fullName", fixtureMarker, "birthTo", "1990-02-03")
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(1);
-        assertThat(JsonPath.<Integer>read(body(list(token, "emailVerified", "false", "enabled", "true")
+        assertThat(JsonPath.<Integer>read(body(list(token,
+                        "fullName", fixtureMarker, "emailVerified", "false", "enabled", "true")
                         .andExpect(status().isOk()).andReturn()), "$.data.content[0].id"))
                 .isEqualTo(special.memberId());
         assertThat(JsonPath.<Integer>read(body(list(token,
@@ -467,7 +475,7 @@ class MemberQueryApiIntegrationTests {
                         "phone", "0388.919.210", "birthFrom", "1990-02-03", "birthTo", "1990-02-03",
                         "emailVerified", "false", "enabled", "true")
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(1);
-        assertThat(JsonPath.<Integer>read(body(list(token, "enabled", "false")
+        assertThat(JsonPath.<Integer>read(body(list(token, "fullName", fixtureMarker, "enabled", "false")
                         .andExpect(status().isOk()).andReturn()), "$.data.totalElements")).isEqualTo(1);
     }
 
