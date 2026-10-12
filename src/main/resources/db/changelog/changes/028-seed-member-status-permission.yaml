@@ -1,0 +1,46 @@
+databaseChangeLog:
+  - changeSet:
+      id: 028-seed-member-status-permission
+      author: codex
+      comment: "Quyền đổi trạng thái tài khoản thành viên chỉ được gán mặc định cho ROLE_ADMIN; SUPER_ADMIN có quyền hiệu lực theo resolver hiện tại."
+      preConditions:
+        - onFail: HALT
+        - onError: HALT
+        - onFailMessage: "Không thể seed member:status:update vì quyền đã tồn tại hoặc thiếu ROLE_ADMIN."
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM permissions WHERE code = 'member:status:update'
+        - sqlCheck:
+            expectedResult: "1"
+            sql: SELECT COUNT(*) FROM roles WHERE code = 'ROLE_ADMIN'
+      changes:
+        - insert:
+            tableName: permissions
+            columns:
+              - column:
+                  name: code
+                  value: member:status:update
+              - column:
+                  name: description
+                  value: Enable or disable a member account
+        - sql:
+            dbms: mysql
+            sql: >
+              INSERT INTO role_permissions (role_id, permission_id)
+              SELECT r.id, p.id
+              FROM roles r
+              JOIN permissions p ON p.code = 'member:status:update'
+              WHERE r.code = 'ROLE_ADMIN'
+      rollback:
+        - sql:
+            dbms: mysql
+            sql: >
+              DELETE rp
+              FROM role_permissions rp
+              JOIN roles r ON r.id = rp.role_id
+              JOIN permissions p ON p.id = rp.permission_id
+              WHERE r.code = 'ROLE_ADMIN'
+                AND p.code = 'member:status:update'
+        - delete:
+            tableName: permissions
+            where: code = 'member:status:update'

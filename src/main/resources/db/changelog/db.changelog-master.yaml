@@ -98,3 +98,15 @@ databaseChangeLog:
   - include:
       file: changes/025-disable-public-super-admin-seed.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/026-member-phone-unique.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/027-member-version.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/028-seed-member-status-permission.yaml
+      relativeToChangelogFile: true

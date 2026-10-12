@@ -40,6 +40,11 @@ public class Member {
     @Column(name = "address", length = 255)
     private String address;
 
+    /** Ngăn form cũ ghi đè hồ sơ đã được quản trị viên khác cập nhật. */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

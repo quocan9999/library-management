@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 026-member-phone-unique
+      author: codex
+      comment: "Dừng thay đổi schema nếu phone hiện hữu sai chuẩn hoặc trùng sau chuẩn hóa; không tự sửa dữ liệu thành viên."
+      preConditions:
+        - onFail: HALT
+        - onError: HALT
+        - onFailMessage: "Không thể tạo unique members.phone: hãy kiểm tra phone sai chuẩn hoặc trùng đã chuẩn hóa trước khi chạy lại."
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >
+              SELECT COUNT(*)
+              FROM members
+              WHERE phone IS NOT NULL
+                AND phone NOT REGEXP '^0[35789][0-9]{8}$'
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >
+              SELECT COUNT(*)
+              FROM (
+                SELECT REGEXP_REPLACE(phone, '[^0-9]', '') AS normalized_phone
+                FROM members
+                WHERE phone IS NOT NULL
+                GROUP BY normalized_phone
+                HAVING COUNT(*) > 1
+              ) duplicate_phones
+      changes:
+        - addUniqueConstraint:
+            tableName: members
+            columnNames: phone
+            constraintName: uk_members_phone
+      rollback:
+        - dropUniqueConstraint:
+            tableName: members
+            constraintName: uk_members_phone
