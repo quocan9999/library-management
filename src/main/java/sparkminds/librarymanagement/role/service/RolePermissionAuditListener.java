@@ -1,19 +1,17 @@
 package sparkminds.librarymanagement.role.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
+@Slf4j
 public class RolePermissionAuditListener {
-
-    private static final Logger logger = LoggerFactory.getLogger(RolePermissionAuditListener.class);
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void logSuccessfulUpdate(RolePermissionAuditEvent event) {
-        logger.info(
+        log.info(
                 "role-permission-update actorId={} roleCode={} addedPermissions={} removedPermissions={} occurredAt={}",
                 event.actorId(),
                 event.roleCode(),

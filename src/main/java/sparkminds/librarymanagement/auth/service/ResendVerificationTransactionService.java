@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.service;
 
+import lombok.RequiredArgsConstructor;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
@@ -10,24 +11,13 @@ import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.auth.repository.EmailVerificationTokenRepository;
 
 @Service
+@RequiredArgsConstructor
 public class ResendVerificationTransactionService {
 
     private final AccountRepository accountRepository;
     private final EmailVerificationTokenRepository tokenRepository;
     private final VerificationTokenService tokenService;
     private final Clock clock;
-
-    public ResendVerificationTransactionService(
-            AccountRepository accountRepository,
-            EmailVerificationTokenRepository tokenRepository,
-            VerificationTokenService tokenService,
-            Clock clock
-    ) {
-        this.accountRepository = accountRepository;
-        this.tokenRepository = tokenRepository;
-        this.tokenService = tokenService;
-        this.clock = clock;
-    }
 
     /** Commit ứng viên trước khi SMTP chạy để khóa DB không bị giữ trong lúc chờ mạng. */
     @Transactional

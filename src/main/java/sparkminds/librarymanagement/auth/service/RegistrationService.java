@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -11,18 +12,11 @@ import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.member.dto.MemberRegistrationProfile;
 
 @Service
+@RequiredArgsConstructor
 public class RegistrationService {
 
     private final AccountRepository accountRepository;
     private final RegistrationTransactionService registrationTransactionService;
-
-    public RegistrationService(
-            AccountRepository accountRepository,
-            RegistrationTransactionService registrationTransactionService
-    ) {
-        this.accountRepository = accountRepository;
-        this.registrationTransactionService = registrationTransactionService;
-    }
 
     public RegisterResponse register(RegisterRequest request) {
         registerForAdmin(request, MemberRegistrationProfile.empty());

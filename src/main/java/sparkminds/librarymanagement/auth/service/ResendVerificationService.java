@@ -1,7 +1,6 @@
 package sparkminds.librarymanagement.auth.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -9,9 +8,8 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 
 @Service
+@Slf4j
 public class ResendVerificationService {
-
-    private static final Logger logger = LoggerFactory.getLogger(ResendVerificationService.class);
 
     private final InMemoryVerificationRateLimiter rateLimiter;
     private final ResendVerificationTransactionService transactionService;
@@ -41,13 +39,13 @@ public class ResendVerificationService {
                     performResend(email);
                 } catch (RuntimeException exception) {
                     // Worker không in exception message/stacktrace có thể chứa email hoặc token.
-                    logger.error("Lỗi xử lý gửi lại email xác thực; loại lỗi={}",
+                    log.error("Lỗi xử lý gửi lại email xác thực; loại lỗi={}",
                             exception.getClass().getSimpleName());
                 }
             });
         } catch (TaskRejectedException exception) {
             // Khi hàng đợi đầy vẫn giữ cùng response chung; không tiết lộ email hoặc trạng thái.
-            logger.warn("Hàng đợi gửi email xác thực đang bận");
+            log.warn("Hàng đợi gửi email xác thực đang bận");
         }
     }
 
@@ -68,11 +66,11 @@ public class ResendVerificationService {
                 permit.recordSuccessfulSend();
             } catch (MailException mailException) {
                 // Chỉ ghi loại lỗi SMTP; không ghi địa chỉ, token, URL hay chi tiết máy chủ mail.
-                logger.warn("Không gửi được email xác thực; loại lỗi={}", mailException.getClass().getSimpleName());
+                log.warn("Không gửi được email xác thực; loại lỗi={}", mailException.getClass().getSimpleName());
                 try {
                     transactionService.removeUnsentCandidate(candidate);
                 } catch (RuntimeException compensationException) {
-                    logger.error("Không khôi phục được token xác thực sau lỗi SMTP; loại lỗi={}",
+                    log.error("Không khôi phục được token xác thực sau lỗi SMTP; loại lỗi={}",
                             compensationException.getClass().getSimpleName());
                 }
             }

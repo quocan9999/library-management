@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 @Service
+@RequiredArgsConstructor
 public class MemberAccountStatusService {
 
     private final MemberRepository memberRepository;
@@ -24,20 +26,6 @@ public class MemberAccountStatusService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final MemberQueryService memberQueryService;
     private final Clock clock;
-
-    public MemberAccountStatusService(
-            MemberRepository memberRepository,
-            AccountRepository accountRepository,
-            RefreshTokenRepository refreshTokenRepository,
-            MemberQueryService memberQueryService,
-            Clock clock
-    ) {
-        this.memberRepository = memberRepository;
-        this.accountRepository = accountRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.memberQueryService = memberQueryService;
-        this.clock = clock;
-    }
 
     /**
      * Khóa Account và dùng CAS để hai thao tác cùng expected state chỉ có một thao tác thắng; thu hồi session cùng commit.

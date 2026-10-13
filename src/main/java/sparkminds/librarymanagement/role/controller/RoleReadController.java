@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.role.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -25,18 +26,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")
+@RequiredArgsConstructor
 public class RoleReadController {
 
     private final RoleReadService roleReadService;
     private final RolePermissionMutationService rolePermissionMutationService;
-
-    public RoleReadController(
-            RoleReadService roleReadService,
-            RolePermissionMutationService rolePermissionMutationService
-    ) {
-        this.roleReadService = roleReadService;
-        this.rolePermissionMutationService = rolePermissionMutationService;
-    }
 
     @GetMapping("/roles")
     @PreAuthorize("hasAuthority('role:read')")

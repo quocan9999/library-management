@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.role.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.GrantedAuthority;
@@ -24,6 +25,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class RoleReadService {
 
     private final RoleRepositoy roleRepository;
@@ -31,20 +33,6 @@ public class RoleReadService {
     private final EffectivePermissionService effectivePermissionService;
     private final RoleAccessPolicy roleAccessPolicy;
     private final PermissionDependencyRegistry permissionDependencyRegistry;
-
-    public RoleReadService(
-            RoleRepositoy roleRepository,
-            PermissionRepository permissionRepository,
-            EffectivePermissionService effectivePermissionService,
-            RoleAccessPolicy roleAccessPolicy,
-            PermissionDependencyRegistry permissionDependencyRegistry
-    ) {
-        this.roleRepository = roleRepository;
-        this.permissionRepository = permissionRepository;
-        this.effectivePermissionService = effectivePermissionService;
-        this.roleAccessPolicy = roleAccessPolicy;
-        this.permissionDependencyRegistry = permissionDependencyRegistry;
-    }
 
     @Transactional(readOnly = true)
     public List<RoleSummaryResponse> getRoles(CustomUserPrincipal actor) {

@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.service;
 
+import lombok.RequiredArgsConstructor;
 import java.util.Locale;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -16,6 +17,7 @@ import sparkminds.librarymanagement.member.dto.MemberRegistrationProfile;
 import sparkminds.librarymanagement.member.repository.MemberRepository;
 
 @Service
+@RequiredArgsConstructor
 public class RegistrationTransactionService {
 
     private final AccountRepository accountRepository;
@@ -25,24 +27,6 @@ public class RegistrationTransactionService {
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenService verificationTokenService;
     private final ApplicationEventPublisher eventPublisher;
-
-    public RegistrationTransactionService(
-            AccountRepository accountRepository,
-            RoleRepositoy roleRepository,
-            MemberRepository memberRepository,
-            EmailVerificationTokenRepository verificationTokenRepository,
-            PasswordEncoder passwordEncoder,
-            VerificationTokenService verificationTokenService,
-            ApplicationEventPublisher eventPublisher
-    ) {
-        this.accountRepository = accountRepository;
-        this.roleRepository = roleRepository;
-        this.memberRepository = memberRepository;
-        this.verificationTokenRepository = verificationTokenRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.verificationTokenService = verificationTokenService;
-        this.eventPublisher = eventPublisher;
-    }
 
     @Transactional
     public Integer create(RegisterRequest request) {

@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -16,15 +17,11 @@ import sparkminds.librarymanagement.common.api.BusinessException;
 
 @RestController
 @RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
 public class AuthSessionController {
 
     private final AuthSessionService authSessionService;
     private final RefreshCookieFactory refreshCookieFactory;
-
-    public AuthSessionController(AuthSessionService authSessionService, RefreshCookieFactory refreshCookieFactory) {
-        this.authSessionService = authSessionService;
-        this.refreshCookieFactory = refreshCookieFactory;
-    }
 
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<LoginResponse>> refresh(

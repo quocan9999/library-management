@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -27,6 +28,7 @@ import java.time.ZoneOffset;
 import java.util.Locale;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final AuthenticationManager authenticationManager;
@@ -34,20 +36,6 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenService jwtTokenService;
     private final EntityManager entityManager;
-
-    public AuthService(
-            AuthenticationManager authenticationManager,
-            AccountRepository accountRepository,
-            RefreshTokenRepository refreshTokenRepository,
-            JwtTokenService jwtTokenService,
-            EntityManager entityManager
-    ) {
-        this.authenticationManager = authenticationManager;
-        this.accountRepository = accountRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.jwtTokenService = jwtTokenService;
-        this.entityManager = entityManager;
-    }
 
     @Transactional
     public LoginResult login(LoginRequest request) {

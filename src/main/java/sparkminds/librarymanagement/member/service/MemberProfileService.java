@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.service;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.persistence.OptimisticLockException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,17 +21,13 @@ import java.util.Map;
 import java.util.Objects;
 
 @Service
+@RequiredArgsConstructor
 public class MemberProfileService {
 
     private static final String PHONE_UNIQUE_CONSTRAINT = "uk_members_phone";
 
     private final MemberRepository memberRepository;
     private final MemberQueryService memberQueryService;
-
-    public MemberProfileService(MemberRepository memberRepository, MemberQueryService memberQueryService) {
-        this.memberRepository = memberRepository;
-        this.memberQueryService = memberQueryService;
-    }
 
     /**
      * Cập nhật các field được gửi, kể cả khi giá trị là null; field vắng mặt được giữ nguyên.

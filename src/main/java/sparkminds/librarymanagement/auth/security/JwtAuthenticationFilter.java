@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.security;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Set;
 
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
@@ -27,14 +29,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final AccessTokenAuthenticationService authenticationService;
     private final AuthenticationEntryPoint authenticationEntryPoint;
-
-    public JwtAuthenticationFilter(
-            AccessTokenAuthenticationService authenticationService,
-            AuthenticationEntryPoint authenticationEntryPoint
-    ) {
-        this.authenticationService = authenticationService;
-        this.authenticationEntryPoint = authenticationEntryPoint;
-    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.security;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import sparkminds.librarymanagement.auth.entity.Account;
 import sparkminds.librarymanagement.auth.entity.Permission;
@@ -9,15 +10,12 @@ import sparkminds.librarymanagement.auth.repository.PermissionRepository;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class EffectivePermissionService {
 
     public static final String ROLE_SUPER_ADMIN = "ROLE_SUPER_ADMIN";
 
     private final PermissionRepository permissionRepository;
-
-    public EffectivePermissionService(PermissionRepository permissionRepository) {
-        this.permissionRepository = permissionRepository;
-    }
 
     public List<String> resolve(Account account) {
         return resolve(account.getRole());

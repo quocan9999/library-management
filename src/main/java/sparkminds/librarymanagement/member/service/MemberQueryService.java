@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class MemberQueryService {
 
     private static final int DEFAULT_PAGE_SIZE = 10;
@@ -26,10 +28,6 @@ public class MemberQueryService {
     private static final Map<String, String> SORT_DIRECTIONS = Map.of("asc", "ASC", "desc", "DESC");
 
     private final MemberReadRepository memberReadRepository;
-
-    public MemberQueryService(MemberReadRepository memberReadRepository) {
-        this.memberReadRepository = memberReadRepository;
-    }
 
     public PagedResponse<MemberListItemResponse> searchMembers(
             String fullName,

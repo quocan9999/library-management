@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.controller;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,13 +16,10 @@ import sparkminds.librarymanagement.member.service.MemberAccountStatusService;
 
 @RestController
 @RequestMapping("/api/v1/members")
+@RequiredArgsConstructor
 public class MemberAccountStatusController {
 
     private final MemberAccountStatusService memberAccountStatusService;
-
-    public MemberAccountStatusController(MemberAccountStatusService memberAccountStatusService) {
-        this.memberAccountStatusService = memberAccountStatusService;
-    }
 
     @PatchMapping("/{id}/account-status")
     @PreAuthorize("hasAuthority('member:status:update')")

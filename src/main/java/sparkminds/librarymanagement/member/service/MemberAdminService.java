@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import sparkminds.librarymanagement.member.repository.MemberRepository;
 import java.time.LocalDate;
 
 @Service
+@RequiredArgsConstructor
 public class MemberAdminService {
 
     private final RegistrationService registrationService;
@@ -22,20 +24,6 @@ public class MemberAdminService {
     private final MemberLoanHistoryRepository loanHistoryRepository;
     private final MemberDeletionTransactionService deletionTransactionService;
     private final MemberQueryService memberQueryService;
-
-    public MemberAdminService(
-            RegistrationService registrationService,
-            MemberRepository memberRepository,
-            MemberLoanHistoryRepository loanHistoryRepository,
-            MemberDeletionTransactionService deletionTransactionService,
-            MemberQueryService memberQueryService
-    ) {
-        this.registrationService = registrationService;
-        this.memberRepository = memberRepository;
-        this.loanHistoryRepository = loanHistoryRepository;
-        this.deletionTransactionService = deletionTransactionService;
-        this.memberQueryService = memberQueryService;
-    }
 
     public MemberDetailResponse create(CreateMemberRequest request) {
         String fullName = MemberProfileRules.normalizeOptionalText(request.fullName());

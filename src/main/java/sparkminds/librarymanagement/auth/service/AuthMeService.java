@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,18 +10,11 @@ import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
 import sparkminds.librarymanagement.auth.security.EffectivePermissionService;
 import sparkminds.librarymanagement.common.api.BusinessException;
 @Service
+@RequiredArgsConstructor
 public class AuthMeService {
 
     private final AccountRepository accountRepository;
     private final EffectivePermissionService effectivePermissionService;
-
-    public AuthMeService(
-            AccountRepository accountRepository,
-            EffectivePermissionService effectivePermissionService
-    ) {
-        this.accountRepository = accountRepository;
-        this.effectivePermissionService = effectivePermissionService;
-    }
 
     @Transactional(readOnly = true)
     public AuthMeResponse getCurrentAccount(CustomUserPrincipal principal) {

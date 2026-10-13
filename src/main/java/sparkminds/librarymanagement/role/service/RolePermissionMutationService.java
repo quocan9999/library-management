@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.role.service;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.springframework.context.ApplicationEventPublisher;
@@ -37,6 +38,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 @Service
+@RequiredArgsConstructor
 public class RolePermissionMutationService {
 
     private static final int MAX_PERMISSION_CODES_PER_DELTA = 100;
@@ -50,28 +52,6 @@ public class RolePermissionMutationService {
     private final JdbcTemplate jdbcTemplate;
     private final EntityManager entityManager;
     private final ApplicationEventPublisher eventPublisher;
-
-    public RolePermissionMutationService(
-            AccountRepository accountRepository,
-            RoleRepositoy roleRepository,
-            PermissionRepository permissionRepository,
-            EffectivePermissionService effectivePermissionService,
-            RoleAccessPolicy roleAccessPolicy,
-            PermissionDependencyRegistry permissionDependencyRegistry,
-            JdbcTemplate jdbcTemplate,
-            EntityManager entityManager,
-            ApplicationEventPublisher eventPublisher
-    ) {
-        this.accountRepository = accountRepository;
-        this.roleRepository = roleRepository;
-        this.permissionRepository = permissionRepository;
-        this.effectivePermissionService = effectivePermissionService;
-        this.roleAccessPolicy = roleAccessPolicy;
-        this.permissionDependencyRegistry = permissionDependencyRegistry;
-        this.jdbcTemplate = jdbcTemplate;
-        this.entityManager = entityManager;
-        this.eventPublisher = eventPublisher;
-    }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public RolePermissionsResponse updatePermissions(

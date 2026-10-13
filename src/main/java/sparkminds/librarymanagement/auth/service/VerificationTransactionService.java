@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.service;
 
+import lombok.RequiredArgsConstructor;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
@@ -13,21 +14,12 @@ import sparkminds.librarymanagement.auth.repository.EmailVerificationTokenReposi
 import sparkminds.librarymanagement.common.api.BusinessException;
 
 @Service
+@RequiredArgsConstructor
 public class VerificationTransactionService {
 
     private final AccountRepository accountRepository;
     private final EmailVerificationTokenRepository tokenRepository;
     private final Clock clock;
-
-    public VerificationTransactionService(
-            AccountRepository accountRepository,
-            EmailVerificationTokenRepository tokenRepository,
-            Clock clock
-    ) {
-        this.accountRepository = accountRepository;
-        this.tokenRepository = tokenRepository;
-        this.clock = clock;
-    }
 
     /** Khóa Account rồi Token theo cùng thứ tự với resend để chỉ một request xác thực được token. */
     @Transactional

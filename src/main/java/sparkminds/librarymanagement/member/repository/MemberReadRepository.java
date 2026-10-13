@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.repository;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -17,6 +18,7 @@ import java.util.Optional;
 
 /** Truy vấn dạng projection để trang hóa theo bản ghi và không phát sinh truy vấn riêng cho từng Member. */
 @Repository
+@RequiredArgsConstructor
 public class MemberReadRepository {
 
     private static final String MEMBER_ACCOUNT_FROM = " FROM members m JOIN accounts a ON a.id = m.account_id ";
@@ -54,10 +56,6 @@ public class MemberReadRepository {
     private static final RowMapper<LoanHistoryItemResponse> LOAN_HISTORY_ROW = MemberReadRepository::mapLoanHistory;
 
     private final JdbcTemplate jdbcTemplate;
-
-    public MemberReadRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
 
     public PagedResponse<MemberListItemResponse> search(MemberSearchCriteria criteria) {
         QueryParts queryParts = memberWhere(criteria);

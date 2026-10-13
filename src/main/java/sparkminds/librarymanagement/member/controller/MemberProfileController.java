@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.controller;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,13 +16,10 @@ import sparkminds.librarymanagement.member.service.MemberProfileService;
 
 @RestController
 @RequestMapping("/api/v1/members")
+@RequiredArgsConstructor
 public class MemberProfileController {
 
     private final MemberProfileService memberProfileService;
-
-    public MemberProfileController(MemberProfileService memberProfileService) {
-        this.memberProfileService = memberProfileService;
-    }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('member:update')")

@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,21 +13,12 @@ import sparkminds.librarymanagement.member.repository.MemberRepository;
 import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
 
 @Service
+@RequiredArgsConstructor
 public class MemberDeletionTransactionService {
 
     private final MemberRepository memberRepository;
     private final AccountRepository accountRepository;
     private final MemberLoanHistoryRepository loanHistoryRepository;
-
-    public MemberDeletionTransactionService(
-            MemberRepository memberRepository,
-            AccountRepository accountRepository,
-            MemberLoanHistoryRepository loanHistoryRepository
-    ) {
-        this.memberRepository = memberRepository;
-        this.accountRepository = accountRepository;
-        this.loanHistoryRepository = loanHistoryRepository;
-    }
 
     @Transactional
     public void deleteMember(Integer memberId) {

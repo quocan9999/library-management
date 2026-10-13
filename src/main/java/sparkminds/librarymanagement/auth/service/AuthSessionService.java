@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 @Service
+@RequiredArgsConstructor
 public class AuthSessionService {
 
     private final JwtTokenService jwtTokenService;
@@ -30,20 +32,6 @@ public class AuthSessionService {
     private final RevokedAccessTokenRepository revokedAccessTokenRepository;
     private final AccountRepository accountRepository;
     private final Clock clock;
-
-    public AuthSessionService(
-            JwtTokenService jwtTokenService,
-            RefreshTokenRepository refreshTokenRepository,
-            RevokedAccessTokenRepository revokedAccessTokenRepository,
-            AccountRepository accountRepository,
-            Clock clock
-    ) {
-        this.jwtTokenService = jwtTokenService;
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.revokedAccessTokenRepository = revokedAccessTokenRepository;
-        this.accountRepository = accountRepository;
-        this.clock = clock;
-    }
 
     @Transactional
     public RefreshResult refresh(String rawRefreshToken) {
