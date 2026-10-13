@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.config;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -15,13 +16,10 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 
 @Component
+@RequiredArgsConstructor
 public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final ObjectMapper objectMapper;
-
-    public ApiAuthenticationEntryPoint(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     public void commence(

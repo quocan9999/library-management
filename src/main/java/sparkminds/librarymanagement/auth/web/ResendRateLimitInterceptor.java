@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.web;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -14,18 +15,11 @@ import sparkminds.librarymanagement.common.api.ApiResponse;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
+@RequiredArgsConstructor
 public class ResendRateLimitInterceptor implements HandlerInterceptor {
 
     private final InMemoryVerificationRateLimiter rateLimiter;
     private final ObjectMapper objectMapper;
-
-    public ResendRateLimitInterceptor(
-            InMemoryVerificationRateLimiter rateLimiter,
-            ObjectMapper objectMapper
-    ) {
-        this.rateLimiter = rateLimiter;
-        this.objectMapper = objectMapper;
-    }
 
     /** Chạy trước khi MVC đọc/validate body để cả request sai định dạng cũng tính vào quota IP. */
     @Override

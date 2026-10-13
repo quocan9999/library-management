@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,13 +17,10 @@ import sparkminds.librarymanagement.member.service.MemberQueryService;
 
 @RestController
 @RequestMapping("/api/v1/members")
+@RequiredArgsConstructor
 public class MemberQueryController {
 
     private final MemberQueryService memberQueryService;
-
-    public MemberQueryController(MemberQueryService memberQueryService) {
-        this.memberQueryService = memberQueryService;
-    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('member:read')")

@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.security;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -10,18 +11,11 @@ import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import java.util.Locale;
 
 @Service
+@RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final AccountRepository accountRepository;
     private final EffectivePermissionService effectivePermissionService;
-
-    public CustomUserDetailsService(
-            AccountRepository accountRepository,
-            EffectivePermissionService effectivePermissionService
-    ) {
-        this.accountRepository = accountRepository;
-        this.effectivePermissionService = effectivePermissionService;
-    }
 
     @Override
     @Transactional(readOnly = true)

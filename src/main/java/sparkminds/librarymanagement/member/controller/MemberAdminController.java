@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.member.controller;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -20,13 +21,10 @@ import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/members")
+@RequiredArgsConstructor
 public class MemberAdminController {
 
     private final MemberAdminService memberAdminService;
-
-    public MemberAdminController(MemberAdminService memberAdminService) {
-        this.memberAdminService = memberAdminService;
-    }
 
     @PostMapping
     @PreAuthorize("hasAuthority('member:create')")

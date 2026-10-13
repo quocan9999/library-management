@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.controller;
 
+import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,7 @@ import sparkminds.librarymanagement.common.api.ApiResponse;
 
 @RestController
 @RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
@@ -37,22 +39,6 @@ public class AuthController {
     private final EmailVerificationService emailVerificationService;
     private final ResendVerificationService resendVerificationService;
     private final RefreshCookieFactory refreshCookieFactory;
-
-    public AuthController(
-            AuthService authService,
-            AuthMeService authMeService,
-            RegistrationService registrationService,
-            EmailVerificationService emailVerificationService,
-            ResendVerificationService resendVerificationService,
-            RefreshCookieFactory refreshCookieFactory
-    ) {
-        this.authService = authService;
-        this.authMeService = authMeService;
-        this.registrationService = registrationService;
-        this.emailVerificationService = emailVerificationService;
-        this.resendVerificationService = resendVerificationService;
-        this.refreshCookieFactory = refreshCookieFactory;
-    }
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest request) {

@@ -1,5 +1,6 @@
 package sparkminds.librarymanagement.auth.security;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -15,24 +16,13 @@ import sparkminds.librarymanagement.auth.security.jwt.JwtTokenType;
 import sparkminds.librarymanagement.auth.security.jwt.VerifiedJwtToken;
 
 @Service
+@RequiredArgsConstructor
 public class AccessTokenAuthenticationService {
 
     private final JwtTokenService jwtTokenService;
     private final RevokedAccessTokenRepository revokedAccessTokenRepository;
     private final AccountRepository accountRepository;
     private final EffectivePermissionService effectivePermissionService;
-
-    public AccessTokenAuthenticationService(
-            JwtTokenService jwtTokenService,
-            RevokedAccessTokenRepository revokedAccessTokenRepository,
-            AccountRepository accountRepository,
-            EffectivePermissionService effectivePermissionService
-    ) {
-        this.jwtTokenService = jwtTokenService;
-        this.revokedAccessTokenRepository = revokedAccessTokenRepository;
-        this.accountRepository = accountRepository;
-        this.effectivePermissionService = effectivePermissionService;
-    }
 
     @Transactional(readOnly = true)
     public Authentication authenticate(String token) {

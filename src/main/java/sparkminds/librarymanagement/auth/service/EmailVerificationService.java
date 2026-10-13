@@ -1,29 +1,19 @@
 package sparkminds.librarymanagement.auth.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import sparkminds.librarymanagement.auth.repository.EmailVerificationTokenRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
 
 @Service
+@RequiredArgsConstructor
 public class EmailVerificationService {
 
     private final EmailVerificationTokenRepository tokenRepository;
     private final VerificationTokenService tokenService;
     private final VerificationTransactionService transactionService;
     private final InMemoryVerificationRateLimiter rateLimiter;
-
-    public EmailVerificationService(
-            EmailVerificationTokenRepository tokenRepository,
-            VerificationTokenService tokenService,
-            VerificationTransactionService transactionService,
-            InMemoryVerificationRateLimiter rateLimiter
-    ) {
-        this.tokenRepository = tokenRepository;
-        this.tokenService = tokenService;
-        this.transactionService = transactionService;
-        this.rateLimiter = rateLimiter;
-    }
 
     /** Chỉ chuyển hash và định danh DB vào transaction; token thô không được lưu hoặc ghi log. */
     public void verify(String rawToken) {
