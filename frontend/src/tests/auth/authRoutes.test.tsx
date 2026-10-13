@@ -303,7 +303,7 @@ describe('public registration and verification routes', () => {
     expect(screen.getByRole('link', { name: 'Đăng nhập' })).toBeTruthy();
   });
 
-  it('registers with normalized email, stores only email, then opens check-email', async () => {
+  it('registers with normalized email and starts cooldown immediately on check-email', async () => {
     const user = userEvent.setup();
     let requestBody = '';
     apiClient.defaults.adapter = (async (config) => {
@@ -322,6 +322,8 @@ describe('public registration and verification routes', () => {
     await user.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
 
     expect(await screen.findByText('reader@example.com')).toBeTruthy();
+    expect(screen.getByText(/gửi lại sau (59|60) giây/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'gửi lại' })).toBeNull();
     expect(window.sessionStorage.getItem('registrationEmail')).toBe('reader@example.com');
     expect(window.sessionStorage.getItem('verificationToken')).toBeNull();
     expect(window.sessionStorage.getItem('password')).toBeNull();
@@ -441,11 +443,12 @@ describe('public registration and verification routes', () => {
 
     expect(screen.getByText('reader@example.com')).toBeTruthy();
     expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
-    expect(screen.getByRole('button', { name: /Gửi lại/ }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'gửi lại' }).hasAttribute('disabled')).toBe(false);
     expect(screen.queryByText(/60 giây/)).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
-    expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'gửi lại' }));
+    expect(await screen.findByText('gửi lại sau 60 giây')).toBeTruthy();
+    expect(screen.queryByText('Yêu cầu đã được tiếp nhận')).toBeNull();
     expect(requestBody).toContain('reader@example.com');
     expect(screen.getByRole('link', { name: 'Quay lại đăng nhập' })).toBeTruthy();
   });
@@ -563,7 +566,7 @@ describe('public registration and verification routes', () => {
     expect(await screen.findByText(/chờ 23 giây/)).toBeTruthy();
   });
 
-  it('shows a generic resend confirmation without assuming SMTP succeeded', async () => {
+  it('keeps the inline resend hint without a success alert after accepting an email request', async () => {
     const user = userEvent.setup();
     let body = '';
     apiClient.defaults.adapter = (async (config) => {
@@ -575,14 +578,9 @@ describe('public registration and verification routes', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'Reader@Example.com');
     await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
 
-    expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
-    expect(screen.queryByText(/60 giây/)).toBeNull();
-    // Ant Design có thể giữ icon loading trong accessible name sau khi submit hoàn tất.
-    // Tìm nút theo phần tên ổn định, nhưng vẫn xác nhận nó được bật lại.
-    await waitFor(() => {
-      const resendButton = screen.getByRole('button', { name: /Gửi lại email xác thực/ });
-      expect(resendButton.hasAttribute('disabled')).toBe(false);
-    });
+    expect(await screen.findByText('gửi lại sau 60 giây')).toBeTruthy();
+    expect(screen.queryByText('Yêu cầu đã được tiếp nhận')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
     expect(body).toContain('reader@example.com');
   });
 });

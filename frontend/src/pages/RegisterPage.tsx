@@ -43,8 +43,8 @@ export function RegisterPage() {
     setDuplicateEmail(null);
     try {
       const result = await authApi.register({ email, password });
-      saveRegistrationEmail(result.email || email);
-      navigate('/check-email');
+      saveRegistrationEmail(result.email || email, 60);
+      navigate('/check-email', { state: { registrationCooldownUntil: Date.now() + 60_000 } });
     } catch (error) {
       const fieldErrors = mapRegisterValidationErrors(error);
       if (fieldErrors?.email) setError('email', { type: 'server', message: fieldErrors.email });

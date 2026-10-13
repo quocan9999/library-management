@@ -1,15 +1,18 @@
-import { Link } from 'react-router-dom';
-import { readRegistrationEmail, saveRegistrationEmail } from '../auth/registrationStorage';
+import { Link, useLocation } from 'react-router-dom';
+import { readRegistrationCooldownSeconds, readRegistrationEmail, saveRegistrationEmail } from '../auth/registrationStorage';
 import { AuthLayout } from '../components/AuthLayout';
 import { ResendVerificationForm } from './ResendVerificationForm';
 
 export function CheckEmailPage() {
   const email = readRegistrationEmail();
+  const state = useLocation().state as { registrationCooldownUntil?: number } | null;
+  const deadline = state?.registrationCooldownUntil;
+  const initialCooldownSeconds = Math.max(readRegistrationCooldownSeconds(),
+    typeof deadline === 'number' && Number.isFinite(deadline) ? Math.max(0, Math.ceil((deadline - Date.now()) / 1000)) : 0);
 
   return (
-    <AuthLayout ariaLabel="Kiểm tra email xác thực">
+    <AuthLayout ariaLabel="Kiểm tra email xác thực" centered>
       <div className="login-content auth-flow-content">
-        <p className="eyebrow">CHỈ CÒN MỘT BƯỚC</p>
         <h1>Kiểm tra email</h1>
         <p className="login-intro">
           Tài khoản đã được đăng ký. Hãy kiểm tra hộp thư và mở liên kết xác thực trong vòng 30 phút.
@@ -19,13 +22,12 @@ export function CheckEmailPage() {
             Email đăng ký: <strong>{email}</strong>
           </p>
         )}
-        <p className="field-hint">
-          Nếu chưa thấy thư, hãy kiểm tra thư rác hoặc yêu cầu gửi lại hướng dẫn.
-        </p>
         <ResendVerificationForm
+          inlineResend
+          initialCooldownSeconds={initialCooldownSeconds}
           initialEmail={email ?? ''}
           hideEmailField={Boolean(email)}
-          onRequested={saveRegistrationEmail}
+          onRequested={(requestedEmail) => saveRegistrationEmail(requestedEmail, 60)}
         />
         <p className="auth-alternate"><Link to="/login">Quay lại đăng nhập</Link></p>
       </div>

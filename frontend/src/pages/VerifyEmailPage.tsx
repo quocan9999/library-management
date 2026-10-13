@@ -101,9 +101,8 @@ export function VerifyEmailPage() {
     || status === 'expired' || status === 'used' || status === 'revoked';
 
   return (
-    <AuthLayout ariaLabel="Xác thực email tài khoản">
-      <div className="login-content auth-flow-content">
-        <p className="eyebrow">XÁC THỰC TÀI KHOẢN</p>
+    <AuthLayout ariaLabel="Xác thực email tài khoản" centered>
+      <div className="login-content auth-flow-content auth-verification-content">
         <h1>{status === 'success' ? 'Email đã được xác thực' : 'Xác thực email'}</h1>
 
         {status === 'checking' && (
@@ -137,7 +136,7 @@ export function VerifyEmailPage() {
               title={verificationCopy[status as keyof typeof verificationCopy]}
               description="Bạn có thể yêu cầu gửi lại hướng dẫn xác thực bên dưới."
             />
-            <ResendVerificationForm initialEmail={registrationEmail ?? ''} />
+            <ResendVerificationForm inlineResend initialEmail={registrationEmail ?? ''} />
             <p className="auth-alternate"><Link to="/login">Quay lại đăng nhập</Link></p>
           </>
         )}
@@ -161,7 +160,7 @@ export function VerifyEmailPage() {
             >
               Thử lại
             </Button>
-            <ResendVerificationForm initialEmail={registrationEmail ?? ''} />
+            <ResendVerificationForm inlineResend initialEmail={registrationEmail ?? ''} />
             <p className="auth-alternate"><Link to="/login">Quay lại đăng nhập</Link></p>
           </>
         )}
