@@ -74,6 +74,21 @@ describe('USER profile routes', () => {
     expect(await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' })).toBeTruthy();
     expect(within(screen.getByRole('region', { name: 'Email hiện tại' })).getByText('reader@example.com')).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Đổi mật khẩu' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Đổi email' }).getAttribute('href')).toBe('/profile/change-email');
+  });
+
+  it('allows the email route only with USER role and change-email permission', async () => {
+    mocks.auth.permissions = ['account:change-email'];
+    mocks.auth.currentUser!.permissions = ['account:change-email'];
+    renderRoute('/profile/change-email');
+    expect(await screen.findByRole('heading', { name: 'Đổi email' })).toBeTruthy();
+
+    cleanup();
+    mocks.auth.permissions = ['account:change-password'];
+    mocks.auth.currentUser!.permissions = ['account:change-password'];
+    renderRoute('/profile/change-email');
+    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
   });
 
   it('allows direct password route only with USER role and change-password permission', async () => {

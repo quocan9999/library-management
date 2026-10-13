@@ -63,4 +63,28 @@ describe('profile API', () => {
       authorization: 'Bearer active-user-token',
     });
   });
+
+  it('sends normalized change-email request and preserves OTP as a string', async () => {
+    setAccessToken('active-user-token');
+    const captured: Array<{ url?: string; data?: unknown }> = [];
+    apiClient.defaults.adapter = (async (config) => {
+      captured.push({ url: config.url, data: JSON.parse(String(config.data)) });
+      return response(config, {
+        success: true,
+        status: 200,
+        code: 'EMAIL_CHANGED',
+        message: 'Email changed.',
+        data: null,
+        timestamp: new Date().toISOString(),
+      } satisfies ApiEnvelope<null>);
+    }) satisfies AxiosAdapter;
+
+    await profileApi.requestEmailChange({ newEmail: 'new.reader@example.com', currentPassword: 'Current1!' });
+    await profileApi.verifyEmailChange({ code: '012345' });
+
+    expect(captured).toEqual([
+      { url: '/api/v1/profile/change-email/request', data: { newEmail: 'new.reader@example.com', currentPassword: 'Current1!' } },
+      { url: '/api/v1/profile/change-email/verify', data: { code: '012345' } },
+    ]);
+  });
 });

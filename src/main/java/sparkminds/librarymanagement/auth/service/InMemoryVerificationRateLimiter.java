@@ -41,6 +41,14 @@ public class InMemoryVerificationRateLimiter {
         return consumeIpRequest("forgot-password", remoteAddress);
     }
 
+    public IpLimitResult consumeEmailChangeSendIpRequest(String remoteAddress) {
+        return consumeIpRequest("email-change-send", remoteAddress);
+    }
+
+    public IpLimitResult consumeEmailChangeVerifyIpRequest(String remoteAddress) {
+        return consumeIpRequest("email-change-verify", remoteAddress);
+    }
+
     private IpLimitResult consumeIpRequest(String operation, String remoteAddress) {
         String key = operation + ":" + (remoteAddress == null ? "unknown" : remoteAddress);
         Instant now = clock.instant();

@@ -16,6 +16,7 @@ import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { ProfilePage } from '../profile/ProfilePage';
 import { ChangePasswordPage } from '../profile/ChangePasswordPage';
+import { ChangeEmailPage } from '../profile/ChangeEmailPage';
 
 function SessionBootstrap() {
   return (
@@ -131,6 +132,14 @@ export function App() {
             element={
               <RequirePermission permission="account:change-password" allowedRoles={['ROLE_USER']}>
                 <ChangePasswordPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="profile/change-email"
+            element={
+              <RequirePermission permission="account:change-email" allowedRoles={['ROLE_USER']}>
+                <ChangeEmailPage />
               </RequirePermission>
             }
           />

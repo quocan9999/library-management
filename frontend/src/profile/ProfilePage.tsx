@@ -30,6 +30,17 @@ export function ProfilePage() {
           <Link className="profile-action__link" to="/profile/change-password">Đổi mật khẩu</Link>
         </section>
       )}
+
+      {permissions.includes('account:change-email') && (
+        <section className="profile-action" aria-labelledby="profile-email-change-title">
+          <div>
+            <p className="profile-card__eyebrow">THÔNG TIN ĐĂNG NHẬP</p>
+            <h2 id="profile-email-change-title">Email</h2>
+            <p>Xác nhận email mới bằng mã gửi đến hộp thư đó.</p>
+          </div>
+          <Link className="profile-action__link" to="/profile/change-email">Đổi email</Link>
+        </section>
+      )}
     </main>
   );
 }
