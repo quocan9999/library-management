@@ -22,11 +22,13 @@ export function ResetPasswordPage() {
   const token = searchParams.get('token');
   const [invalidLink, setInvalidLink] = useState(!token);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [completed, setCompleted] = useState(false);
   const {
     control,
     handleSubmit,
     setError,
     trigger,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<ResetPasswordFormInput, unknown, ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -36,20 +38,22 @@ export function ResetPasswordPage() {
   });
 
   const onSubmit = async ({ newPassword, confirmNewPassword }: ResetPasswordFormValues) => {
-    if (!token) return;
+    if (!token || completed) return;
     setServerError(null);
     setInvalidLink(false);
     try {
       await authApi.resetPassword({ token, newPassword, confirmNewPassword });
       // Reset đã revoke server-side toàn bộ phiên; bỏ phiên cục bộ để Login không redirect lại.
       setAccessToken(null);
-      navigate('/login', { replace: true, state: { passwordReset: true } });
+      reset();
+      setCompleted(true);
     } catch (error) {
       const fieldErrors = mapResetPasswordValidationErrors(error);
       if (fieldErrors?.newPassword) setError('newPassword', { type: 'server', message: fieldErrors.newPassword });
       if (fieldErrors?.confirmNewPassword) {
         setError('confirmNewPassword', { type: 'server', message: fieldErrors.confirmNewPassword });
       }
+      if (fieldErrors) return;
       if (getPasswordResetError(error) === 'invalid') {
         setInvalidLink(true);
       } else {
@@ -65,13 +69,24 @@ export function ResetPasswordPage() {
     : errors.newPassword?.message ? [errors.newPassword.message] : [];
 
   return (
-    <AuthLayout ariaLabel="Đặt lại mật khẩu tài khoản thư viện">
+    <AuthLayout ariaLabel="Đặt lại mật khẩu tài khoản thư viện" centered>
       <div className="login-content auth-flow-content">
-        <p className="eyebrow">KHÔI PHỤC TÀI KHOẢN</p>
         <h1>Đặt lại mật khẩu</h1>
-        <p className="login-intro">Tạo mật khẩu mới cho tài khoản của bạn.</p>
 
-        {invalidLink ? (
+        {completed ? (
+          <div className="login-form">
+            <Alert
+              type="success"
+              showIcon
+              role="status"
+              title="Đổi mật khẩu thành công"
+              description="Bạn có thể đăng nhập bằng mật khẩu mới."
+            />
+            <Button type="primary" size="large" block onClick={() => navigate('/login', { replace: true })}>
+              Đăng nhập
+            </Button>
+          </div>
+        ) : invalidLink ? (
           <>
             <Alert
               className="login-alert"

@@ -143,12 +143,15 @@ describe('public registration and verification routes', () => {
     await user.type(await screen.findByRole('textbox', { name: 'Email' }), '  Reader@Example.COM  ');
     await user.click(screen.getByRole('button', { name: 'Gửi liên kết đặt lại mật khẩu' }));
 
-    expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
+    expect(await screen.findByText('Kiểm tra email của bạn!')).toBeTruthy();
     expect(forgotBody).toContain('reader@example.com');
+    expect(screen.getByText('Nếu email này có tài khoản, bạn sẽ nhận được liên kết đặt lại mật khẩu trong vài phút.')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Đăng nhập' })).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
+    expect(!!screen.getByText('gửi lại sau 60 giây')).toBe(true);
   });
 
-  it('resets from the URL token, clears the local session, and returns to login', async () => {
+  it('resets from the URL token, clears the session, and waits for the login action', async () => {
     const user = userEvent.setup();
     setAccessToken('stale-access-token');
     let resetBody = '';
@@ -170,9 +173,14 @@ describe('public registration and verification routes', () => {
     await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Fresh3!Password');
     await user.click(screen.getByRole('button', { name: 'Đặt lại mật khẩu' }));
 
-    expect(await screen.findByRole('heading', { name: 'Chào mừng bạn quay lại' })).toBeTruthy();
-    expect(screen.getByText('Mật khẩu đã được đặt lại. Vui lòng đăng nhập bằng mật khẩu mới.')).toBeTruthy();
+    expect(await screen.findByText('Đổi mật khẩu thành công')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Đặt lại mật khẩu' })).toBeTruthy();
+    expect(screen.queryByLabelText('Mật khẩu mới')).toBeNull();
     expect(getAccessToken()).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeTruthy();
+    expect(screen.queryByText('Đổi mật khẩu thành công')).toBeNull();
+    expect(screen.queryByText('Mật khẩu đã được đặt lại')).toBeNull();
     expect(JSON.parse(resetBody)).toEqual({
       token: 'one-time-secret',
       newPassword: 'Fresh3!Password',
@@ -181,6 +189,34 @@ describe('public registration and verification routes', () => {
     expect(resetBody).not.toContain('stale-access-token');
     expect(authorization).toBe('');
     expect(credentials).toBe(false);
+  });
+
+  it('shows password reuse as a field error and allows another password with the same reset link', async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING');
+      if (config.url === '/api/v1/auth/reset-password') {
+        attempts += 1;
+        if (attempts === 1) apiFailure(config, 422, 'VALIDATION_ERROR', {}, { newPassword: 'Mật khẩu mới phải khác mật khẩu hiện tại' });
+        return response(config, success('PASSWORD_RESET_SUCCESS', null));
+      }
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+    renderAppWithAuth('/reset-password?token=reusable-after-rejection');
+    await user.type(await screen.findByLabelText('Mật khẩu mới'), 'Existing1!');
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Existing1!');
+    await user.click(screen.getByRole('button', { name: 'Đặt lại mật khẩu' }));
+    expect(await screen.findByText('Mật khẩu mới phải khác mật khẩu hiện tại.')).toBeTruthy();
+    expect(screen.queryByText('Không thể đặt lại mật khẩu lúc này. Vui lòng thử lại.')).toBeNull();
+    expect(screen.getByLabelText('current search').textContent).toBe('?token=reusable-after-rejection');
+    await user.clear(screen.getByLabelText('Mật khẩu mới'));
+    await user.type(screen.getByLabelText('Mật khẩu mới'), 'Different2!');
+    await user.clear(screen.getByLabelText('Xác nhận mật khẩu mới'));
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Different2!');
+    await user.click(screen.getByRole('button', { name: /Đặt lại mật khẩu/ }));
+    expect(await screen.findByText('Đổi mật khẩu thành công')).toBeTruthy();
+    expect(attempts).toBe(2);
   });
 
   it('does not call reset without a URL token and offers a new link', async () => {

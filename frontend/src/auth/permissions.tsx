@@ -7,6 +7,20 @@ export function usePermission(permission: string): boolean {
   return capabilityStatus === 'ready' && permissions.includes(permission);
 }
 
+export function DefaultAccountRoute() {
+  const { role, permissions, capabilityStatus, refreshCapabilities } = useAuth();
+  if (capabilityStatus === 'loading') return <CapabilityLoading />;
+  if (capabilityStatus === 'error') {
+    return <CapabilityRetry onRetry={() => { void refreshCapabilities().catch(() => undefined); }} />;
+  }
+  if (role === 'ROLE_USER') return <Navigate to="/profile" replace />;
+  if (permissions.includes('member:read')) return <Navigate to="/admin/members" replace />;
+  if (permissions.includes('role:read') && ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'].includes(role ?? '')) {
+    return <Navigate to="/admin/roles" replace />;
+  }
+  return <Navigate to="/403" replace />;
+}
+
 function CapabilityLoading() {
   return <main className="session-bootstrap" role="status" aria-live="polite">
     <span className="session-bootstrap__mark" aria-hidden="true" />

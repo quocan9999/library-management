@@ -60,11 +60,9 @@ export function RegisterPage() {
   const passwordErrors = fieldMessages(errors.password);
 
   return (
-    <AuthLayout ariaLabel="Đăng ký tài khoản thư viện">
+    <AuthLayout ariaLabel="Đăng ký tài khoản thư viện" centered>
       <div className="login-content auth-flow-content">
-        <p className="eyebrow">BẮT ĐẦU HÀNH TRÌNH ĐỌC</p>
         <h1>Tạo tài khoản</h1>
-        <p className="login-intro">Đăng ký để khám phá và quản lý những cuốn sách bạn yêu thích.</p>
 
         <form className="login-form register-form" onSubmit={handleSubmit(onSubmit)} noValidate>
           {serverError && (

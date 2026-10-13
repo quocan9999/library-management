@@ -51,9 +51,8 @@ export function ChangePasswordPage() {
     : errors.newPassword?.message ? [errors.newPassword.message] : [];
 
   return (
-    <main className="profile-page" aria-labelledby="change-password-title">
+    <main className="profile-page profile-page--form" aria-labelledby="change-password-title">
       <header className="profile-page__heading">
-        <p className="profile-page__eyebrow">BẢO MẬT TÀI KHOẢN</p>
         <h1 id="change-password-title">Đổi mật khẩu</h1>
         <p>Nhập mật khẩu hiện tại để thiết lập mật khẩu mới.</p>
       </header>
@@ -66,7 +65,6 @@ export function ChangePasswordPage() {
             showIcon
             role="status"
             title="Mật khẩu đã được thay đổi thành công."
-            description="Phiên đăng nhập hiện tại và các phiên khác vẫn được giữ nguyên."
           />
         )}
         {serverError && (

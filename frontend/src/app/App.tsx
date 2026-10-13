@@ -2,9 +2,8 @@ import { useEffect } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useOptionalAuth } from '../auth/AuthContext';
 import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
-import { RequirePermission, RequireRole } from '../auth/permissions';
+import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
-import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
@@ -98,7 +97,7 @@ export function App() {
           path="/"
           element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
         >
-          <Route index element={<HomePage />} />
+          <Route index element={<DefaultAccountRoute />} />
           <Route
             path="admin/roles"
             element={
@@ -137,11 +136,7 @@ export function App() {
           />
           <Route
             path="profile/change-email"
-            element={
-              <RequirePermission permission="account:change-email" allowedRoles={['ROLE_USER']}>
-                <ChangeEmailPage />
-              </RequirePermission>
-            }
+            element={<ChangeEmailPage />}
           />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

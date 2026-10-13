@@ -15,7 +15,6 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const accountDisabledNotice = (location.state as { accountDisabled?: unknown } | null)?.accountDisabled === true;
-  const passwordResetNotice = (location.state as { passwordReset?: unknown } | null)?.passwordReset === true;
   const [serverError, setServerError] = useState<ReturnType<typeof getLoginError> | null>(null);
   const {
     control,
@@ -57,11 +56,9 @@ export function LoginPage() {
   const resendEmail = identifier.includes('@') ? identifier : '';
 
   return (
-    <AuthLayout ariaLabel="Đăng nhập hệ thống quản lý thư viện">
+    <AuthLayout ariaLabel="Đăng nhập hệ thống quản lý thư viện" centered>
       <div className="login-content">
-        <p className="eyebrow">TRUY CẬP HỆ THỐNG</p>
-        <h1>Chào mừng bạn quay lại</h1>
-        <p className="login-intro">Đăng nhập để tiếp tục sử dụng hệ thống quản lý thư viện.</p>
+        <h1>Đăng nhập</h1>
 
         {accountDisabledNotice && <Alert
           className="login-alert"
@@ -70,15 +67,6 @@ export function LoginPage() {
           role="status"
           title="Phiên đăng nhập đã bị thu hồi"
           description="Tài khoản thành viên đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hỗ trợ."
-        />}
-
-        {passwordResetNotice && <Alert
-          className="login-alert"
-          type="success"
-          showIcon
-          role="status"
-          title="Mật khẩu đã được đặt lại"
-          description="Mật khẩu đã được đặt lại. Vui lòng đăng nhập bằng mật khẩu mới."
         />}
 
         <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -165,15 +153,6 @@ export function LoginPage() {
 
         <p className="auth-alternate">
           Chưa có tài khoản? <Link to="/register">Đăng ký</Link>
-        </p>
-        <p className="privacy-note">
-          <span className="privacy-note__icon" aria-hidden="true">
-            <svg viewBox="0 0 20 20" fill="none">
-              <rect x="4.25" y="8.5" width="11.5" height="8.25" rx="1.5" />
-              <path d="M6.75 8.5V6.25a3.25 3.25 0 0 1 6.5 0V8.5M10 11.5v2.25" />
-            </svg>
-          </span>
-          Thông tin đăng nhập của bạn được bảo vệ và giữ riêng tư.
         </p>
       </div>
     </AuthLayout>

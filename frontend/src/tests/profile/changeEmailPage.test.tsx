@@ -57,6 +57,29 @@ afterEach(() => {
 });
 
 describe('ChangeEmailPage', () => {
+  it('keeps the OTP step and expired-code error across capability refresh', async () => {
+    mocks.requestEmailChange.mockResolvedValue(undefined);
+    let rejectVerification!: (error: unknown) => void;
+    mocks.verifyEmailChange.mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectVerification = reject; }));
+    const view = renderPage();
+    fireEvent.change(screen.getByLabelText('Email mới'), { target: { value: 'new.reader@example.com' } });
+    fireEvent.change(screen.getByLabelText('Mật khẩu hiện tại'), { target: { value: 'Current1!' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi mã xác thực' }));
+    await screen.findByText(/Mã xác thực đã được gửi/);
+    fireEvent.change(screen.getByLabelText('Mã xác thực 6 chữ số'), { target: { value: '012345' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đổi email' }));
+    await waitFor(() => expect(mocks.verifyEmailChange).toHaveBeenCalledTimes(1));
+    mocks.auth.capabilityStatus = 'loading';
+    view.rerender(<MemoryRouter initialEntries={['/profile/change-email']}><App /><LocationProbe /></MemoryRouter>);
+    await act(async () => rejectVerification({ isAxiosError: true, response: { status: 400, data: { code: 'EMAIL_CHANGE_CODE_INVALID' } } }));
+    mocks.auth.capabilityStatus = 'ready';
+    view.rerender(<MemoryRouter initialEntries={['/profile/change-email']}><App /><LocationProbe /></MemoryRouter>);
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByLabelText('Mã xác thực 6 chữ số')).toBeTruthy();
+    expect(screen.queryByLabelText('Email mới')).toBeNull();
+    expect(screen.getByLabelText('current path').textContent).toBe('/profile/change-email');
+  });
+
   it('requests a code, verifies leading-zero code, refreshes profile and keeps session', async () => {
     mocks.requestEmailChange.mockResolvedValue(undefined);
     mocks.verifyEmailChange.mockResolvedValue(undefined);

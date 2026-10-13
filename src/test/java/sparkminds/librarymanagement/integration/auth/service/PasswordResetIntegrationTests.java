@@ -287,6 +287,29 @@ class PasswordResetIntegrationTests {
     }
 
     @Test
+    void rejectsTheCurrentPasswordWithoutConsumingTheResetToken() throws Exception {
+        Account account = createAccount(uniqueEmail(), "ROLE_USER", true, true);
+        String originalHash = account.getPasswordHash();
+        String rawToken = "reuse-" + UUID.randomUUID();
+        PasswordResetToken token = createResetToken(account, rawToken, LocalDateTime.now(ZoneOffset.UTC).plusMinutes(30));
+
+        resetRequest(rawToken, "Existing1!", "Existing1!")
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors.newPassword").value("Mật khẩu mới phải khác mật khẩu hiện tại"));
+
+        Account unchanged = accountRepository.findById(account.getId()).orElseThrow();
+        assertThat(unchanged.getPasswordHash()).isEqualTo(originalHash);
+        assertThat(unchanged.getSessionVersion()).isZero();
+        assertThat(passwordResetTokenRepository.findById(token.getId()).orElseThrow().getUsedAt()).isNull();
+
+        resetRequest(rawToken, "Different2!", "Different2!")
+                .andExpect(status().isOk());
+        assertThat(accountRepository.findById(account.getId()).orElseThrow().getSessionVersion()).isEqualTo(1);
+        assertThat(passwordResetTokenRepository.findById(token.getId()).orElseThrow().getUsedAt()).isNotNull();
+    }
+
+    @Test
     void rollsBackTokenUseWhenPasswordHashingFails() throws Exception {
         Account account = createAccount(uniqueEmail(), "ROLE_USER", true, true);
         String originalHash = account.getPasswordHash();

@@ -24,7 +24,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           colorBgContainer: '#ffffff',
           fontFamily: "'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif",
           borderRadius: 4,
-          controlHeight: 52,
+          controlHeight: 40,
+          controlHeightLG: 40,
+          controlHeightSM: 40,
           controlOutline: 'rgba(197, 155, 39, 0.2)',
         },
       }}

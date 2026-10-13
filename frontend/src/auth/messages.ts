@@ -195,7 +195,11 @@ export function mapResetPasswordValidationErrors(error: unknown): ResetPasswordF
   const validation = error.response?.data;
   if (validation?.code !== 'VALIDATION_ERROR' || !validation.errors) return null;
   const mapped: ResetPasswordFieldErrors = {};
-  if (validation.errors.newPassword) mapped.newPassword = 'Mật khẩu chưa đáp ứng yêu cầu.';
+  if (validation.errors.newPassword) {
+    mapped.newPassword = validation.errors.newPassword === 'Mật khẩu mới phải khác mật khẩu hiện tại'
+      ? 'Mật khẩu mới phải khác mật khẩu hiện tại.'
+      : 'Mật khẩu chưa đáp ứng yêu cầu.';
+  }
   if (validation.errors.confirmNewPassword) mapped.confirmNewPassword = 'Mật khẩu xác nhận không khớp.';
   return Object.keys(mapped).length > 0 ? mapped : null;
 }

@@ -1,4 +1,4 @@
-import { Alert, Modal } from 'antd';
+import { Alert } from 'antd';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -6,15 +6,6 @@ import { getLogoutErrorMessage } from '../auth/messages';
 import { PermissionGate } from '../auth/permissions';
 import { BrandMark } from './BrandMark';
 import { clearMemberListState } from '../features/members/listState';
-
-function OverviewIcon() {
-  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
-    <rect x="3.5" y="3.5" width="7" height="7" rx="1" />
-    <rect x="13.5" y="3.5" width="7" height="7" rx="1" />
-    <rect x="3.5" y="13.5" width="7" height="7" rx="1" />
-    <rect x="13.5" y="13.5" width="7" height="7" rx="1" />
-  </svg>;
-}
 
 function RolesIcon() {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
@@ -118,18 +109,6 @@ export function AdminLayout() {
     }
   };
 
-  const confirmLogout = () => {
-    if (isLoggingOut) return;
-    Modal.confirm({
-      title: 'Xác nhận đăng xuất',
-      content: 'Bạn có chắc muốn đăng xuất khỏi hệ thống?',
-      centered: true,
-      okText: 'Đăng xuất',
-      cancelText: 'Ở lại',
-      onOk: handleLogout,
-    });
-  };
-
   const displayName = currentUser?.username?.trim()
     || currentUser?.email?.trim()
     || (currentUser ? `Tài khoản ${currentUser.id}` : 'Đang đồng bộ hồ sơ');
@@ -169,15 +148,6 @@ export function AdminLayout() {
           {role === 'ROLE_USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
         </p>
         <nav className="admin-shell__nav" aria-label="Chính">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
-            onClick={closeMobileMenu}
-          >
-            <OverviewIcon />
-            <span>Tổng quan</span>
-          </NavLink>
           <PermissionGate permission="role:read" fallback={null}>
             <NavLink
               to="/admin/roles"
@@ -223,7 +193,7 @@ export function AdminLayout() {
           <button
             className="admin-shell__logout"
             type="button"
-            onClick={confirmLogout}
+            onClick={() => { void handleLogout(); }}
             disabled={isLoggingOut}
           >
             <LogoutIcon />

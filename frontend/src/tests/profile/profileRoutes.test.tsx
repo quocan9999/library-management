@@ -122,7 +122,7 @@ describe('USER profile routes', () => {
     mocks.auth.permissions = [];
     renderRoute('/profile/change-password');
 
-    expect(await screen.findByRole('heading', { name: 'Chào mừng bạn quay lại' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeTruthy();
     await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/login'));
   });
 });

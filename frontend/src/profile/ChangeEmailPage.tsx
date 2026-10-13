@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { RequirePermission } from '../auth/permissions';
 import type { ApiEnvelope } from '../auth/types';
 import { profileApi } from './api';
 import { createChangeEmailSchema, changeEmailCodeSchema, type ChangeEmailFormInput, type ChangeEmailFormValues } from './changeEmailSchema';
@@ -16,7 +17,7 @@ function getErrorMessage(error: unknown, step: 'request' | 'verify'): string {
   const code = error.response?.data?.code;
   if (code === 'CURRENT_PASSWORD_INVALID') return 'Mật khẩu hiện tại không chính xác.';
   if (code === 'EMAIL_ALREADY_REGISTERED') return 'Email này đã được sử dụng bởi tài khoản khác.';
-  if (code === 'EMAIL_CHANGE_CODE_INVALID') return 'Mã không hợp lệ hoặc đã hết hạn. Hãy kiểm tra mã mới nhất.';
+  if (code === 'EMAIL_CHANGE_CODE_INVALID') return 'Mã xác thực không hợp lệ hoặc đã hết hạn. Vui lòng gửi lại mã và dùng mã mới nhất.';
   if (code === 'EMAIL_CHANGE_RATE_LIMITED') return 'Bạn đã thao tác quá nhanh. Vui lòng đợi rồi thử lại.';
   if (code === 'EMAIL_CHANGE_EMAIL_SEND_FAILED' || error.response?.status === 503) {
     return 'Không thể gửi email lúc này. Vui lòng thử lại sau ít phút.';
@@ -86,9 +87,9 @@ export function ChangeEmailPage() {
   };
 
   return (
-    <main className="profile-page" aria-labelledby="change-email-title">
+    <RequirePermission permission="account:change-email" allowedRoles={['ROLE_USER']}>
+    <main className="profile-page profile-page--form" aria-labelledby="change-email-title">
       <header className="profile-page__heading">
-        <p className="profile-page__eyebrow">THÔNG TIN ĐĂNG NHẬP</p>
         <h1 id="change-email-title">Đổi email</h1>
         <p>Xác nhận mật khẩu hiện tại và mã gửi đến email mới để cập nhật tài khoản.</p>
       </header>
@@ -178,5 +179,6 @@ export function ChangeEmailPage() {
         {changedEmail && <div className="profile-password-form__actions"><Link to="/profile">Quay lại hồ sơ</Link></div>}
       </section>
     </main>
+    </RequirePermission>
   );
 }

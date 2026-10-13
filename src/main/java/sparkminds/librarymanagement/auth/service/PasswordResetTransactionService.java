@@ -10,9 +10,11 @@ import sparkminds.librarymanagement.auth.entity.PasswordResetToken;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.auth.repository.PasswordResetTokenRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
+import sparkminds.librarymanagement.common.api.FieldValidationException;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -80,6 +82,12 @@ public class PasswordResetTransactionService {
                 || !token.getExpiresAt().isAfter(now)
                 || !isLatest) {
             throw invalidToken();
+        }
+
+        if (passwordEncoder.matches(newPassword, account.getPasswordHash())) {
+            throw new FieldValidationException(HttpStatus.UNPROCESSABLE_ENTITY, "VALIDATION_ERROR",
+                    "Mật khẩu mới phải khác mật khẩu hiện tại",
+                    Map.of("newPassword", "Mật khẩu mới phải khác mật khẩu hiện tại"));
         }
 
         token.setUsedAt(now);

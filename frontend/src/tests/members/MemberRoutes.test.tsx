@@ -5,7 +5,7 @@ import {
   type AxiosResponse,
 } from 'axios';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App } from '../../app/App';
 import { apiClient } from '../../auth/api';
 import type { ApiEnvelope } from '../../auth/types';
@@ -171,8 +171,7 @@ describe('Member routes integrated with shared Role permissions', () => {
     await screen.findByRole('heading', { name: 'Quản lý thành viên' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Đăng xuất' }));
-    const logoutDialog = await screen.findByRole('dialog');
-    fireEvent.click(within(logoutDialog).getByRole('button', { name: 'Đăng xuất' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(window.sessionStorage.getItem('memberManagement:listState:v1')).toBeNull());
   });
 });
