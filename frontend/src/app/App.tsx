@@ -12,6 +12,8 @@ import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { RoleManagementPage } from '../role/RoleManagementPage';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
+import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 
 function SessionBootstrap() {
   return (
@@ -84,6 +86,8 @@ export function App() {
           }
         />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/check-email" element={<CheckEmailPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/403" element={<ForbiddenPage />} />

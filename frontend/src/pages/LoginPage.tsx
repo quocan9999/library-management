@@ -15,6 +15,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const accountDisabledNotice = (location.state as { accountDisabled?: unknown } | null)?.accountDisabled === true;
+  const passwordResetNotice = (location.state as { passwordReset?: unknown } | null)?.passwordReset === true;
   const [serverError, setServerError] = useState<ReturnType<typeof getLoginError> | null>(null);
   const {
     control,
@@ -69,6 +70,15 @@ export function LoginPage() {
           role="status"
           title="Phiên đăng nhập đã bị thu hồi"
           description="Tài khoản thành viên đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hỗ trợ."
+        />}
+
+        {passwordResetNotice && <Alert
+          className="login-alert"
+          type="success"
+          showIcon
+          role="status"
+          title="Mật khẩu đã được đặt lại"
+          description="Mật khẩu đã được đặt lại. Vui lòng đăng nhập bằng mật khẩu mới."
         />}
 
         <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -131,6 +141,8 @@ export function LoginPage() {
               <p className="field-error" id="password-error" role="alert">{errors.password.message}</p>
             )}
           </div>
+
+          <p className="login-forgot-link"><Link to="/forgot-password">Quên mật khẩu?</Link></p>
 
           <Button
             className="login-submit"

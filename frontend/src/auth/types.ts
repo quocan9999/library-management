@@ -36,3 +36,9 @@ export interface RegisterData {
   email: string;
   emailVerificationRequired: true;
 }
+
+export interface ResetPasswordCredentials {
+  token: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}

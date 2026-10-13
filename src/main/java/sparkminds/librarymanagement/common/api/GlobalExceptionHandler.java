@@ -26,6 +26,11 @@ public class GlobalExceptionHandler {
         return error(exception.getStatus(), exception.getCode(), exception.getMessage(), exception.getFieldErrors());
     }
 
+    @ExceptionHandler(FieldValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFieldValidation(FieldValidationException exception) {
+        return error(exception.getStatus(), exception.getCode(), exception.getMessage(), exception.getFieldErrors());
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_BODY", "Nội dung yêu cầu không hợp lệ", null);

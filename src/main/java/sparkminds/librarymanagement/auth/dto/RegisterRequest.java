@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import sparkminds.librarymanagement.auth.validation.PasswordPolicy;
 
 public record RegisterRequest(
         @NotBlank
@@ -13,7 +14,7 @@ public record RegisterRequest(
         @Size(max = 255)
         String email,
         @NotBlank
-        @Pattern(regexp = "(?U)^(?=.{8,20}$)(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[\\p{P}\\p{S}])\\S+$")
+        @Pattern(regexp = PasswordPolicy.REGEX)
         String password) {
 
     public RegisterRequest {

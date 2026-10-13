@@ -33,7 +33,16 @@ public class InMemoryVerificationRateLimiter {
 
     /** Ghi nhận cả request bị chặn để mọi lần thử đều tham gia rolling window. */
     public IpLimitResult consumeResendIpRequest(String remoteAddress) {
-        String key = remoteAddress == null ? "unknown" : remoteAddress;
+        return consumeIpRequest("resend-verification", remoteAddress);
+    }
+
+    /** Dùng cùng rolling-window implementation nhưng không chia sẻ quota IP với resend verification. */
+    public IpLimitResult consumeForgotPasswordIpRequest(String remoteAddress) {
+        return consumeIpRequest("forgot-password", remoteAddress);
+    }
+
+    private IpLimitResult consumeIpRequest(String operation, String remoteAddress) {
+        String key = operation + ":" + (remoteAddress == null ? "unknown" : remoteAddress);
         Instant now = clock.instant();
         IpLimitResult[] result = new IpLimitResult[1];
 

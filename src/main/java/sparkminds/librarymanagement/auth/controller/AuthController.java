@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import sparkminds.librarymanagement.auth.dto.LoginRequest;
 import sparkminds.librarymanagement.auth.dto.LoginResponse;
 import sparkminds.librarymanagement.auth.dto.AuthMeResponse;
+import sparkminds.librarymanagement.auth.dto.ForgotPasswordRequest;
+import sparkminds.librarymanagement.auth.dto.ResetPasswordRequest;
 import sparkminds.librarymanagement.auth.dto.RegisterRequest;
 import sparkminds.librarymanagement.auth.dto.RegisterResponse;
 import sparkminds.librarymanagement.auth.dto.ResendVerificationRequest;
@@ -26,6 +28,8 @@ import sparkminds.librarymanagement.auth.service.LoginResult;
 import sparkminds.librarymanagement.auth.service.RegistrationService;
 import sparkminds.librarymanagement.auth.service.RefreshCookieFactory;
 import sparkminds.librarymanagement.auth.service.ResendVerificationService;
+import sparkminds.librarymanagement.auth.service.ForgotPasswordService;
+import sparkminds.librarymanagement.auth.service.PasswordResetService;
 import sparkminds.librarymanagement.common.api.ApiResponse;
 
 @RestController
@@ -38,6 +42,8 @@ public class AuthController {
     private final RegistrationService registrationService;
     private final EmailVerificationService emailVerificationService;
     private final ResendVerificationService resendVerificationService;
+    private final ForgotPasswordService forgotPasswordService;
+    private final PasswordResetService passwordResetService;
     private final RefreshCookieFactory refreshCookieFactory;
 
     @PostMapping("/register")
@@ -72,6 +78,28 @@ public class AuthController {
                 HttpStatus.OK.value(),
                 "VERIFICATION_EMAIL_REQUESTED",
                 "Nếu email chưa được xác thực, hướng dẫn xác thực sẽ được gửi đến hộp thư.",
+                null
+        ));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        forgotPasswordService.requestReset(request.email());
+        return ResponseEntity.ok(ApiResponse.success(
+                HttpStatus.OK.value(),
+                "FORGOT_PASSWORD_REQUESTED",
+                "Nếu email đủ điều kiện, hướng dẫn đặt lại mật khẩu sẽ được gửi đến hộp thư.",
+                null
+        ));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.reset(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                HttpStatus.OK.value(),
+                "PASSWORD_RESET_SUCCESS",
+                "Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.",
                 null
         ));
     }

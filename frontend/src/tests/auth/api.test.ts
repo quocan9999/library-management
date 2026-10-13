@@ -71,6 +71,68 @@ describe('API base URL configuration', () => {
   });
 });
 
+describe('public password recovery API', () => {
+  it('exposes forgot-password and reset-password calls', () => {
+    expect(typeof (authApi as unknown as Record<string, unknown>).forgotPassword).toBe('function');
+    expect(typeof (authApi as unknown as Record<string, unknown>).resetPassword).toBe('function');
+  });
+
+  it('sends both recovery calls without an access token or credential cookies', async () => {
+    type RecoveryApi = {
+      forgotPassword(email: string): Promise<void>;
+      resetPassword(request: { token: string; newPassword: string; confirmNewPassword: string }): Promise<void>;
+    };
+    const recoveryApi = authApi as unknown as RecoveryApi;
+    const requests: Array<{ url: string; body: string; authorization: string; withCredentials: boolean }> = [];
+    setAccessToken('stale-access-token');
+    apiClient.defaults.adapter = (async (config) => {
+      requests.push({
+        url: config.url ?? '',
+        body: String(config.data),
+        authorization: config.headers.get('Authorization')?.toString() ?? '',
+        withCredentials: config.withCredentials === true,
+      });
+      const code = config.url === '/api/v1/auth/forgot-password'
+        ? 'FORGOT_PASSWORD_REQUESTED'
+        : 'PASSWORD_RESET_SUCCESS';
+      return response(config, {
+        success: true,
+        status: 200,
+        code,
+        message: 'Accepted.',
+        data: null,
+        timestamp: new Date().toISOString(),
+      } satisfies ApiEnvelope<null>);
+    }) satisfies AxiosAdapter;
+
+    await recoveryApi.forgotPassword('reader@example.com');
+    await recoveryApi.resetPassword({
+      token: 'one-time-token',
+      newPassword: 'Fresh3!Password',
+      confirmNewPassword: 'Fresh3!Password',
+    });
+
+    expect(requests).toEqual([
+      {
+        url: '/api/v1/auth/forgot-password',
+        body: JSON.stringify({ email: 'reader@example.com' }),
+        authorization: '',
+        withCredentials: false,
+      },
+      {
+        url: '/api/v1/auth/reset-password',
+        body: JSON.stringify({
+          token: 'one-time-token',
+          newPassword: 'Fresh3!Password',
+          confirmNewPassword: 'Fresh3!Password',
+        }),
+        authorization: '',
+        withCredentials: false,
+      },
+    ]);
+  });
+});
+
 describe('authenticated API client', () => {
   it('refreshes only an expired access token and retries the protected request once', async () => {
     let protectedAttempts = 0;

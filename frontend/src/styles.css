@@ -410,6 +410,20 @@ input:focus-visible,
   text-underline-offset: 3px;
 }
 
+.login-forgot-link {
+  align-self: flex-end;
+  margin: -12px 0 -10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.login-forgot-link a {
+  color: var(--navy);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .login-resend {
   margin-top: 14px;
 }

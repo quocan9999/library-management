@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-export const registerSchema = z.object({
-  email: z.string()
+export const emailSchema = z.string()
     .trim()
     .min(1, 'Vui lòng nhập địa chỉ email.')
     .max(255, 'Email không được vượt quá 255 ký tự.')
     .email('Vui lòng nhập địa chỉ email hợp lệ.')
-    .transform((email) => email.toLowerCase()),
-  password: z.string()
+    .transform((email) => email.toLowerCase());
+
+export const passwordSchema = z.string()
     .min(1, 'Vui lòng nhập mật khẩu.')
     .superRefine((password, context) => {
       if (!password) return;
@@ -23,16 +23,20 @@ export const registerSchema = z.object({
       if (!/[a-z]/.test(password)) {
         context.addIssue({ code: 'custom', message: 'Mật khẩu cần có ít nhất một chữ thường.' });
       }
-      if (!/[0-9]/.test(password)) {
+      if (!/\p{Nd}/u.test(password)) {
         context.addIssue({ code: 'custom', message: 'Mật khẩu cần có ít nhất một chữ số.' });
       }
-      if (!/[^A-Za-z0-9\s]/.test(password)) {
+      if (!/[\p{P}\p{S}]/u.test(password)) {
         context.addIssue({ code: 'custom', message: 'Mật khẩu cần có ít nhất một ký tự đặc biệt.' });
       }
       if (/\s/.test(password)) {
         context.addIssue({ code: 'custom', message: 'Mật khẩu không được chứa khoảng trắng.' });
       }
-    }),
+    });
+
+export const registerSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
   confirmPassword: z.string().min(1, 'Vui lòng xác nhận mật khẩu.'),
 }).superRefine(({ password, confirmPassword }, context) => {
   if (confirmPassword && password !== confirmPassword) {

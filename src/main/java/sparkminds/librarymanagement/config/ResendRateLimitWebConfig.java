@@ -15,6 +15,6 @@ public class ResendRateLimitWebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
-                .addPathPatterns("/api/v1/auth/resend-verification");
+                .addPathPatterns("/api/v1/auth/resend-verification", "/api/v1/auth/forgot-password");
     }
 }
