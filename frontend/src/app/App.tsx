@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useOptionalAuth } from '../auth/AuthContext';
 import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
-import { RequirePermission } from '../auth/permissions';
+import { RequirePermission, RequireRole } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
 import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
@@ -14,6 +14,8 @@ import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
+import { ProfilePage } from '../profile/ProfilePage';
+import { ChangePasswordPage } from '../profile/ChangePasswordPage';
 
 function SessionBootstrap() {
   return (
@@ -117,6 +119,18 @@ export function App() {
             element={
               <RequirePermission permission="member:read">
                 <MemberDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="profile"
+            element={<RequireRole role="ROLE_USER"><ProfilePage /></RequireRole>}
+          />
+          <Route
+            path="profile/change-password"
+            element={
+              <RequirePermission permission="account:change-password" allowedRoles={['ROLE_USER']}>
+                <ChangePasswordPage />
               </RequirePermission>
             }
           />

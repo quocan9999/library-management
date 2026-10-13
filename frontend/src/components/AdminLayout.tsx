@@ -150,7 +150,7 @@ export function AdminLayout() {
         ref={sidebarRef}
         id="admin-sidebar"
         className={`admin-shell__sidebar${mobileMenuOpen ? ' admin-shell__sidebar--open' : ''}`}
-        aria-label="Điều hướng quản trị"
+        aria-label={role === 'ROLE_USER' ? 'Điều hướng tài khoản' : 'Điều hướng quản trị'}
         role={mobileMenuOpen ? 'dialog' : undefined}
         aria-modal={mobileMenuOpen || undefined}
         onKeyDown={handleSidebarKeyDown}
@@ -165,7 +165,9 @@ export function AdminLayout() {
           ><CloseIcon /></button>
         </header>
 
-        <p className="admin-shell__section-label">KHÔNG GIAN QUẢN TRỊ</p>
+        <p className="admin-shell__section-label">
+          {role === 'ROLE_USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
+        </p>
         <nav className="admin-shell__nav" aria-label="Chính">
           <NavLink
             to="/"
@@ -200,6 +202,16 @@ export function AdminLayout() {
 
         <footer className="admin-shell__footer">
           {logoutError && <Alert type="error" showIcon role="alert" title={logoutError} />}
+          {role === 'ROLE_USER' && (
+            <NavLink
+              to="/profile"
+              className={({ isActive }) => `admin-shell__profile-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <ProfileIcon />
+              <span>Hồ sơ tài khoản</span>
+            </NavLink>
+          )}
           <section className="admin-shell__profile" aria-label="Tài khoản đang đăng nhập">
             <span className="admin-shell__profile-icon"><ProfileIcon /></span>
             <span className="admin-shell__profile-copy">

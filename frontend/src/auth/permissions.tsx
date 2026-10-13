@@ -65,3 +65,22 @@ export function RequirePermission({
   }
   return children;
 }
+
+export function RequireRole({
+  role: requiredRole,
+  children,
+}: {
+  role: string;
+  children: React.ReactNode;
+}) {
+  const { accessToken, isBootstrapping, capabilityStatus, role, refreshCapabilities } = useAuth();
+
+  if (isBootstrapping) return <CapabilityLoading />;
+  if (!accessToken) return <Navigate to="/login" replace />;
+  if (capabilityStatus === 'loading') return <CapabilityLoading />;
+  if (capabilityStatus === 'error') {
+    return <CapabilityRetry onRetry={() => { void refreshCapabilities().catch(() => undefined); }} />;
+  }
+  if (role !== requiredRole) return <Navigate to="/403" replace />;
+  return children;
+}
