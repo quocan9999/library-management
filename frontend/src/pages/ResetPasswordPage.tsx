@@ -14,6 +14,7 @@ import {
   type ResetPasswordFormValues,
 } from '../auth/passwordRecoverySchema';
 import { setAccessToken } from '../auth/tokenStore';
+import { publishSessionTabEvent } from '../auth/sessionTabEvents';
 import { AuthLayout } from '../components/AuthLayout';
 
 export function ResetPasswordPage() {
@@ -45,6 +46,7 @@ export function ResetPasswordPage() {
       await authApi.resetPassword({ token, newPassword, confirmNewPassword });
       // Reset đã revoke server-side toàn bộ phiên; bỏ phiên cục bộ để Login không redirect lại.
       setAccessToken(null);
+      publishSessionTabEvent('password-reset');
       reset();
       setCompleted(true);
     } catch (error) {

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useOptionalAuth } from '../auth/AuthContext';
 import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
+import { SessionTabSync } from '../auth/SessionTabSync';
 import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
 import { LoginPage } from '../pages/LoginPage';
@@ -77,6 +78,7 @@ export function App() {
   return (
     <>
       <CapabilityRouteSync />
+      <SessionTabSync />
       <DisabledAccountRouteSync />
       <Routes>
         <Route

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { authApi } from './api';
 import { subscribeToCapabilityRefresh } from './capabilityEvents';
 import { logoutAndClearAccessToken } from './logout';
+import { publishSessionTabEvent } from './sessionTabEvents';
 import { getAccessToken, setAccessToken, subscribeToAccessToken } from './tokenStore';
 import type { AuthMeData, LoginCredentials } from './types';
 
@@ -131,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (credentials: LoginCredentials) => {
     const result = await authApi.login(credentials);
     setAccessToken(result.accessToken);
+    publishSessionTabEvent('signed-in');
     try {
       await refreshCapabilities();
     } catch {
