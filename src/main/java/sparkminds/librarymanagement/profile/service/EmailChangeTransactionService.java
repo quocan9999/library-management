@@ -30,7 +30,7 @@ public class EmailChangeTransactionService {
     private final EntityManager entityManager;
     private final Clock clock;
 
-    /** Lưu mã trước khi gửi thư; transaction kết thúc trước khi SMTP được gọi. */
+    /** Chuẩn bị mã trong bộ nhớ; transaction kết thúc trước khi SMTP được gọi. */
     @Transactional
     public Candidate createCandidate(Integer accountId, ChangeEmailRequest request) {
         Account account = lockActiveUser(accountId);
@@ -48,27 +48,29 @@ public class EmailChangeTransactionService {
             throw emailAlreadyRegistered();
         }
 
-        LocalDateTime now = LocalDateTime.now(clock);
-        verificationRepository.invalidatePendingForAccount(accountId, now);
         EmailChangeCodeService.IssuedCode issued = codeService.issue(account, request.newEmail());
-        EmailChangeVerification verification = verificationRepository.saveAndFlush(issued.verification());
-        return new Candidate(accountId, verification.getId(), request.newEmail(), issued.rawCode());
+        return new Candidate(accountId, account.getEmail(), account.getSessionVersion(), request.newEmail(),
+                issued.rawCode(), issued.verification().getCodeHash(), issued.verification().getExpiresAt());
     }
 
+    /** Chỉ thay mã đã gửi sau SMTP thành công; khóa account serialize với resend/verify. */
     @Transactional
-    public void removeUnsentCandidate(Candidate candidate) {
-        Account account = accountRepository.findByIdForUpdate(candidate.accountId()).orElse(null);
-        if (account == null) return;
-        verificationRepository.findByIdForUpdate(candidate.verificationId()).ifPresent(verification -> {
-            boolean isLatest = verificationRepository
-                    .findTopByAccountIdAndUsedAtIsNullOrderByCreatedAtDescIdDesc(candidate.accountId())
-                    .map(latest -> latest.getId().equals(verification.getId()))
-                    .orElse(false);
-            if (isLatest && verification.getAccount().getId().equals(account.getId())) {
-                verificationRepository.delete(verification);
-                verificationRepository.flush();
-            }
-        });
+    public void activateSentCandidate(Candidate candidate) {
+        Account account = lockActiveUser(candidate.accountId());
+        entityManager.refresh(account, LockModeType.PESSIMISTIC_WRITE);
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!account.getEmail().equalsIgnoreCase(candidate.currentEmail())
+                || account.getSessionVersion() != candidate.sessionVersion()
+                || !candidate.expiresAt().isAfter(now)) {
+            throw invalidCode();
+        }
+        verificationRepository.invalidatePendingForAccount(candidate.accountId(), now);
+        EmailChangeVerification verification = new EmailChangeVerification();
+        verification.setAccount(account);
+        verification.setNewEmail(candidate.email());
+        verification.setCodeHash(candidate.codeHash());
+        verification.setExpiresAt(candidate.expiresAt());
+        verificationRepository.saveAndFlush(verification);
     }
 
     /** Account luôn được khóa trước verification để serialize hai lần xác nhận cùng một mã. */
@@ -118,6 +120,7 @@ public class EmailChangeTransactionService {
                 "Email này đã được sử dụng bởi tài khoản khác.");
     }
 
-    public record Candidate(Integer accountId, Integer verificationId, String email, String rawCode) {
+    public record Candidate(Integer accountId, String currentEmail, long sessionVersion,
+                            String email, String rawCode, String codeHash, LocalDateTime expiresAt) {
     }
 }

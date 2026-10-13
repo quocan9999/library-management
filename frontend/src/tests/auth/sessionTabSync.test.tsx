@@ -6,8 +6,8 @@ import { SessionTabSync } from '../../auth/SessionTabSync';
 import { publishSessionTabEvent, SESSION_TAB_EVENT_KEY } from '../../auth/sessionTabEvents';
 import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
 
-const mocks = vi.hoisted(() => ({ restoreSession: vi.fn() }));
-vi.mock('../../auth/api', () => ({ authApi: { restoreSession: mocks.restoreSession } }));
+const mocks = vi.hoisted(() => ({ restoreSession: vi.fn(), validateSession: vi.fn() }));
+vi.mock('../../auth/api', () => ({ authApi: mocks }));
 
 function LocationProbe() {
   return <output data-testid="path">{useLocation().pathname}</output>;
@@ -26,16 +26,80 @@ afterEach(() => {
   setAccessToken(null);
   vi.restoreAllMocks();
   mocks.restoreSession.mockReset();
+  mocks.validateSession.mockReset();
 });
 
 describe('session synchronization between tabs', () => {
-  it('silently redirects the old forgot tab to login after reset and clears its token', () => {
+  it('silently redirects the old forgot tab to login after reset and clears a revoked token', async () => {
     setAccessToken('old-token');
+    mocks.validateSession.mockRejectedValue({ isAxiosError: true, response: { status: 401 } });
     mount();
-    act(() => event('password-reset'));
+    await act(async () => event('password-reset'));
     expect(screen.getByTestId('path').textContent).toBe('/login');
     expect(getAccessToken()).toBeNull();
     expect(mocks.restoreSession).not.toHaveBeenCalled();
+    expect(mocks.validateSession).toHaveBeenCalledWith('old-token');
+  });
+
+  it.each(['/admin/roles', '/profile'])('preserves another account session at %s when the backend accepts it', async (path) => {
+    setAccessToken('account-B');
+    mocks.validateSession.mockResolvedValue({ id: 2 });
+    mount(path);
+    await act(async () => event('password-reset'));
+    expect(getAccessToken()).toBe('account-B');
+    expect(screen.getByTestId('path').textContent).toBe(path);
+    expect(mocks.validateSession).toHaveBeenCalledWith('account-B');
+  });
+
+  it('redirects a signed-in reset account to login after the backend rejects its token', async () => {
+    setAccessToken('account-A');
+    mocks.validateSession.mockRejectedValue({ isAxiosError: true, response: { status: 401 } });
+    mount('/profile');
+    await act(async () => event('password-reset'));
+    expect(getAccessToken()).toBeNull();
+    expect(screen.getByTestId('path').textContent).toBe('/login');
+  });
+
+  it('does not clear a valid session on a temporary backend failure', async () => {
+    setAccessToken('account-B');
+    mocks.validateSession.mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+    mount('/profile');
+    await act(async () => event('password-reset'));
+    expect(getAccessToken()).toBe('account-B');
+    expect(screen.getByTestId('path').textContent).toBe('/profile');
+  });
+
+  it('does not clear a newly installed token after a late validation rejection', async () => {
+    let reject!: (error: unknown) => void;
+    mocks.validateSession.mockImplementation(() => new Promise((_, fail) => { reject = fail; }));
+    setAccessToken('account-A');
+    mount('/login');
+    act(() => event('password-reset'));
+    setAccessToken('account-B');
+    await act(async () => reject({ isAxiosError: true, response: { status: 401 } }));
+    expect(getAccessToken()).toBe('account-B');
+  });
+
+  it('does not cancel revoked-session validation for a sign-in event ignored on a protected route', async () => {
+    let reject!: (error: unknown) => void;
+    mocks.validateSession.mockImplementation(() => new Promise((_, fail) => { reject = fail; }));
+    setAccessToken('account-A');
+    mount('/profile');
+    act(() => event('password-reset'));
+    act(() => event('signed-in'));
+    await act(async () => reject({ isAxiosError: true, response: { status: 401 } }));
+    expect(getAccessToken()).toBeNull();
+    expect(screen.getByTestId('path').textContent).toBe('/login');
+  });
+
+  it('does not overwrite a local login with an older pending session restore', async () => {
+    let resolve!: (result: { accessToken: string }) => void;
+    mocks.restoreSession.mockImplementation(() => new Promise((done) => { resolve = done; }));
+    mount('/login');
+    act(() => event('signed-in'));
+    setAccessToken('new-local-login');
+    await act(async () => resolve({ accessToken: 'older-restored-session' }));
+    expect(getAccessToken()).toBe('new-local-login');
   });
 
   it('keeps the reset success tab on its current page', () => {

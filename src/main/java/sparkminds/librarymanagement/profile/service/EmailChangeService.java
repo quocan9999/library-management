@@ -25,16 +25,12 @@ public class EmailChangeService {
             EmailChangeTransactionService.Candidate candidate = transactionService.createCandidate(accountId, request);
             try {
                 mailSender.sendCode(candidate.email(), candidate.rawCode());
-                permit.recordSuccessfulSend();
             } catch (MailException exception) {
-                try {
-                    transactionService.removeUnsentCandidate(candidate);
-                } catch (RuntimeException compensationException) {
-                    // Do not log raw SMTP, address, code or credentials.
-                }
                 throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "EMAIL_CHANGE_EMAIL_SEND_FAILED",
                         "Không thể gửi mã xác thực lúc này. Vui lòng thử lại sau.");
             }
+            permit.recordSuccessfulSend();
+            transactionService.activateSentCandidate(candidate);
         }
     }
 

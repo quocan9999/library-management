@@ -15,6 +15,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import sparkminds.librarymanagement.auth.entity.Account;
@@ -45,6 +46,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -82,7 +85,7 @@ class ChangeEmailIntegrationTests {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Autowired
+    @MockitoSpyBean
     private Clock clock;
 
     @Autowired
@@ -260,6 +263,102 @@ class ChangeEmailIntegrationTests {
         assertThat(accountRepository.findById(account.getId()).orElseThrow().getEmail()).isEqualTo(account.getEmail());
         assertThat(emailChangeVerificationRepository.findTopByAccountIdAndUsedAtIsNullOrderByCreatedAtDesc(
                 account.getId())).isEmpty();
+    }
+
+    @Test
+    void failedResendKeepsPreviouslyDeliveredCodeUsable() throws Exception {
+        Account account = createAccount("ROLE_USER");
+        String token = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
+        String firstEmail = "first-delivered-" + UUID.randomUUID() + "@example.com";
+        requestEmailChange(token, firstEmail, CURRENT_PASSWORD, nextClientIp()).andExpect(status().isOk());
+        String firstCode = readLatestCode();
+        Integer firstId = latestVerification(account.getId()).getId();
+        var afterCooldown = clock.instant().plusSeconds(61);
+        doReturn(afterCooldown).when(clock).instant();
+        doThrow(new MailSendException("private SMTP detail"))
+                .when(javaMailSender).send(any(SimpleMailMessage.class));
+
+        requestEmailChange(token, firstEmail, CURRENT_PASSWORD, nextClientIp())
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("EMAIL_CHANGE_EMAIL_SEND_FAILED"));
+        assertThat(latestVerification(account.getId()).getId()).isEqualTo(firstId);
+        verifyEmailChange(token, firstCode, nextClientIp()).andExpect(status().isOk());
+        assertThat(accountRepository.findById(account.getId()).orElseThrow().getEmail()).isEqualTo(firstEmail);
+        verifyEmailChange(token, firstCode, nextClientIp()).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void verifyDuringResendDoesNotHoldSmtpLockOrActivateCodeAfterEmailAlreadyChanged() throws Exception {
+        Account account = createAccount("ROLE_USER");
+        String token = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
+        String firstEmail = "verify-during-send-" + UUID.randomUUID() + "@example.com";
+        requestEmailChange(token, firstEmail, CURRENT_PASSWORD, nextClientIp()).andExpect(status().isOk());
+        String firstCode = readLatestCode();
+        CountDownLatch sending = new CountDownLatch(1);
+        CountDownLatch finishSending = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            sending.countDown();
+            assertThat(finishSending.await(20, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(javaMailSender).send(any(SimpleMailMessage.class));
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var resend = executor.submit(() -> requestEmailChange(token,
+                    "pending-resend-" + UUID.randomUUID() + "@example.com", CURRENT_PASSWORD, nextClientIp()).andReturn());
+            assertThat(sending.await(10, TimeUnit.SECONDS)).isTrue();
+            var verification = executor.submit(() -> verifyEmailChange(token, firstCode, nextClientIp()).andReturn());
+            assertThat(verification.get(10, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
+            finishSending.countDown();
+            assertThat(resend.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(400);
+            assertThat(accountRepository.findById(account.getId()).orElseThrow().getEmail()).isEqualTo(firstEmail);
+            assertThat(emailChangeVerificationRepository.findTopByAccountIdAndUsedAtIsNullOrderByCreatedAtDesc(
+                    account.getId())).isEmpty();
+            verifyEmailChange(token, firstCode, nextClientIp()).andExpect(status().isBadRequest());
+        } finally {
+            finishSending.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void concurrentSuccessfulResendsLeaveOnlyOneUsableCode() throws Exception {
+        Account account = createAccount("ROLE_USER");
+        String token = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
+        String prefix = UUID.randomUUID().toString();
+        CountDownLatch sending = new CountDownLatch(2);
+        CountDownLatch finishSending = new CountDownLatch(1);
+        Map<String, String> codes = new ConcurrentHashMap<>();
+        doAnswer(invocation -> {
+            SimpleMailMessage message = invocation.getArgument(0);
+            Matcher matcher = SIX_DIGIT_CODE.matcher(message.getText());
+            assertThat(matcher.find()).isTrue();
+            codes.put(message.getTo()[0], matcher.group());
+            sending.countDown();
+            assertThat(finishSending.await(20, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(javaMailSender).send(any(SimpleMailMessage.class));
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> requestEmailChange(token, "first-" + prefix + "@example.com",
+                    CURRENT_PASSWORD, nextClientIp()).andReturn());
+            var second = executor.submit(() -> requestEmailChange(token, "second-" + prefix + "@example.com",
+                    CURRENT_PASSWORD, nextClientIp()).andReturn());
+            assertThat(sending.await(10, TimeUnit.SECONDS)).isTrue();
+            finishSending.countDown();
+            assertThat(first.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
+            assertThat(second.get(20, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
+            EmailChangeVerification latest = latestVerification(account.getId());
+            assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM email_change_verifications "
+                    + "WHERE account_id = ? AND used_at IS NULL", Integer.class, account.getId())).isEqualTo(1);
+            verifyEmailChange(token, codes.get(latest.getNewEmail()), nextClientIp()).andExpect(status().isOk());
+            for (String code : codes.values()) {
+                verifyEmailChange(token, code, nextClientIp()).andExpect(status().isBadRequest());
+            }
+            assertThat(accountRepository.findById(account.getId()).orElseThrow().getEmail()).isEqualTo(latest.getNewEmail());
+        } finally {
+            finishSending.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test

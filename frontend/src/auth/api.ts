@@ -245,4 +245,13 @@ export const authApi = {
     const response = await apiClient.get<ApiEnvelope<AuthMeData>>('/api/v1/auth/me');
     return readRequiredData(response.data, 'AUTH_ME_SUCCESS');
   },
+
+  async validateSession(accessToken: string): Promise<AuthMeData> {
+    // Không refresh hoặc tự clear token: caller kiểm tra token vẫn hiện hành trước khi xử lý.
+    const response = await apiClient.get<ApiEnvelope<AuthMeData>>('/api/v1/auth/me', {
+      ...publicAuthRequestConfig,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return readRequiredData(response.data, 'AUTH_ME_SUCCESS');
+  },
 };

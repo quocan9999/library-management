@@ -65,6 +65,19 @@ afterEach(() => {
 });
 
 describe('API base URL configuration', () => {
+  it('validates the specified session without refresh or clearing a newer token on rejection', async () => {
+    setAccessToken('current-account-B');
+    const requests: string[] = [];
+    apiClient.defaults.adapter = (async (config) => {
+      requests.push(config.url ?? '');
+      expect(config.headers.get('Authorization')).toBe('Bearer old-account-A');
+      expect(config.withCredentials).toBe(false);
+      unauthorized(config, 'AUTH_TOKEN_EXPIRED');
+    }) satisfies AxiosAdapter;
+    await expect(authApi.validateSession('old-account-A')).rejects.toBeInstanceOf(AxiosError);
+    expect(requests).toEqual(['/api/v1/auth/me']);
+    expect(getAccessToken()).toBe('current-account-B');
+  });
   it('uses the configured backend origin or the develop fallback', () => {
     const expectedUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8081';
     expect(apiClient.defaults.baseURL).toBe(expectedUrl);

@@ -56,6 +56,18 @@ afterEach(() => {
 });
 
 describe('USER profile routes', () => {
+  it.each([
+    ['ROLE_ADMIN', '/admin/roles'], ['ROLE_ADMIN', '/admin/members'],
+    ['ROLE_SUPER_ADMIN', '/admin/roles'], ['ROLE_SUPER_ADMIN', '/admin/members'],
+  ])('still denies direct %s access to %s without permission', async (role, path) => {
+    mocks.auth.role = role;
+    mocks.auth.currentUser!.role = role;
+    mocks.auth.permissions = [];
+    mocks.auth.currentUser!.permissions = [];
+    renderRoute(path);
+    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
+    expect(screen.getByLabelText('current path').textContent).toBe('/403');
+  });
   it('shows the profile email and password action for a USER with permission', async () => {
     renderRoute('/profile');
 

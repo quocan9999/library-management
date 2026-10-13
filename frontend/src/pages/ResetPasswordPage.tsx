@@ -13,7 +13,7 @@ import {
   type ResetPasswordFormInput,
   type ResetPasswordFormValues,
 } from '../auth/passwordRecoverySchema';
-import { setAccessToken } from '../auth/tokenStore';
+import { clearRevokedSessionAfterReset } from '../auth/passwordResetSession';
 import { publishSessionTabEvent } from '../auth/sessionTabEvents';
 import { AuthLayout } from '../components/AuthLayout';
 
@@ -44,8 +44,8 @@ export function ResetPasswordPage() {
     setInvalidLink(false);
     try {
       await authApi.resetPassword({ token, newPassword, confirmNewPassword });
-      // Reset đã revoke server-side toàn bộ phiên; bỏ phiên cục bộ để Login không redirect lại.
-      setAccessToken(null);
+      // Phiên tài khoản khác vẫn hợp lệ; chỉ clear khi server xác nhận phiên hiện tại bị thu hồi.
+      void clearRevokedSessionAfterReset();
       publishSessionTabEvent('password-reset');
       reset();
       setCompleted(true);

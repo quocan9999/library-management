@@ -219,6 +219,29 @@ describe('public registration and verification routes', () => {
     expect(attempts).toBe(2);
   });
 
+  it('keeps account B signed in when the public reset page successfully resets account A', async () => {
+    const user = userEvent.setup();
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') return response(config, success('AUTH_TOKEN_REFRESHED', {
+        accessToken: 'account-B-token', tokenType: 'Bearer', accessTokenExpiresIn: 900,
+      }));
+      if (config.url === '/api/v1/auth/me') return response(config, success('AUTH_ME_SUCCESS', {
+        id: 2, username: 'admin-B', email: 'admin-B@example.com', role: 'ROLE_ADMIN', permissions: [],
+      }));
+      if (config.url === '/api/v1/auth/reset-password') return response(config, success('PASSWORD_RESET_SUCCESS', null));
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+    renderAppWithAuth('/reset-password?token=account-A-reset-link');
+    await user.type(await screen.findByLabelText('Mật khẩu mới'), 'Fresh3!Password');
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Fresh3!Password');
+    await user.click(screen.getByRole('button', { name: 'Đặt lại mật khẩu' }));
+    expect(await screen.findByText('Đổi mật khẩu thành công')).toBeTruthy();
+    expect(getAccessToken()).toBe('account-B-token');
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    expect(await screen.findByRole('region', { name: 'Tài khoản đang đăng nhập' })).toBeTruthy();
+    expect(getAccessToken()).toBe('account-B-token');
+  });
+
   it('does not call reset without a URL token and offers a new link', async () => {
     let resetCalls = 0;
     apiClient.defaults.adapter = (async (config) => {

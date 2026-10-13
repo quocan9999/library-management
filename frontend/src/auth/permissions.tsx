@@ -18,6 +18,7 @@ export function DefaultAccountRoute() {
   if (permissions.includes('role:read') && ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'].includes(role ?? '')) {
     return <Navigate to="/admin/roles" replace />;
   }
+  if (role === 'ROLE_ADMIN' || role === 'ROLE_SUPER_ADMIN') return null;
   return <Navigate to="/403" replace />;
 }
 
