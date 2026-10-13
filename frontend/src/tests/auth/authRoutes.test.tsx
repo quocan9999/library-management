@@ -16,6 +16,8 @@ import {
 } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../app/App';
+import { AuthProvider } from '../../auth/AuthContext';
+import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
 import { apiClient } from '../../auth/api';
 import type { ApiEnvelope, RegisterData } from '../../auth/types';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -89,13 +91,207 @@ function renderApp(entry: string) {
   );
 }
 
+function renderAppWithAuth(entry: string) {
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <AuthProvider>
+        <App />
+        <LocationProbe />
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+}
+
 afterEach(() => {
   cleanup();
   apiClient.defaults.adapter = originalAdapter;
+  setAccessToken(null);
   window.sessionStorage.clear();
 });
 
 describe('public registration and verification routes', () => {
+  it('renders the forgot-password page as a public route', async () => {
+    apiClient.defaults.adapter = (async (config) => apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING')) satisfies AxiosAdapter;
+    renderAppWithAuth('/forgot-password');
+
+    expect(await screen.findByRole('heading', { name: 'Quên mật khẩu' })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeTruthy();
+  });
+
+  it('renders a reset-password token link as a public route', async () => {
+    apiClient.defaults.adapter = (async (config) => apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING')) satisfies AxiosAdapter;
+    renderAppWithAuth('/reset-password?token=secret-in-url');
+
+    expect(await screen.findByRole('heading', { name: 'Đặt lại mật khẩu' })).toBeTruthy();
+    expect(screen.getByLabelText('Mật khẩu mới')).toBeTruthy();
+    expect(screen.getByLabelText('Xác nhận mật khẩu mới')).toBeTruthy();
+  });
+
+  it('normalizes forgot email and shows a generic receipt after the API accepts it', async () => {
+    const user = userEvent.setup();
+    let forgotBody = '';
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING');
+      if (config.url === '/api/v1/auth/forgot-password') {
+        forgotBody = String(config.data);
+        return response(config, success('FORGOT_PASSWORD_REQUESTED', null));
+      }
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    renderAppWithAuth('/forgot-password');
+    await user.type(await screen.findByRole('textbox', { name: 'Email' }), '  Reader@Example.COM  ');
+    await user.click(screen.getByRole('button', { name: 'Gửi liên kết đặt lại mật khẩu' }));
+
+    expect(await screen.findByText('Kiểm tra email của bạn!')).toBeTruthy();
+    expect(forgotBody).toContain('reader@example.com');
+    expect(screen.getByText('Nếu email này có tài khoản, bạn sẽ nhận được liên kết đặt lại mật khẩu trong vài phút.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Đăng nhập' })).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
+    expect(!!screen.getByText('gửi lại sau 60 giây')).toBe(true);
+  });
+
+  it('resets from the URL token, clears the session, and waits for the login action', async () => {
+    const user = userEvent.setup();
+    setAccessToken('stale-access-token');
+    let resetBody = '';
+    let authorization = '';
+    let credentials = true;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING');
+      if (config.url === '/api/v1/auth/reset-password') {
+        resetBody = String(config.data);
+        authorization = config.headers.get('Authorization')?.toString() ?? '';
+        credentials = config.withCredentials === true;
+        return response(config, success('PASSWORD_RESET_SUCCESS', null));
+      }
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    renderAppWithAuth('/reset-password?token=one-time-secret');
+    await user.type(await screen.findByLabelText('Mật khẩu mới'), 'Fresh3!Password');
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Fresh3!Password');
+    await user.click(screen.getByRole('button', { name: 'Đặt lại mật khẩu' }));
+
+    expect(await screen.findByText('Đổi mật khẩu thành công')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Đặt lại mật khẩu' })).toBeTruthy();
+    expect(screen.queryByLabelText('Mật khẩu mới')).toBeNull();
+    expect(getAccessToken()).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeTruthy();
+    expect(screen.queryByText('Đổi mật khẩu thành công')).toBeNull();
+    expect(screen.queryByText('Mật khẩu đã được đặt lại')).toBeNull();
+    expect(JSON.parse(resetBody)).toEqual({
+      token: 'one-time-secret',
+      newPassword: 'Fresh3!Password',
+      confirmNewPassword: 'Fresh3!Password',
+    });
+    expect(resetBody).not.toContain('stale-access-token');
+    expect(authorization).toBe('');
+    expect(credentials).toBe(false);
+  });
+
+  it('shows password reuse as a field error and allows another password with the same reset link', async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING');
+      if (config.url === '/api/v1/auth/reset-password') {
+        attempts += 1;
+        if (attempts === 1) apiFailure(config, 422, 'VALIDATION_ERROR', {}, { newPassword: 'Mật khẩu mới phải khác mật khẩu hiện tại' });
+        return response(config, success('PASSWORD_RESET_SUCCESS', null));
+      }
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+    renderAppWithAuth('/reset-password?token=reusable-after-rejection');
+    await user.type(await screen.findByLabelText('Mật khẩu mới'), 'Existing1!');
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Existing1!');
+    await user.click(screen.getByRole('button', { name: 'Đặt lại mật khẩu' }));
+    expect(await screen.findByText('Mật khẩu mới phải khác mật khẩu hiện tại.')).toBeTruthy();
+    expect(screen.queryByText('Không thể đặt lại mật khẩu lúc này. Vui lòng thử lại.')).toBeNull();
+    expect(screen.getByLabelText('current search').textContent).toBe('?token=reusable-after-rejection');
+    await user.clear(screen.getByLabelText('Mật khẩu mới'));
+    await user.type(screen.getByLabelText('Mật khẩu mới'), 'Different2!');
+    await user.clear(screen.getByLabelText('Xác nhận mật khẩu mới'));
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Different2!');
+    await user.click(screen.getByRole('button', { name: /Đặt lại mật khẩu/ }));
+    expect(await screen.findByText('Đổi mật khẩu thành công')).toBeTruthy();
+    expect(attempts).toBe(2);
+  });
+
+  it('keeps account B signed in when the public reset page successfully resets account A', async () => {
+    const user = userEvent.setup();
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') return response(config, success('AUTH_TOKEN_REFRESHED', {
+        accessToken: 'account-B-token', tokenType: 'Bearer', accessTokenExpiresIn: 900,
+      }));
+      if (config.url === '/api/v1/auth/me') return response(config, success('AUTH_ME_SUCCESS', {
+        id: 2, username: 'admin-B', email: 'admin-B@example.com', role: 'ROLE_ADMIN', permissions: [],
+      }));
+      if (config.url === '/api/v1/auth/reset-password') return response(config, success('PASSWORD_RESET_SUCCESS', null));
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+    renderAppWithAuth('/reset-password?token=account-A-reset-link');
+    await user.type(await screen.findByLabelText('Mật khẩu mới'), 'Fresh3!Password');
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Fresh3!Password');
+    await user.click(screen.getByRole('button', { name: 'Đặt lại mật khẩu' }));
+    expect(await screen.findByText('Đổi mật khẩu thành công')).toBeTruthy();
+    expect(getAccessToken()).toBe('account-B-token');
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    expect(await screen.findByRole('region', { name: 'Tài khoản đang đăng nhập' })).toBeTruthy();
+    expect(getAccessToken()).toBe('account-B-token');
+  });
+
+  it('does not call reset without a URL token and offers a new link', async () => {
+    let resetCalls = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING');
+      if (config.url === '/api/v1/auth/reset-password') resetCalls += 1;
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    renderAppWithAuth('/reset-password');
+
+    expect(await screen.findByText('Liên kết không hợp lệ hoặc đã hết hạn')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Yêu cầu liên kết mới' }).getAttribute('href')).toBe('/forgot-password');
+    expect(resetCalls).toBe(0);
+  });
+
+  it('shows a generic expired-link state after the backend rejects the reset token', async () => {
+    const user = userEvent.setup();
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING');
+      if (config.url === '/api/v1/auth/reset-password') apiFailure(config, 400, 'PASSWORD_RESET_TOKEN_INVALID');
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    renderAppWithAuth('/reset-password?token=expired-token');
+    await user.type(await screen.findByLabelText('Mật khẩu mới'), 'Fresh3!Password');
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'Fresh3!Password');
+    await user.click(screen.getByRole('button', { name: 'Đặt lại mật khẩu' }));
+
+    expect(await screen.findByText('Liên kết không hợp lệ hoặc đã hết hạn')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Yêu cầu liên kết mới' })).toBeTruthy();
+  });
+
+  it('shows the forgot-password retry-after response without exposing backend details', async () => {
+    const user = userEvent.setup();
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING');
+      if (config.url === '/api/v1/auth/forgot-password') {
+        apiFailure(config, 429, 'FORGOT_PASSWORD_RATE_LIMITED', { 'Retry-After': '23' });
+      }
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    renderAppWithAuth('/forgot-password');
+    await user.type(await screen.findByRole('textbox', { name: 'Email' }), 'reader@example.com');
+    await user.click(screen.getByRole('button', { name: 'Gửi liên kết đặt lại mật khẩu' }));
+
+    expect(await screen.findByText(/thử lại sau 23 giây/)).toBeTruthy();
+    expect(screen.queryByText('Private backend detail.')).toBeNull();
+  });
+
   it('renders the register form as a public route with password guidance and accessible labels', () => {
     renderApp('/register');
 
@@ -107,7 +303,7 @@ describe('public registration and verification routes', () => {
     expect(screen.getByRole('link', { name: 'Đăng nhập' })).toBeTruthy();
   });
 
-  it('registers with normalized email, stores only email, then opens check-email', async () => {
+  it('registers with normalized email and starts cooldown immediately on check-email', async () => {
     const user = userEvent.setup();
     let requestBody = '';
     apiClient.defaults.adapter = (async (config) => {
@@ -126,6 +322,8 @@ describe('public registration and verification routes', () => {
     await user.click(screen.getByRole('button', { name: 'Tạo tài khoản' }));
 
     expect(await screen.findByText('reader@example.com')).toBeTruthy();
+    expect(screen.getByText(/gửi lại sau (59|60) giây/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'gửi lại' })).toBeNull();
     expect(window.sessionStorage.getItem('registrationEmail')).toBe('reader@example.com');
     expect(window.sessionStorage.getItem('verificationToken')).toBeNull();
     expect(window.sessionStorage.getItem('password')).toBeNull();
@@ -245,11 +443,12 @@ describe('public registration and verification routes', () => {
 
     expect(screen.getByText('reader@example.com')).toBeTruthy();
     expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
-    expect(screen.getByRole('button', { name: /Gửi lại/ }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'gửi lại' }).hasAttribute('disabled')).toBe(false);
     expect(screen.queryByText(/60 giây/)).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
-    expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'gửi lại' }));
+    expect(await screen.findByText('gửi lại sau 60 giây')).toBeTruthy();
+    expect(screen.queryByText('Yêu cầu đã được tiếp nhận')).toBeNull();
     expect(requestBody).toContain('reader@example.com');
     expect(screen.getByRole('link', { name: 'Quay lại đăng nhập' })).toBeTruthy();
   });
@@ -287,6 +486,7 @@ describe('public registration and verification routes', () => {
     ));
 
     expect(await screen.findByText('Email đã được xác thực thành công.')).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('library:session-tab-event')!).type).toBe('email-verified');
     expect(window.sessionStorage.getItem('registrationEmail')).toBeNull();
     expect(screen.getByRole('link', { name: 'Đăng nhập ngay' })).toBeTruthy();
   });
@@ -367,7 +567,7 @@ describe('public registration and verification routes', () => {
     expect(await screen.findByText(/chờ 23 giây/)).toBeTruthy();
   });
 
-  it('shows a generic resend confirmation without assuming SMTP succeeded', async () => {
+  it('keeps the inline resend hint without a success alert after accepting an email request', async () => {
     const user = userEvent.setup();
     let body = '';
     apiClient.defaults.adapter = (async (config) => {
@@ -379,14 +579,9 @@ describe('public registration and verification routes', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'Reader@Example.com');
     await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
 
-    expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
-    expect(screen.queryByText(/60 giây/)).toBeNull();
-    // Ant Design có thể giữ icon loading trong accessible name sau khi submit hoàn tất.
-    // Tìm nút theo phần tên ổn định, nhưng vẫn xác nhận nó được bật lại.
-    await waitFor(() => {
-      const resendButton = screen.getByRole('button', { name: /Gửi lại email xác thực/ });
-      expect(resendButton.hasAttribute('disabled')).toBe(false);
-    });
+    expect(await screen.findByText('gửi lại sau 60 giây')).toBeTruthy();
+    expect(screen.queryByText('Yêu cầu đã được tiếp nhận')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
     expect(body).toContain('reader@example.com');
   });
 });

@@ -1,5 +1,5 @@
 import { Alert, Button, Input } from 'antd';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,6 +23,7 @@ interface ResendVerificationFormProps {
   initialCooldownSeconds?: number;
   hideEmailField?: boolean;
   compact?: boolean;
+  inlineResend?: boolean;
   onRequested?: (email: string) => void;
 }
 
@@ -31,11 +32,14 @@ export function ResendVerificationForm({
   initialCooldownSeconds = 0,
   hideEmailField = false,
   compact = false,
+  inlineResend = false,
   onRequested,
 }: ResendVerificationFormProps) {
   const [serverError, setServerError] = useState<ReturnType<typeof getResendError> | null>(null);
   const [requested, setRequested] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(Math.max(0, initialCooldownSeconds));
+  const cooldownUntil = useRef(initialCooldownSeconds > 0 ? Date.now() + initialCooldownSeconds * 1000 : 0);
+  const sending = useRef(false);
   const {
     control,
     register,
@@ -54,18 +58,22 @@ export function ResendVerificationForm({
   useEffect(() => {
     if (!isCoolingDown) return undefined;
     const interval = window.setInterval(() => {
-      setCooldownSeconds((seconds) => Math.max(0, seconds - 1));
+      setCooldownSeconds(Math.max(0, Math.ceil((cooldownUntil.current - Date.now()) / 1000)));
     }, 1000);
     return () => window.clearInterval(interval);
   }, [isCoolingDown]);
 
   const onSubmit = async ({ email }: ResendFormValues) => {
+    if (sending.current || Date.now() < cooldownUntil.current) return;
+    sending.current = true;
     setServerError(null);
-    setRequested(false);
+    if (!inlineResend) setRequested(false);
 
     try {
       await authApi.resendVerification(email);
       setRequested(true);
+      cooldownUntil.current = Date.now() + 60_000;
+      setCooldownSeconds(60);
       onRequested?.(email);
     } catch (error) {
       const fieldErrors = mapResendValidationErrors(error);
@@ -74,14 +82,19 @@ export function ResendVerificationForm({
       } else {
         const copy = getResendError(error);
         setServerError(copy);
-        if (copy.retryAfterSeconds) setCooldownSeconds(copy.retryAfterSeconds);
+        if (copy.retryAfterSeconds) {
+          cooldownUntil.current = Date.now() + copy.retryAfterSeconds * 1000;
+          setCooldownSeconds(copy.retryAfterSeconds);
+        }
       }
+    } finally {
+      sending.current = false;
     }
   };
 
   return (
     <div className={`resend-panel${compact ? ' resend-panel--compact' : ''}`}>
-      {requested && (
+      {requested && !inlineResend && (
         <Alert
           className="login-alert"
           type="success"
@@ -103,8 +116,8 @@ export function ResendVerificationForm({
       )}
 
       <form className="resend-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        {hideEmailField && <input type="hidden" {...register('email')} />}
-        {!hideEmailField && <div className="form-field">
+        {(hideEmailField || (inlineResend && requested)) && <input type="hidden" {...register('email')} />}
+        {!hideEmailField && !(inlineResend && requested) && <div className="form-field">
           <label htmlFor="resend-email">Email</label>
           <Controller
             name="email"
@@ -136,6 +149,16 @@ export function ResendVerificationForm({
           )}
         </div>}
 
+        {inlineResend && (hideEmailField || requested) ? (
+          <p className="field-hint">
+            Không thấy email? Hãy kiểm tra thư rác hoặc{' '}
+            {cooldownSeconds > 0 ? <span>gửi lại sau {cooldownSeconds} giây</span> : (
+              <button className="password-recovery-resend" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'đang gửi lại…' : 'gửi lại'}
+              </button>
+            )}.
+          </p>
+        ) : <>
         {cooldownSeconds > 0 && (
           <p className="resend-cooldown" role="status" aria-live="polite">
             Vui lòng chờ {cooldownSeconds} giây trước khi gửi yêu cầu tiếp theo.
@@ -153,6 +176,7 @@ export function ResendVerificationForm({
         >
           {isSubmitting ? 'Đang gửi yêu cầu…' : 'Gửi lại email xác thực'}
         </Button>
+        </>}
       </form>
     </div>
   );

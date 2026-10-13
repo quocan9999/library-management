@@ -1,4 +1,4 @@
-import { Alert, Modal } from 'antd';
+import { Alert } from 'antd';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -6,15 +6,6 @@ import { getLogoutErrorMessage } from '../auth/messages';
 import { PermissionGate } from '../auth/permissions';
 import { BrandMark } from './BrandMark';
 import { clearMemberListState } from '../features/members/listState';
-
-function OverviewIcon() {
-  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
-    <rect x="3.5" y="3.5" width="7" height="7" rx="1" />
-    <rect x="13.5" y="3.5" width="7" height="7" rx="1" />
-    <rect x="3.5" y="13.5" width="7" height="7" rx="1" />
-    <rect x="13.5" y="13.5" width="7" height="7" rx="1" />
-  </svg>;
-}
 
 function RolesIcon() {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
@@ -118,18 +109,6 @@ export function AdminLayout() {
     }
   };
 
-  const confirmLogout = () => {
-    if (isLoggingOut) return;
-    Modal.confirm({
-      title: 'Xác nhận đăng xuất',
-      content: 'Bạn có chắc muốn đăng xuất khỏi hệ thống?',
-      centered: true,
-      okText: 'Đăng xuất',
-      cancelText: 'Ở lại',
-      onOk: handleLogout,
-    });
-  };
-
   const displayName = currentUser?.username?.trim()
     || currentUser?.email?.trim()
     || (currentUser ? `Tài khoản ${currentUser.id}` : 'Đang đồng bộ hồ sơ');
@@ -150,7 +129,7 @@ export function AdminLayout() {
         ref={sidebarRef}
         id="admin-sidebar"
         className={`admin-shell__sidebar${mobileMenuOpen ? ' admin-shell__sidebar--open' : ''}`}
-        aria-label="Điều hướng quản trị"
+        aria-label={role === 'ROLE_USER' ? 'Điều hướng tài khoản' : 'Điều hướng quản trị'}
         role={mobileMenuOpen ? 'dialog' : undefined}
         aria-modal={mobileMenuOpen || undefined}
         onKeyDown={handleSidebarKeyDown}
@@ -165,17 +144,10 @@ export function AdminLayout() {
           ><CloseIcon /></button>
         </header>
 
-        <p className="admin-shell__section-label">KHÔNG GIAN QUẢN TRỊ</p>
+        <p className="admin-shell__section-label">
+          {role === 'ROLE_USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
+        </p>
         <nav className="admin-shell__nav" aria-label="Chính">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
-            onClick={closeMobileMenu}
-          >
-            <OverviewIcon />
-            <span>Tổng quan</span>
-          </NavLink>
           <PermissionGate permission="role:read" fallback={null}>
             <NavLink
               to="/admin/roles"
@@ -200,6 +172,16 @@ export function AdminLayout() {
 
         <footer className="admin-shell__footer">
           {logoutError && <Alert type="error" showIcon role="alert" title={logoutError} />}
+          {role === 'ROLE_USER' && (
+            <NavLink
+              to="/profile"
+              className={({ isActive }) => `admin-shell__profile-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <ProfileIcon />
+              <span>Hồ sơ tài khoản</span>
+            </NavLink>
+          )}
           <section className="admin-shell__profile" aria-label="Tài khoản đang đăng nhập">
             <span className="admin-shell__profile-icon"><ProfileIcon /></span>
             <span className="admin-shell__profile-copy">
@@ -211,7 +193,7 @@ export function AdminLayout() {
           <button
             className="admin-shell__logout"
             type="button"
-            onClick={confirmLogout}
+            onClick={() => { void handleLogout(); }}
             disabled={isLoggingOut}
           >
             <LogoutIcon />

@@ -56,11 +56,9 @@ export function LoginPage() {
   const resendEmail = identifier.includes('@') ? identifier : '';
 
   return (
-    <AuthLayout ariaLabel="Đăng nhập hệ thống quản lý thư viện">
+    <AuthLayout ariaLabel="Đăng nhập hệ thống quản lý thư viện" centered>
       <div className="login-content">
-        <p className="eyebrow">TRUY CẬP HỆ THỐNG</p>
-        <h1>Chào mừng bạn quay lại</h1>
-        <p className="login-intro">Đăng nhập để tiếp tục sử dụng hệ thống quản lý thư viện.</p>
+        <h1>Đăng nhập</h1>
 
         {accountDisabledNotice && <Alert
           className="login-alert"
@@ -132,6 +130,8 @@ export function LoginPage() {
             )}
           </div>
 
+          <p className="login-forgot-link"><Link to="/forgot-password">Quên mật khẩu?</Link></p>
+
           <Button
             className="login-submit"
             type="primary"
@@ -153,15 +153,6 @@ export function LoginPage() {
 
         <p className="auth-alternate">
           Chưa có tài khoản? <Link to="/register">Đăng ký</Link>
-        </p>
-        <p className="privacy-note">
-          <span className="privacy-note__icon" aria-hidden="true">
-            <svg viewBox="0 0 20 20" fill="none">
-              <rect x="4.25" y="8.5" width="11.5" height="8.25" rx="1.5" />
-              <path d="M6.75 8.5V6.25a3.25 3.25 0 0 1 6.5 0V8.5M10 11.5v2.25" />
-            </svg>
-          </span>
-          Thông tin đăng nhập của bạn được bảo vệ và giữ riêng tư.
         </p>
       </div>
     </AuthLayout>

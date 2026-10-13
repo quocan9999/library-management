@@ -29,7 +29,10 @@ public class ResendRateLimitInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        var result = rateLimiter.consumeResendIpRequest(request.getRemoteAddr());
+        boolean forgotPassword = "/api/v1/auth/forgot-password".equals(request.getRequestURI());
+        var result = forgotPassword
+                ? rateLimiter.consumeForgotPasswordIpRequest(request.getRemoteAddr())
+                : rateLimiter.consumeResendIpRequest(request.getRemoteAddr());
         if (result.allowed()) {
             return true;
         }
@@ -40,8 +43,10 @@ public class ResendRateLimitInterceptor implements HandlerInterceptor {
         response.setCharacterEncoding("UTF-8");
         objectMapper.writeValue(response.getOutputStream(), ApiResponse.error(
                 HttpStatus.TOO_MANY_REQUESTS.value(),
-                "RESEND_RATE_LIMITED",
-                "Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau.",
+                forgotPassword ? "FORGOT_PASSWORD_RATE_LIMITED" : "RESEND_RATE_LIMITED",
+                forgotPassword
+                        ? "Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau."
+                        : "Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau.",
                 null
         ));
         return false;

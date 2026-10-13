@@ -57,6 +57,13 @@ afterEach(() => {
 });
 
 describe('login verification guidance', () => {
+  it('provides a public forgot-password link', () => {
+    render(<MemoryRouter><LoginPage /></MemoryRouter>);
+
+    const link = screen.getByRole('link', { name: 'Quên mật khẩu?' });
+    expect(link.getAttribute('href')).toBe('/forgot-password');
+  });
+
   it('preserves the email, clears the password, and resends without reusing credentials', async () => {
     const user = userEvent.setup();
     loginMock.mockRejectedValue(unverifiedError());

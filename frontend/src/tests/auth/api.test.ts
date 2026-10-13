@@ -7,6 +7,7 @@ import {
 } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ACCOUNT_DISABLED_EVENT, apiClient, authApi } from '../../auth/api';
+import { clearRevokedSessionAfterReset } from '../../auth/passwordResetSession';
 import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
 import type { ApiEnvelope, LoginData, RegisterData } from '../../auth/types';
 
@@ -65,9 +66,104 @@ afterEach(() => {
 });
 
 describe('API base URL configuration', () => {
+  it('continues an expired account B session through refresh after a reset signal for A', async () => {
+    const expired = `header.${btoa(JSON.stringify({ sub: '2' }))}.signature`;
+    setAccessToken(expired);
+    let refreshes = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') { refreshes++; return refreshedResponse(config, 'fresh-B'); }
+      if (config.url === '/api/v1/auth/me' && config.headers.get('Authorization') === `Bearer ${expired}`) {
+        unauthorized(config, 'AUTH_TOKEN_EXPIRED');
+      }
+      if (config.url === '/api/v1/auth/me') return response(config, {
+        success: true, code: 'AUTH_ME_SUCCESS', status: 200, message: '', timestamp: new Date().toISOString(),
+        data: { id: 2, username: 'B', email: 'b@example.com', role: 'ROLE_USER', permissions: [] },
+      });
+      throw new Error(`Unexpected request ${config.url}`);
+    }) satisfies AxiosAdapter;
+    expect(await clearRevokedSessionAfterReset()).toBe(false);
+    expect(getAccessToken()).toBe('fresh-B');
+    expect((await authApi.getMe()).id).toBe(2);
+    expect(refreshes).toBe(1);
+  });
+  it('validates the specified session without refresh or clearing a newer token on rejection', async () => {
+    setAccessToken('current-account-B');
+    const requests: string[] = [];
+    apiClient.defaults.adapter = (async (config) => {
+      requests.push(config.url ?? '');
+      expect(config.headers.get('Authorization')).toBe('Bearer old-account-A');
+      expect(config.withCredentials).toBe(false);
+      unauthorized(config, 'AUTH_TOKEN_EXPIRED');
+    }) satisfies AxiosAdapter;
+    await expect(authApi.validateSession('old-account-A')).rejects.toBeInstanceOf(AxiosError);
+    expect(requests).toEqual(['/api/v1/auth/me']);
+    expect(getAccessToken()).toBe('current-account-B');
+  });
   it('uses the configured backend origin or the develop fallback', () => {
     const expectedUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8081';
     expect(apiClient.defaults.baseURL).toBe(expectedUrl);
+  });
+});
+
+describe('public password recovery API', () => {
+  it('exposes forgot-password and reset-password calls', () => {
+    expect(typeof (authApi as unknown as Record<string, unknown>).forgotPassword).toBe('function');
+    expect(typeof (authApi as unknown as Record<string, unknown>).resetPassword).toBe('function');
+  });
+
+  it('sends both recovery calls without an access token or credential cookies', async () => {
+    type RecoveryApi = {
+      forgotPassword(email: string): Promise<void>;
+      resetPassword(request: { token: string; newPassword: string; confirmNewPassword: string }): Promise<void>;
+    };
+    const recoveryApi = authApi as unknown as RecoveryApi;
+    const requests: Array<{ url: string; body: string; authorization: string; withCredentials: boolean }> = [];
+    setAccessToken('stale-access-token');
+    apiClient.defaults.adapter = (async (config) => {
+      requests.push({
+        url: config.url ?? '',
+        body: String(config.data),
+        authorization: config.headers.get('Authorization')?.toString() ?? '',
+        withCredentials: config.withCredentials === true,
+      });
+      const code = config.url === '/api/v1/auth/forgot-password'
+        ? 'FORGOT_PASSWORD_REQUESTED'
+        : 'PASSWORD_RESET_SUCCESS';
+      return response(config, {
+        success: true,
+        status: 200,
+        code,
+        message: 'Accepted.',
+        data: null,
+        timestamp: new Date().toISOString(),
+      } satisfies ApiEnvelope<null>);
+    }) satisfies AxiosAdapter;
+
+    await recoveryApi.forgotPassword('reader@example.com');
+    await recoveryApi.resetPassword({
+      token: 'one-time-token',
+      newPassword: 'Fresh3!Password',
+      confirmNewPassword: 'Fresh3!Password',
+    });
+
+    expect(requests).toEqual([
+      {
+        url: '/api/v1/auth/forgot-password',
+        body: JSON.stringify({ email: 'reader@example.com' }),
+        authorization: '',
+        withCredentials: false,
+      },
+      {
+        url: '/api/v1/auth/reset-password',
+        body: JSON.stringify({
+          token: 'one-time-token',
+          newPassword: 'Fresh3!Password',
+          confirmNewPassword: 'Fresh3!Password',
+        }),
+        authorization: '',
+        withCredentials: false,
+      },
+    ]);
   });
 });
 

@@ -13,9 +13,18 @@ export interface LoginErrorCopy {
 export type LoginFieldErrors = Partial<Record<'identifier' | 'password', string>>;
 export type RegisterFieldErrors = Partial<Record<'email' | 'password', string>>;
 export type ResendFieldErrors = Partial<Record<'email', string>>;
+export type ForgotPasswordFieldErrors = Partial<Record<'email', string>>;
+export type ResetPasswordFieldErrors = Partial<Record<'newPassword' | 'confirmNewPassword', string>>;
 export type VerificationErrorState = 'invalid' | 'expired' | 'used' | 'revoked' | 'unavailable';
+export type PasswordResetErrorState = 'invalid' | 'unavailable';
 
 export interface ResendErrorCopy {
+  title: string;
+  description: string;
+  retryAfterSeconds?: number;
+}
+
+export interface ForgotPasswordErrorCopy {
   title: string;
   description: string;
   retryAfterSeconds?: number;
@@ -149,6 +158,55 @@ export function mapResendValidationErrors(error: unknown): ResendFieldErrors | n
   const validation = error.response?.data;
   if (validation?.code !== 'VALIDATION_ERROR' || !validation.errors?.email) return null;
   return { email: 'Vui lòng nhập địa chỉ email hợp lệ.' };
+}
+
+export function mapForgotPasswordValidationErrors(error: unknown): ForgotPasswordFieldErrors | null {
+  if (!axios.isAxiosError<ApiEnvelope<unknown>>(error)) return null;
+  const validation = error.response?.data;
+  if (validation?.code !== 'VALIDATION_ERROR' || !validation.errors?.email) return null;
+  return { email: 'Vui lòng nhập địa chỉ email hợp lệ.' };
+}
+
+export function getForgotPasswordError(error: unknown): ForgotPasswordErrorCopy {
+  if (!axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
+    return { title: 'Không thể gửi yêu cầu', description: 'Không thể gửi yêu cầu lúc này. Vui lòng thử lại.' };
+  }
+
+  const response = error.response;
+  if (!response) return { title: 'Không thể kết nối đến hệ thống', description: SERVICE_NOT_READY };
+  if (response.status === 429) {
+    const headers = response.headers as Record<string, unknown> | undefined;
+    const rawRetryAfter = headers?.['retry-after'] ?? headers?.['Retry-After'];
+    const retryAfterSeconds = Number.parseInt(String(rawRetryAfter ?? ''), 10);
+    return {
+      title: 'Bạn đã gửi quá nhiều yêu cầu',
+      description: 'Vui lòng chờ một lúc trước khi gửi yêu cầu khác.',
+      retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? Math.max(1, retryAfterSeconds) : 60,
+    };
+  }
+  if (response.status === 500 || response.status === 503) {
+    return { title: 'Không thể gửi yêu cầu', description: TEMPORARY_SYSTEM_FAILURE };
+  }
+  return { title: 'Không thể gửi yêu cầu', description: 'Không thể gửi yêu cầu lúc này. Vui lòng thử lại.' };
+}
+
+export function mapResetPasswordValidationErrors(error: unknown): ResetPasswordFieldErrors | null {
+  if (!axios.isAxiosError<ApiEnvelope<unknown>>(error)) return null;
+  const validation = error.response?.data;
+  if (validation?.code !== 'VALIDATION_ERROR' || !validation.errors) return null;
+  const mapped: ResetPasswordFieldErrors = {};
+  if (validation.errors.newPassword) {
+    mapped.newPassword = validation.errors.newPassword === 'Mật khẩu mới phải khác mật khẩu hiện tại'
+      ? 'Mật khẩu mới phải khác mật khẩu hiện tại.'
+      : 'Mật khẩu chưa đáp ứng yêu cầu.';
+  }
+  if (validation.errors.confirmNewPassword) mapped.confirmNewPassword = 'Mật khẩu xác nhận không khớp.';
+  return Object.keys(mapped).length > 0 ? mapped : null;
+}
+
+export function getPasswordResetError(error: unknown): PasswordResetErrorState {
+  if (!axios.isAxiosError<ApiEnvelope<unknown>>(error)) return 'unavailable';
+  return error.response?.data?.code === 'PASSWORD_RESET_TOKEN_INVALID' ? 'invalid' : 'unavailable';
 }
 
 export function getResendError(error: unknown): ResendErrorCopy {

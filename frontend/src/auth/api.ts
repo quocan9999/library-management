@@ -11,6 +11,7 @@ import type {
   LoginData,
   RegisterCredentials,
   RegisterData,
+  ResetPasswordCredentials,
 } from './types';
 import { requestCapabilityRefresh } from './capabilityEvents';
 import { clearMemberListState } from '../features/members/listState';
@@ -175,6 +176,24 @@ export const authApi = {
     assertSuccess(response.data, 'VERIFICATION_EMAIL_REQUESTED');
   },
 
+  async forgotPassword(email: string): Promise<void> {
+    const response = await apiClient.post<ApiEnvelope<null>>(
+      '/api/v1/auth/forgot-password',
+      { email },
+      publicAuthRequestConfig,
+    );
+    assertSuccess(response.data, 'FORGOT_PASSWORD_REQUESTED');
+  },
+
+  async resetPassword(credentials: ResetPasswordCredentials): Promise<void> {
+    const response = await apiClient.post<ApiEnvelope<null>>(
+      '/api/v1/auth/reset-password',
+      credentials,
+      publicAuthRequestConfig,
+    );
+    assertSuccess(response.data, 'PASSWORD_RESET_SUCCESS');
+  },
+
   async login(credentials: LoginCredentials): Promise<LoginData> {
     const response = await apiClient.post<ApiEnvelope<LoginData>>(
       '/api/v1/auth/login',
@@ -224,6 +243,15 @@ export const authApi = {
 
   async getMe(): Promise<AuthMeData> {
     const response = await apiClient.get<ApiEnvelope<AuthMeData>>('/api/v1/auth/me');
+    return readRequiredData(response.data, 'AUTH_ME_SUCCESS');
+  },
+
+  async validateSession(accessToken: string): Promise<AuthMeData> {
+    // Không refresh hoặc tự clear token: caller kiểm tra token vẫn hiện hành trước khi xử lý.
+    const response = await apiClient.get<ApiEnvelope<AuthMeData>>('/api/v1/auth/me', {
+      ...publicAuthRequestConfig,
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
     return readRequiredData(response.data, 'AUTH_ME_SUCCESS');
   },
 };

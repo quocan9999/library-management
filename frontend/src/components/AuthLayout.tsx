@@ -4,9 +4,19 @@ import { BrandMark } from './BrandMark';
 interface AuthLayoutProps {
   ariaLabel: string;
   children: ReactNode;
+  centered?: boolean;
 }
 
-export function AuthLayout({ ariaLabel, children }: AuthLayoutProps) {
+export function AuthLayout({ ariaLabel, children, centered = false }: AuthLayoutProps) {
+  if (centered) {
+    return (
+      <main className="auth-stage auth-stage--centered">
+        <section className="auth-card" aria-label={ariaLabel}>
+          <div className="auth-main">{children}</div>
+        </section>
+      </main>
+    );
+  }
   return (
     <main className="auth-stage">
       <section className="auth-card" aria-label={ariaLabel}>

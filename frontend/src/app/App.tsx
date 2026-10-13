@@ -2,9 +2,9 @@ import { useEffect } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useOptionalAuth } from '../auth/AuthContext';
 import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
-import { RequirePermission } from '../auth/permissions';
+import { SessionTabSync } from '../auth/SessionTabSync';
+import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
-import { HomePage } from '../pages/HomePage';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
@@ -12,6 +12,11 @@ import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { RoleManagementPage } from '../role/RoleManagementPage';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
+import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '../pages/ResetPasswordPage';
+import { ProfilePage } from '../profile/ProfilePage';
+import { ChangePasswordPage } from '../profile/ChangePasswordPage';
+import { ChangeEmailPage } from '../profile/ChangeEmailPage';
 
 function SessionBootstrap() {
   return (
@@ -73,6 +78,7 @@ export function App() {
   return (
     <>
       <CapabilityRouteSync />
+      <SessionTabSync />
       <DisabledAccountRouteSync />
       <Routes>
         <Route
@@ -84,6 +90,8 @@ export function App() {
           }
         />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/check-email" element={<CheckEmailPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/403" element={<ForbiddenPage />} />
@@ -91,7 +99,7 @@ export function App() {
           path="/"
           element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
         >
-          <Route index element={<HomePage />} />
+          <Route index element={<DefaultAccountRoute />} />
           <Route
             path="admin/roles"
             element={
@@ -115,6 +123,22 @@ export function App() {
                 <MemberDetailPage />
               </RequirePermission>
             }
+          />
+          <Route
+            path="profile"
+            element={<RequireRole role="ROLE_USER"><ProfilePage /></RequireRole>}
+          />
+          <Route
+            path="profile/change-password"
+            element={
+              <RequirePermission permission="account:change-password" allowedRoles={['ROLE_USER']}>
+                <ChangePasswordPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="profile/change-email"
+            element={<ChangeEmailPage />}
           />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

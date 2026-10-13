@@ -7,6 +7,21 @@ export function usePermission(permission: string): boolean {
   return capabilityStatus === 'ready' && permissions.includes(permission);
 }
 
+export function DefaultAccountRoute() {
+  const { role, permissions, capabilityStatus, refreshCapabilities } = useAuth();
+  if (capabilityStatus === 'loading') return <CapabilityLoading />;
+  if (capabilityStatus === 'error') {
+    return <CapabilityRetry onRetry={() => { void refreshCapabilities().catch(() => undefined); }} />;
+  }
+  if (role === 'ROLE_USER') return <Navigate to="/profile" replace />;
+  if (permissions.includes('member:read')) return <Navigate to="/admin/members" replace />;
+  if (permissions.includes('role:read') && ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'].includes(role ?? '')) {
+    return <Navigate to="/admin/roles" replace />;
+  }
+  if (role === 'ROLE_ADMIN' || role === 'ROLE_SUPER_ADMIN') return null;
+  return <Navigate to="/403" replace />;
+}
+
 function CapabilityLoading() {
   return <main className="session-bootstrap" role="status" aria-live="polite">
     <span className="session-bootstrap__mark" aria-hidden="true" />
@@ -63,5 +78,24 @@ export function RequirePermission({
   if (!allowed || (allowedRoles && !allowedRoles.includes(role ?? ''))) {
     return <Navigate to="/403" replace />;
   }
+  return children;
+}
+
+export function RequireRole({
+  role: requiredRole,
+  children,
+}: {
+  role: string;
+  children: React.ReactNode;
+}) {
+  const { accessToken, isBootstrapping, capabilityStatus, role, refreshCapabilities } = useAuth();
+
+  if (isBootstrapping) return <CapabilityLoading />;
+  if (!accessToken) return <Navigate to="/login" replace />;
+  if (capabilityStatus === 'loading') return <CapabilityLoading />;
+  if (capabilityStatus === 'error') {
+    return <CapabilityRetry onRetry={() => { void refreshCapabilities().catch(() => undefined); }} />;
+  }
+  if (role !== requiredRole) return <Navigate to="/403" replace />;
   return children;
 }
