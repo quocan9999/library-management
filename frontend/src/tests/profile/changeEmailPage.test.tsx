@@ -96,6 +96,8 @@ describe('ChangeEmailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đổi email' }));
 
     expect(await screen.findByText('Email đã được thay đổi thành công.')).toBeTruthy();
+    expect(screen.getByText('new.reader@example.com').tagName).toBe('STRONG');
+    expect(screen.queryByText(/Các phiên đăng nhập/)).toBeNull();
     expect(mocks.verifyEmailChange).toHaveBeenCalledWith({ code: '012345' });
     expect(mocks.auth.refreshCapabilities).toHaveBeenCalledWith({ force: true });
     expect(mocks.auth.accessToken).toBe('active-user-token');

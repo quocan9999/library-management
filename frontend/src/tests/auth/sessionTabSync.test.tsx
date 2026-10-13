@@ -30,6 +30,67 @@ afterEach(() => {
 });
 
 describe('session synchronization between tabs', () => {
+  it('returns the check-email tab to login after verification elsewhere without clearing another session', () => {
+    setAccessToken('account-B');
+    sessionStorage.setItem('registrationEmail', 'reader@example.com');
+    mount('/check-email');
+    act(() => event('email-verified'));
+    expect(screen.getByTestId('path').textContent).toBe('/login');
+    expect(getAccessToken()).toBe('account-B');
+    expect(sessionStorage.getItem('registrationEmail')).toBeNull();
+  });
+
+  it('preserves the verification success page when another verification event arrives', () => {
+    mount('/verify-email');
+    act(() => event('email-verified'));
+    expect(screen.getByTestId('path').textContent).toBe('/verify-email');
+  });
+
+  it('refreshes an expired token for B without logging B out when A is reset', async () => {
+    const expired = `header.${btoa(JSON.stringify({ sub: '2' }))}.signature`;
+    setAccessToken(expired);
+    mocks.validateSession.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401, data: { code: 'AUTH_TOKEN_EXPIRED' } } });
+    mocks.restoreSession.mockResolvedValue({ accessToken: 'fresh-B' });
+    mocks.validateSession.mockResolvedValueOnce({ id: 2 });
+    mount('/profile');
+    await act(async () => event('password-reset'));
+    expect(getAccessToken()).toBe('fresh-B');
+    expect(screen.getByTestId('path').textContent).toBe('/profile');
+  });
+
+  it('rejects an expired session for A when its refresh token was also revoked', async () => {
+    setAccessToken(`header.${btoa(JSON.stringify({ sub: '1' }))}.signature`);
+    mocks.validateSession.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401, data: { code: 'AUTH_TOKEN_EXPIRED' } } });
+    mocks.restoreSession.mockRejectedValue({ isAxiosError: true, response: { status: 401, data: { code: 'AUTH_REFRESH_TOKEN_REVOKED' } } });
+    mount('/profile');
+    await act(async () => event('password-reset'));
+    expect(getAccessToken()).toBeNull();
+    expect(screen.getByTestId('path').textContent).toBe('/login');
+  });
+
+  it('does not replace expired B with another account returned by the shared refresh cookie', async () => {
+    const expired = `header.${btoa(JSON.stringify({ sub: '2' }))}.signature`;
+    setAccessToken(expired);
+    mocks.validateSession.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401, data: { code: 'AUTH_TOKEN_EXPIRED' } } });
+    mocks.restoreSession.mockResolvedValue({ accessToken: 'fresh-C' });
+    mocks.validateSession.mockResolvedValueOnce({ id: 3 });
+    mount('/profile');
+    await act(async () => event('password-reset'));
+    expect(getAccessToken()).toBe(expired);
+    expect(screen.getByTestId('path').textContent).toBe('/profile');
+  });
+
+  it('ignores an expired-token refresh response after a newer local login', async () => {
+    let resolve!: (result: { accessToken: string }) => void;
+    setAccessToken(`header.${btoa(JSON.stringify({ sub: '2' }))}.signature`);
+    mocks.validateSession.mockRejectedValueOnce({ isAxiosError: true, response: { status: 401, data: { code: 'AUTH_TOKEN_EXPIRED' } } });
+    mocks.restoreSession.mockImplementation(() => new Promise((done) => { resolve = done; }));
+    mount('/profile');
+    await act(async () => event('password-reset'));
+    setAccessToken('newer-login');
+    await act(async () => resolve({ accessToken: 'older-refresh' }));
+    expect(getAccessToken()).toBe('newer-login');
+  });
   it('silently redirects the old forgot tab to login after reset and clears a revoked token', async () => {
     setAccessToken('old-token');
     mocks.validateSession.mockRejectedValue({ isAxiosError: true, response: { status: 401 } });

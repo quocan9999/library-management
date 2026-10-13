@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from './api';
 import { subscribeToSessionTabEvents } from './sessionTabEvents';
 import { clearRevokedSessionAfterReset } from './passwordResetSession';
+import { clearRegistrationEmail } from './registrationStorage';
 import { getAccessToken, setAccessToken } from './tokenStore';
 
 export function SessionTabSync() {
@@ -15,6 +16,14 @@ export function SessionTabSync() {
     let active = true;
     let generation = 0;
     const unsubscribe = subscribeToSessionTabEvents((type) => {
+      if (type === 'email-verified') {
+        if (pathname.current === '/check-email') {
+          generation += 1;
+          clearRegistrationEmail();
+          navigate('/login', { replace: true });
+        }
+        return;
+      }
       if (type === 'password-reset') {
         const currentGeneration = ++generation;
         if (pathname.current === '/forgot-password') navigate('/login', { replace: true });

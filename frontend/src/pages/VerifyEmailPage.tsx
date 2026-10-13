@@ -5,6 +5,7 @@ import { authApi } from '../auth/api';
 import { getVerificationError, type VerificationErrorState } from '../auth/messages';
 import { clearRegistrationEmail, readRegistrationEmail } from '../auth/registrationStorage';
 import { AuthLayout } from '../components/AuthLayout';
+import { publishSessionTabEvent } from '../auth/sessionTabEvents';
 import { ResendVerificationForm } from './ResendVerificationForm';
 
 type VerificationStatus = 'checking' | 'success' | 'missing' | VerificationErrorState;
@@ -38,6 +39,7 @@ function requestVerification(rawToken: string): Promise<Exclude<VerificationStat
   return verifyTokenOnce(rawToken)
     .then(() => {
       clearRegistrationEmail();
+      publishSessionTabEvent('email-verified');
       return 'success' as const;
     })
     .catch((error: unknown) => getVerificationError(error));

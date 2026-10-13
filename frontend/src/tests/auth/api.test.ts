@@ -7,6 +7,7 @@ import {
 } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ACCOUNT_DISABLED_EVENT, apiClient, authApi } from '../../auth/api';
+import { clearRevokedSessionAfterReset } from '../../auth/passwordResetSession';
 import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
 import type { ApiEnvelope, LoginData, RegisterData } from '../../auth/types';
 
@@ -65,6 +66,26 @@ afterEach(() => {
 });
 
 describe('API base URL configuration', () => {
+  it('continues an expired account B session through refresh after a reset signal for A', async () => {
+    const expired = `header.${btoa(JSON.stringify({ sub: '2' }))}.signature`;
+    setAccessToken(expired);
+    let refreshes = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') { refreshes++; return refreshedResponse(config, 'fresh-B'); }
+      if (config.url === '/api/v1/auth/me' && config.headers.get('Authorization') === `Bearer ${expired}`) {
+        unauthorized(config, 'AUTH_TOKEN_EXPIRED');
+      }
+      if (config.url === '/api/v1/auth/me') return response(config, {
+        success: true, code: 'AUTH_ME_SUCCESS', status: 200, message: '', timestamp: new Date().toISOString(),
+        data: { id: 2, username: 'B', email: 'b@example.com', role: 'ROLE_USER', permissions: [] },
+      });
+      throw new Error(`Unexpected request ${config.url}`);
+    }) satisfies AxiosAdapter;
+    expect(await clearRevokedSessionAfterReset()).toBe(false);
+    expect(getAccessToken()).toBe('fresh-B');
+    expect((await authApi.getMe()).id).toBe(2);
+    expect(refreshes).toBe(1);
+  });
   it('validates the specified session without refresh or clearing a newer token on rejection', async () => {
     setAccessToken('current-account-B');
     const requests: string[] = [];

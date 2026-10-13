@@ -102,7 +102,7 @@ export function ChangeEmailPage() {
             showIcon
             role="status"
             title="Email đã được thay đổi thành công."
-            description={`Email đăng nhập mới: ${changedEmail}. Các phiên đăng nhập hiện tại vẫn được giữ nguyên.`}
+            description={<>Email đăng nhập mới: <strong>{changedEmail}</strong>.</>}
           />
         )}
         {serverError && <Alert className="profile-form-card__alert" type="error" showIcon role="alert" title={serverError} />}

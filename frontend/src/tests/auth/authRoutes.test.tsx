@@ -486,6 +486,7 @@ describe('public registration and verification routes', () => {
     ));
 
     expect(await screen.findByText('Email đã được xác thực thành công.')).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('library:session-tab-event')!).type).toBe('email-verified');
     expect(window.sessionStorage.getItem('registrationEmail')).toBeNull();
     expect(screen.getByRole('link', { name: 'Đăng nhập ngay' })).toBeTruthy();
   });
