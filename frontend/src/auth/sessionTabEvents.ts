@@ -1,5 +1,5 @@
 export const SESSION_TAB_EVENT_KEY = 'library:session-tab-event';
-export type SessionTabEvent = 'password-reset' | 'signed-in' | 'email-verified';
+export type SessionTabEvent = 'password-reset' | 'signed-in' | 'email-verified' | 'session-revoked';
 
 function readEvent(): string | null {
   try {
@@ -28,7 +28,7 @@ export function subscribeToSessionTabEvents(listener: (type: SessionTabEvent) =>
     } catch {
       return;
     }
-    if (type !== 'password-reset' && type !== 'signed-in' && type !== 'email-verified') return;
+    if (type !== 'password-reset' && type !== 'signed-in' && type !== 'email-verified' && type !== 'session-revoked') return;
     // Tab nền sẽ khôi phục phiên khi người dùng quay lại, tránh refresh đồng thời.
     if (type === 'signed-in' && document.visibilityState === 'hidden') return;
     lastSeen = value;

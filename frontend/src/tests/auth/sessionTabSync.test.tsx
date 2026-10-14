@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SessionTabSync } from '../../auth/SessionTabSync';
 import { publishSessionTabEvent, SESSION_TAB_EVENT_KEY } from '../../auth/sessionTabEvents';
 import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
+import { AppNotificationProvider } from '../../components/AppNotificationProvider';
 
 const mocks = vi.hoisted(() => ({ restoreSession: vi.fn(), validateSession: vi.fn() }));
 vi.mock('../../auth/api', () => ({ authApi: mocks }));
@@ -175,6 +176,37 @@ describe('session synchronization between tabs', () => {
     await act(async () => event('signed-in'));
     expect(getAccessToken()).toBe('restored-token');
     expect(screen.getByTestId('path').textContent).toBe('/');
+  });
+
+  it('clears a role-revoked account after another tab reports a session change', async () => {
+    setAccessToken('account-A');
+    mocks.validateSession.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 401, data: { code: 'AUTH_ROLE_CHANGED' } },
+    });
+    render(<AppNotificationProvider><MemoryRouter initialEntries={['/admin/accounts']}>
+      <SessionTabSync /><LocationProbe />
+    </MemoryRouter></AppNotificationProvider>);
+
+    await act(async () => event('session-revoked'));
+    await waitFor(() => expect(mocks.validateSession).toHaveBeenCalledWith('account-A'));
+    await waitFor(() => expect(getAccessToken()).toBeNull());
+    expect(screen.getByTestId('path').textContent).toBe('/login');
+    expect(await screen.findByText('Nhóm quyền của tài khoản đã thay đổi. Vui lòng đăng nhập lại để tiếp tục.'))
+      .toBeTruthy();
+    expect(mocks.restoreSession).not.toHaveBeenCalled();
+  });
+
+  it('preserves a different account whose session still passes server validation', async () => {
+    setAccessToken('account-B');
+    mocks.validateSession.mockResolvedValue({ id: 2 });
+    mount('/profile');
+
+    await act(async () => event('session-revoked'));
+
+    await waitFor(() => expect(mocks.validateSession).toHaveBeenCalledWith('account-B'));
+    expect(getAccessToken()).toBe('account-B');
+    expect(screen.getByTestId('path').textContent).toBe('/profile');
   });
 
   it('defers session restore until a background tab becomes visible and processes it once', async () => {

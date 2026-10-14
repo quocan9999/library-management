@@ -66,7 +66,7 @@ export function LoginPage() {
           showIcon
           role="status"
           title="Phiên đăng nhập đã bị thu hồi"
-          description="Tài khoản thành viên đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hỗ trợ."
+          description="Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên."
         />}
 
         <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
