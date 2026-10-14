@@ -93,6 +93,7 @@ public class PasswordResetTransactionService {
         token.setUsedAt(now);
         account.setPasswordHash(passwordEncoder.encode(newPassword));
         account.setSessionVersion(account.getSessionVersion() + 1);
+        account.setLastSessionChangeReason("PASSWORD_RESET");
     }
 
     private static BusinessException invalidToken() {

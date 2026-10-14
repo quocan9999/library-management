@@ -56,7 +56,8 @@ public class MemberAccountStatusService {
 
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         int changed = accountRepository.updateStatusAndAdvanceSessionVersion(
-                accountId, request.expectedEnabled(), request.enabled(), now);
+                accountId, request.expectedEnabled(), request.enabled(),
+                request.enabled() ? "ACCOUNT_ENABLED" : "ACCOUNT_DISABLED", now);
         if (changed != 1) {
             throw new BusinessException(
                     HttpStatus.CONFLICT,

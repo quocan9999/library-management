@@ -45,6 +45,9 @@ public class Account {
     @Column(name = "session_version", nullable = false)
     private long sessionVersion;
 
+    @Column(name = "last_session_change_reason", nullable = false, length = 40)
+    private String lastSessionChangeReason = "OTHER";
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

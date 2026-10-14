@@ -8,6 +8,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import sparkminds.librarymanagement.member.exception.MemberProfilePatchException;
 
 import java.util.LinkedHashMap;
@@ -34,6 +35,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_BODY", "Nội dung yêu cầu không hợp lệ", null);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidRequestParameter(MethodArgumentTypeMismatchException exception) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_PARAMETER", "Tham số yêu cầu không hợp lệ", null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

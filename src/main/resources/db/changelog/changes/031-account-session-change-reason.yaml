@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 031-account-session-change-reason
+      author: codex
+      changes:
+        - addColumn:
+            tableName: accounts
+            columns:
+              - column:
+                  name: last_session_change_reason
+                  type: VARCHAR(40)
+                  defaultValue: OTHER
+                  constraints:
+                    nullable: false
