@@ -4,13 +4,14 @@ import { useAuth, useOptionalAuth } from '../auth/AuthContext';
 import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
 import { SessionTabSync } from '../auth/SessionTabSync';
 import { readRegistrationEmail } from '../auth/registrationStorage';
-import { DefaultAccountRoute, RequirePermission } from '../auth/permissions';
+import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { RoleManagementPage } from '../role/RoleManagementPage';
+import { AssignmentPlaceholderPage, AuthorizationLandingPage } from '../role/AuthorizationPages';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
@@ -128,14 +129,16 @@ export function App() {
           element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
         >
           <Route index element={<DefaultAccountRoute />} />
-          <Route
-            path="admin/roles"
-            element={
+          <Route path="admin/roles" element={<RequireRole role="ADMIN"><Navigate to="/admin/authorization/groups" replace /></RequireRole>} />
+          <Route path="admin/authorization" element={<RequireRole role="ADMIN"><AuthorizationLandingPage /></RequireRole>} />
+          <Route path="admin/authorization/groups" element={
+            <RequireRole role="ADMIN">
               <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
                 <RoleManagementPage />
               </RequirePermission>
-            }
-          />
+            </RequireRole>
+          } />
+          <Route path="admin/authorization/assignments" element={<RequireRole role="ADMIN"><AssignmentPlaceholderPage /></RequireRole>} />
           <Route
             path="admin/members"
             element={

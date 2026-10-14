@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useAppNotification } from '../components/AppNotificationProvider';
+import { RoleGroupDirectory } from './RoleGroupDirectory';
 import { roleApi } from './api';
 import {
   findMissingPermissionDependencies,
@@ -51,7 +52,13 @@ function groupLabel(prefix: string): string {
   return GROUP_LABELS[prefix] ?? `Nhóm ${prefix}`;
 }
 
-export function RoleManagementPage() {
+function RolePermissionEditor({
+  permissionSelectionRequest,
+  rolesRefreshVersion,
+}: {
+  permissionSelectionRequest?: { roleCode: string; requestId: number };
+  rolesRefreshVersion: number;
+}) {
   const { refreshCapabilities } = useAuth();
   const { dismiss, notify } = useAppNotification();
   const [roles, setRoles] = useState<RoleSummary[]>([]);
@@ -69,6 +76,7 @@ export function RoleManagementPage() {
   const [hasConflict, setHasConflict] = useState(false);
   const detailsGeneration = useRef(0);
   const roleCodeRef = useRef<string | undefined>(undefined);
+  const appliedSelectionRequest = useRef(0);
 
   useEffect(() => {
     let mounted = true;
@@ -88,7 +96,7 @@ export function RoleManagementPage() {
         const details = await roleApi.getRolePermissions(initialRole.code);
         if (!mounted || detailsGeneration.current !== generation) return;
         setRolePermissions(details);
-        setDraft(new Set(details.assignedPermissions));
+        setDraft(new Set(initialRole.code === 'ADMIN' ? details.effectivePermissions : details.assignedPermissions));
       })
       .catch(() => {
         if (mounted && detailsGeneration.current === generation) {
@@ -108,6 +116,15 @@ export function RoleManagementPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (rolesRefreshVersion === 0) return undefined;
+    let current = true;
+    void roleApi.getRoles()
+      .then((roleList) => { if (current) setRoles(roleList); })
+      .catch(() => { if (current) setErrorMessage('Không thể làm mới danh sách nhóm quyền. Vui lòng thử lại.'); });
+    return () => { current = false; };
+  }, [rolesRefreshVersion]);
+
   const loadRolePermissions = useCallback(async (targetRoleCode: string) => {
     const generation = ++detailsGeneration.current;
     setIsLoadingDetails(true);
@@ -119,7 +136,7 @@ export function RoleManagementPage() {
       const result = await roleApi.getRolePermissions(targetRoleCode);
       if (detailsGeneration.current !== generation) return;
       setRolePermissions(result);
-      setDraft(new Set(result.assignedPermissions));
+      setDraft(new Set(targetRoleCode === 'ADMIN' ? result.effectivePermissions : result.assignedPermissions));
       setHasConflict(false);
     } catch {
       if (detailsGeneration.current === generation) {
@@ -131,6 +148,20 @@ export function RoleManagementPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const request = permissionSelectionRequest;
+    if (!request || !roles.some(({ code }) => code === request.roleCode)
+      || appliedSelectionRequest.current === request.requestId) return;
+    appliedSelectionRequest.current = request.requestId;
+    roleCodeRef.current = request.roleCode;
+    setRolePermissions(null);
+    setDraft(new Set());
+    setSelectionErrorMessage(null);
+    setIsLoadingDetails(true);
+    setRoleCode(request.roleCode);
+    void loadRolePermissions(request.roleCode);
+  }, [permissionSelectionRequest, roles, loadRolePermissions]);
+
   const selectedRole = roles.find(({ code }) => code === roleCode);
   const editablePermissions = useMemo(() => new Set(
     rolePermissions?.editablePermissions.filter((code) =>
@@ -138,8 +169,10 @@ export function RoleManagementPage() {
     ) ?? [],
   ), [catalog, rolePermissions]);
   const assignedPermissions = useMemo(
-    () => new Set(rolePermissions?.assignedPermissions ?? []),
-    [rolePermissions],
+    () => new Set(selectedRole?.code === 'ADMIN'
+      ? rolePermissions?.effectivePermissions ?? []
+      : rolePermissions?.assignedPermissions ?? []),
+    [rolePermissions, selectedRole?.code],
   );
   const canEdit = Boolean(selectedRole?.canEdit && rolePermissions?.editable && editablePermissions.size > 0);
   const additions = useMemo(() => [...draft]
@@ -308,12 +341,12 @@ export function RoleManagementPage() {
 
   return (
     <main className="role-stage">
-      <section className="role-workspace" aria-labelledby="role-title">
+      <section id="role-permission-editor" className="role-workspace" aria-labelledby="role-title">
         <div className="role-heading">
           <div>
             <p className="role-eyebrow">QUẢN TRỊ HỆ THỐNG</p>
-            <h1 id="role-title">Quản lý vai trò</h1>
-            <p className="role-intro">Xem và cập nhật quyền hiệu lực theo từng vai trò.</p>
+            <h1 id="role-title">Quản lý quyền theo nhóm</h1>
+            <p className="role-intro">Xem quyền hiệu lực và cập nhật tập quyền được gán cho nhóm.</p>
           </div>
         </div>
 
@@ -324,7 +357,7 @@ export function RoleManagementPage() {
         {isLoading ? <div className="role-loading" role="status"><Spin /> Đang tải dữ liệu vai trò…</div> : (
           <>
             <div className="role-selector-row">
-              <label htmlFor="role-target-select">Vai trò cần xem</label>
+              <label htmlFor="role-target-select">Nhóm cần xem</label>
               <Select
                 id="role-target-select"
                 aria-label="Vai trò"
@@ -334,16 +367,14 @@ export function RoleManagementPage() {
                 onChange={handleRoleChange}
                 options={roles.map((role) => ({
                   value: role.code,
-                  label: role.code === 'ADMIN' ? 'Quản trị viên'
-                    : role.code === 'USER' ? 'Người dùng' : role.code.replaceAll('_', ' '),
+                  label: role.displayName ?? role.code,
                 }))}
               />
               {selectedRole && <span className="role-version">Phiên bản {rolePermissions?.version ?? selectedRole.version}</span>}
             </div>
 
             {selectedRole && <div className="role-readonly-note">
-              <strong>{selectedRole.code === 'ADMIN' ? 'Quản trị viên'
-                : selectedRole.code === 'USER' ? 'Người dùng' : selectedRole.code.replaceAll('_', ' ')}</strong>
+              <strong>{selectedRole.displayName ?? selectedRole.code}</strong>
               <span>{canEdit ? 'Các quyền có thể thay đổi được đánh dấu bên dưới.' : 'Vai trò này chỉ được xem trong phiên quản trị hiện tại.'}</span>
             </div>}
 
@@ -461,4 +492,28 @@ export function RoleManagementPage() {
       </Modal>
     </main>
   );
+}
+
+export function RoleManagementPage() {
+  const [permissionSelectionRequest, setPermissionSelectionRequest] = useState<{
+    roleCode: string;
+    requestId: number;
+  }>();
+  const [rolesRefreshVersion, setRolesRefreshVersion] = useState(0);
+  const nextSelectionRequest = useRef(0);
+
+  return <>
+    <RoleGroupDirectory
+      onSelectPermissions={(roleCode) => {
+        nextSelectionRequest.current += 1;
+        setPermissionSelectionRequest({ roleCode, requestId: nextSelectionRequest.current });
+        document.getElementById('role-permission-editor')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+      }}
+      onRolesChanged={() => setRolesRefreshVersion((value) => value + 1)}
+    />
+    <RolePermissionEditor
+      permissionSelectionRequest={permissionSelectionRequest}
+      rolesRefreshVersion={rolesRefreshVersion}
+    />
+  </>;
 }

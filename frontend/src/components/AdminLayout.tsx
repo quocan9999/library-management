@@ -147,16 +147,14 @@ export function AdminLayout() {
           {role === 'USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
         </p>
         <nav className="admin-shell__nav" aria-label="Chính">
-          <PermissionGate permission="role:read" allowedRoles={['ADMIN']} fallback={null}>
-            <NavLink
-              to="/admin/roles"
-              className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
-              onClick={closeMobileMenu}
-            >
-              <RolesIcon />
-              <span>Quản lý vai trò</span>
-            </NavLink>
-          </PermissionGate>
+          {role === 'ADMIN' && <NavLink
+            to="/admin/authorization"
+            className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+            onClick={closeMobileMenu}
+          >
+            <RolesIcon />
+            <span>Quản lý phân quyền</span>
+          </NavLink>}
           <PermissionGate permission="member:read" deniedRoles={['USER']} fallback={null}>
             <NavLink
               to="/admin/members"

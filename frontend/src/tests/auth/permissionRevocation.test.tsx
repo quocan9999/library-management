@@ -6,7 +6,7 @@ import {
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../../app/App';
@@ -17,6 +17,29 @@ import { setAccessToken } from '../../auth/tokenStore';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const originalAdapter = apiClient.defaults.adapter;
+
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  Object.defineProperty(globalThis, 'ResizeObserver', { writable: true, value: ResizeObserverStub });
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: (media: string) => ({
+      matches: false,
+      media,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  });
+});
 
 function response<T>(config: InternalAxiosRequestConfig, data: T, status = 200): AxiosResponse<T> {
   return {
@@ -129,7 +152,7 @@ describe('permission revocation synchronization', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Quản lý vai trò' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Quản lý quyền theo nhóm' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Gọi endpoint bị từ chối' }));
 
     expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();

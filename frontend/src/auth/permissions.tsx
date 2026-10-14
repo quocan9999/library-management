@@ -16,7 +16,7 @@ export function DefaultAccountRoute() {
   if (role === 'USER') return <Navigate to="/profile" replace />;
   if (role && role !== 'USER' && permissions.includes('member:read')) return <Navigate to="/admin/members" replace />;
   if (permissions.includes('role:read') && role === 'ADMIN') {
-    return <Navigate to="/admin/roles" replace />;
+    return <Navigate to="/admin/authorization" replace />;
   }
   if (role && role !== 'USER') return null;
   return <Navigate to="/403" replace />;

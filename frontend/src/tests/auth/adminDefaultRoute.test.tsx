@@ -29,7 +29,7 @@ function Probe() {
 describe('default route for administrators without permissions', () => {
   it.each([
     ['ADMIN', 'member:read', 'Members page'],
-    ['ADMIN', 'role:read', 'Roles page'],
+    ['ADMIN', 'role:read', 'Quản lý phân quyền'],
   ])('keeps empty content after %s login and opens the existing page when %s is restored', async (role, restoredPermission, heading) => {
     const user = userEvent.setup();
     let permissions: string[] = [];
@@ -57,7 +57,7 @@ describe('default route for administrators without permissions', () => {
     await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
     await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/'));
     const nav = screen.getByRole('navigation', { name: 'Chính' });
-    expect(within(nav).queryAllByRole('link')).toHaveLength(0);
+    expect(within(nav).getByRole('link', { name: 'Quản lý phân quyền' })).toBeTruthy();
     expect(view.container.querySelector('.admin-shell__content')?.textContent).toBe('');
     expect(screen.getByRole('region', { name: 'Tài khoản đang đăng nhập' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Đăng xuất' })).toBeTruthy();
