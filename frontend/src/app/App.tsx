@@ -11,7 +11,8 @@ import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { RoleManagementPage } from '../role/RoleManagementPage';
-import { AssignmentPlaceholderPage, AuthorizationLandingPage } from '../role/AuthorizationPages';
+import { AuthorizationLandingPage } from '../role/AuthorizationPages';
+import { AdminAccountAssignmentPage, AdminAccountManagementPage } from '../features/adminAccounts/AdminAccountDirectory';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
@@ -138,7 +139,20 @@ export function App() {
               </RequirePermission>
             </RequireRole>
           } />
-          <Route path="admin/authorization/assignments" element={<RequireRole role="ADMIN"><AssignmentPlaceholderPage /></RequireRole>} />
+          <Route path="admin/accounts" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
+                <AdminAccountManagementPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
+          <Route path="admin/authorization/assignments" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
+                <AdminAccountAssignmentPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
           <Route
             path="admin/members"
             element={

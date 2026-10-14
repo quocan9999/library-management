@@ -2,7 +2,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { AuthorizationLandingPage, AssignmentPlaceholderPage } from '../../role/AuthorizationPages';
+import { AuthorizationLandingPage } from '../../role/AuthorizationPages';
 
 afterEach(cleanup);
 
@@ -19,12 +19,5 @@ describe('authorization overview', () => {
     ]);
     expect(within(cards[0]).getByText('Quản lý nhóm quyền')).toBeTruthy();
     expect(within(cards[1]).getByText('Gán nhóm quyền cho tài khoản')).toBeTruthy();
-  });
-
-  it('clearly marks account assignment as coming in Phase 05', () => {
-    render(<MemoryRouter><AssignmentPlaceholderPage /></MemoryRouter>);
-
-    expect(screen.getByRole('heading', { name: 'Gán nhóm quyền cho tài khoản' })).toBeTruthy();
-    expect(screen.getByText(/được triển khai đầy đủ ở Phase 05/i)).toBeTruthy();
   });
 });

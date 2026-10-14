@@ -21,6 +21,14 @@ function MembersIcon() {
   </svg>;
 }
 
+function AdminAccountsIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <circle cx="8" cy="8" r="3" />
+    <circle cx="17" cy="9" r="2.25" />
+    <path d="M2.75 19c.25-3.1 2-4.75 5.25-4.75s5 1.65 5.25 4.75M14.25 14.75c2.95-.35 5.15 1.08 5.75 4.25" />
+  </svg>;
+}
+
 function ProfileIcon() {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
     <circle cx="12" cy="8" r="3.25" />
@@ -147,14 +155,6 @@ export function AdminLayout() {
           {role === 'USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
         </p>
         <nav className="admin-shell__nav" aria-label="Chính">
-          {role === 'ADMIN' && <NavLink
-            to="/admin/authorization"
-            className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
-            onClick={closeMobileMenu}
-          >
-            <RolesIcon />
-            <span>Quản lý phân quyền</span>
-          </NavLink>}
           <PermissionGate permission="member:read" deniedRoles={['USER']} fallback={null}>
             <NavLink
               to="/admin/members"
@@ -165,6 +165,22 @@ export function AdminLayout() {
               <span>Quản lý thành viên</span>
             </NavLink>
           </PermissionGate>
+          {role === 'ADMIN' && <NavLink
+            to="/admin/accounts"
+            className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+            onClick={closeMobileMenu}
+          >
+            <AdminAccountsIcon />
+            <span>Quản lý tài khoản quản trị</span>
+          </NavLink>}
+          {role === 'ADMIN' && <NavLink
+            to="/admin/authorization"
+            className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+            onClick={closeMobileMenu}
+          >
+            <RolesIcon />
+            <span>Quản lý phân quyền</span>
+          </NavLink>}
         </nav>
 
         <footer className="admin-shell__footer">
