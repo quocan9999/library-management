@@ -88,7 +88,7 @@ class AccessTokenAuthenticationIntegrationTests {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
 
-        Role role = roleRepository.findByCode("ROLE_USER").orElseThrow();
+        Role role = roleRepository.findByCode("USER").orElseThrow();
         role.getPermissions().removeIf(permission -> permission.getCode().equals("book:read"));
         roleRepository.saveAndFlush(role);
 

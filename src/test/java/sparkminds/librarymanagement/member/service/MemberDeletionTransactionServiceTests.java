@@ -38,7 +38,7 @@ class MemberDeletionTransactionServiceTests {
     void refusesToDeleteAnAdminAccountEvenIfItHasAMemberRow() {
         Account account = new Account();
         Role role = new Role();
-        role.setCode("ROLE_ADMIN");
+        role.setCode("ADMIN");
         account.setRole(role);
         Member member = new Member();
         member.setAccount(account);

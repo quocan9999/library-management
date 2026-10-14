@@ -19,10 +19,10 @@ const mocks = vi.hoisted(() => ({
       id: 7,
       username: 'reader',
       email: 'reader@example.test',
-      role: 'ROLE_USER',
+      role: 'USER',
       permissions: ['member:read'],
     },
-    role: 'ROLE_USER',
+    role: 'USER',
     permissions: ['member:read'],
     capabilityStatus: 'ready',
     refreshCapabilities: vi.fn(async () => undefined),
@@ -116,8 +116,8 @@ afterEach(() => {
   window.sessionStorage.clear();
   Object.assign(mocks.auth, {
     accessToken: 'opaque-member-session',
-    currentUser: { ...mocks.auth.currentUser, role: 'ROLE_USER', permissions: ['member:read'] },
-    role: 'ROLE_USER',
+    currentUser: { ...mocks.auth.currentUser, role: 'USER', permissions: ['member:read'] },
+    role: 'USER',
     permissions: ['member:read'],
     capabilityStatus: 'ready',
   });
@@ -126,29 +126,24 @@ afterEach(() => {
 });
 
 describe('Member routes integrated with shared Role permissions', () => {
-  it('mounts list/detail/history for a USER with member:read and keeps navigation state on back', async () => {
-    const requests = configureMemberApi();
+  it('denies a USER with member:read from the member administration routes', async () => {
+    let memberRequests = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      memberRequests += 1;
+      throw new Error(`Member API should not be called: ${config.url}`);
+    }) satisfies AxiosAdapter;
     render(<MemoryRouter initialEntries={['/admin/members']}><App /><LocationProbe /></MemoryRouter>);
 
-    expect(await screen.findByRole('heading', { name: 'Quản lý thành viên' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Quản lý thành viên' })).toBeTruthy();
-    expect(await screen.findByText('M000017')).toBeTruthy();
-    fireEvent.click(screen.getByRole('link', { name: 'Xem chi tiết' }));
-
-    expect(await screen.findByRole('heading', { name: 'Thông tin thành viên' })).toBeTruthy();
-    expect(await screen.findByRole('heading', { name: 'Lịch sử mượn/trả sách' })).toBeTruthy();
-    expect(await screen.findByText('Chưa có lịch sử mượn/trả sách')).toBeTruthy();
-    await waitFor(() => expect(requests).toContain('/api/v1/members/17/loan-history'));
-    fireEvent.click(screen.getByRole('link', { name: 'Quay lại danh sách' }));
-    expect(await screen.findByRole('heading', { name: 'Quản lý thành viên' })).toBeTruthy();
-    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/admin/members'));
-    expect(requests.filter((path) => path === '/api/v1/members')).toHaveLength(2);
+    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
+    expect(screen.queryByRole('link', { name: 'Quản lý thành viên' })).toBeNull();
+    expect(memberRequests).toBe(0);
   });
 
   it('denies an Admin without member:read and keeps the menu hidden by effective permission', async () => {
     Object.assign(mocks.auth, {
-      currentUser: { ...mocks.auth.currentUser, role: 'ROLE_ADMIN', permissions: ['role:read'] },
-      role: 'ROLE_ADMIN',
+      currentUser: { ...mocks.auth.currentUser, role: 'ADMIN', permissions: ['role:read'] },
+      role: 'ADMIN',
       permissions: ['role:read'],
     });
     let memberRequests = 0;
@@ -165,6 +160,11 @@ describe('Member routes integrated with shared Role permissions', () => {
   });
 
   it('clears the saved member list state when the shared AdminLayout logs out', async () => {
+    Object.assign(mocks.auth, {
+      currentUser: { ...mocks.auth.currentUser, role: 'ADMIN', permissions: ['member:read'] },
+      role: 'ADMIN',
+      permissions: ['member:read'],
+    });
     configureMemberApi();
     window.sessionStorage.setItem('memberManagement:listState:v1', JSON.stringify({ privateSearch: 'Nguyen' }));
     render(<MemoryRouter initialEntries={['/admin/members']}><App /></MemoryRouter>);

@@ -75,8 +75,8 @@ class RolePermissionMutationServiceDependencyTests {
                 eventPublisher
         );
 
-        actorRole = role(1, "ROLE_ADMIN", 4);
-        targetRole = role(2, "ROLE_USER", 7);
+        actorRole = role(1, "ADMIN", 4);
+        targetRole = role(2, "USER", 7);
         actorAccount = new Account();
         actorAccount.setId(10);
         actorAccount.setUsername("admin");
@@ -90,19 +90,19 @@ class RolePermissionMutationServiceDependencyTests {
         memberCreate = permission(2, "member:create");
 
         when(accountRepository.findByIdForUpdate(10)).thenReturn(Optional.of(actorAccount));
-        when(accountRepository.findRoleCodeByAccountId(10)).thenReturn(Optional.of("ROLE_ADMIN"));
-        when(roleRepository.findByCodeForUpdate("ROLE_ADMIN")).thenReturn(Optional.of(actorRole));
-        when(roleRepository.findByCodeForUpdate("ROLE_USER")).thenReturn(Optional.of(targetRole));
-        when(roleAccessPolicy.canReadTarget("ROLE_ADMIN", "ROLE_USER")).thenReturn(true);
-        when(roleAccessPolicy.canEditTarget(eq("ROLE_ADMIN"), eq("ROLE_USER"), any())).thenReturn(true);
-        when(effectivePermissionService.resolveCurrentRoleCode("ROLE_ADMIN"))
+        when(accountRepository.findRoleCodeByAccountId(10)).thenReturn(Optional.of("ADMIN"));
+        when(roleRepository.findByCodeForUpdate("ADMIN")).thenReturn(Optional.of(actorRole));
+        when(roleRepository.findByCodeForUpdate("USER")).thenReturn(Optional.of(targetRole));
+        when(roleAccessPolicy.canReadTarget("ADMIN", "USER")).thenReturn(true);
+        when(roleAccessPolicy.canEditTarget(eq("ADMIN"), eq("USER"), any())).thenReturn(true);
+        when(effectivePermissionService.resolveCurrentRoleCode("ADMIN"))
                 .thenReturn(List.of("role:read", "role:update", "member:create", "member:read"));
         when(effectivePermissionService.allPermissionCodes())
                 .thenReturn(List.of(
                         "role:read", "role:update", "member:read", "member:create", "member:update",
                         "member:delete", "member:status:update", "book:read", "book:create", "book:update",
                         "book:delete", "book:import"));
-        when(roleAccessPolicy.editablePermissions(eq("ROLE_ADMIN"), eq("ROLE_USER"), any(), any()))
+        when(roleAccessPolicy.editablePermissions(eq("ADMIN"), eq("USER"), any(), any()))
                 .thenReturn(List.of("member:read", "member:create"));
         when(permissionRepository.findAllByCodeIn(any()))
                 .thenReturn(List.of(memberRead, memberCreate));
@@ -112,10 +112,10 @@ class RolePermissionMutationServiceDependencyTests {
 
     @Test
     void grantingOperationAlsoPersistsItsRequiredBasePermissionAndAuditsBoth() throws Exception {
-        when(effectivePermissionService.resolveCurrentRoleCode("ROLE_USER"))
+        when(effectivePermissionService.resolveCurrentRoleCode("USER"))
                 .thenReturn(List.of(), List.of("member:create", "member:read"));
 
-        service.updatePermissions(actor, "ROLE_USER", request(7, List.of("member:create"), List.of()));
+        service.updatePermissions(actor, "USER", request(7, List.of("member:create"), List.of()));
 
         verify(jdbcTemplate).update(
                 "INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)", (short) 2, (short) 2);
@@ -129,12 +129,12 @@ class RolePermissionMutationServiceDependencyTests {
 
     @Test
     void actorCannotCauseAnUnassignableDependencyToBeGrantedPartially() throws Exception {
-        when(roleAccessPolicy.editablePermissions(eq("ROLE_ADMIN"), eq("ROLE_USER"), any(), any()))
+        when(roleAccessPolicy.editablePermissions(eq("ADMIN"), eq("USER"), any(), any()))
                 .thenReturn(List.of("member:create"));
-        when(effectivePermissionService.resolveCurrentRoleCode("ROLE_USER")).thenReturn(List.of());
+        when(effectivePermissionService.resolveCurrentRoleCode("USER")).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.updatePermissions(
-                actor, "ROLE_USER", request(7, List.of("member:create"), List.of())))
+                actor, "USER", request(7, List.of("member:create"), List.of())))
                 .isInstanceOf(AccessDeniedException.class);
 
         verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
@@ -143,11 +143,11 @@ class RolePermissionMutationServiceDependencyTests {
 
     @Test
     void basePermissionCannotBeRemovedWhileARegisteredDependentRemains() throws Exception {
-        when(effectivePermissionService.resolveCurrentRoleCode("ROLE_USER"))
+        when(effectivePermissionService.resolveCurrentRoleCode("USER"))
                 .thenReturn(List.of("member:create", "member:read"));
 
         assertThatThrownBy(() -> service.updatePermissions(
-                actor, "ROLE_USER", request(7, List.of(), List.of("member:read"))))
+                actor, "USER", request(7, List.of(), List.of("member:read"))))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> {
                     BusinessException businessException = (BusinessException) exception;
@@ -163,10 +163,10 @@ class RolePermissionMutationServiceDependencyTests {
 
     @Test
     void dependentAndBaseCanBeRemovedInTheSameDelta() throws Exception {
-        when(effectivePermissionService.resolveCurrentRoleCode("ROLE_USER"))
+        when(effectivePermissionService.resolveCurrentRoleCode("USER"))
                 .thenReturn(List.of("member:create", "member:read"), List.of());
 
-        service.updatePermissions(actor, "ROLE_USER",
+        service.updatePermissions(actor, "USER",
                 request(7, List.of(), List.of("member:create", "member:read")));
 
         verify(jdbcTemplate).update(
@@ -178,7 +178,7 @@ class RolePermissionMutationServiceDependencyTests {
     @Test
     void staleRoleVersionDoesNotApplyPermissionOrAuditChanges() throws Exception {
         assertThatThrownBy(() -> service.updatePermissions(
-                actor, "ROLE_USER", request(6, List.of("member:create"), List.of())))
+                actor, "USER", request(6, List.of("member:create"), List.of())))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> org.assertj.core.api.Assertions.assertThat(
                         ((BusinessException) exception).getCode()).isEqualTo("ROLE_VERSION_CONFLICT"));
@@ -189,10 +189,10 @@ class RolePermissionMutationServiceDependencyTests {
 
     @Test
     void noOpPermissionDeltaDoesNotWriteOrAdvanceRoleVersion() throws Exception {
-        when(effectivePermissionService.resolveCurrentRoleCode("ROLE_USER"))
+        when(effectivePermissionService.resolveCurrentRoleCode("USER"))
                 .thenReturn(List.of("member:read"), List.of("member:read"));
 
-        service.updatePermissions(actor, "ROLE_USER", request(7, List.of("member:read"), List.of()));
+        service.updatePermissions(actor, "USER", request(7, List.of("member:read"), List.of()));
 
         verify(jdbcTemplate, never()).update(anyString(), any(Object[].class));
         verifyNoInteractions(eventPublisher);

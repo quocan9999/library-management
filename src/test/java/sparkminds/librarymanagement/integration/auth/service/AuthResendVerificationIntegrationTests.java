@@ -379,7 +379,7 @@ class AuthResendVerificationIntegrationTests {
         Account account = new Account();
         account.setEmail(email);
         account.setPasswordHash(passwordEncoder.encode("Existing1!"));
-        account.setRole(roleRepository.findByCode("ROLE_USER").orElseThrow());
+        account.setRole(roleRepository.findByCode("USER").orElseThrow());
         account.setEnabled(true);
         account.setEmailVerified(verified);
         return accountRepository.saveAndFlush(account);

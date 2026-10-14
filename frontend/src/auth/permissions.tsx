@@ -13,12 +13,12 @@ export function DefaultAccountRoute() {
   if (capabilityStatus === 'error') {
     return <CapabilityRetry onRetry={() => { void refreshCapabilities().catch(() => undefined); }} />;
   }
-  if (role === 'ROLE_USER') return <Navigate to="/profile" replace />;
-  if (permissions.includes('member:read')) return <Navigate to="/admin/members" replace />;
-  if (permissions.includes('role:read') && ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'].includes(role ?? '')) {
+  if (role === 'USER') return <Navigate to="/profile" replace />;
+  if (role && role !== 'USER' && permissions.includes('member:read')) return <Navigate to="/admin/members" replace />;
+  if (permissions.includes('role:read') && role === 'ADMIN') {
     return <Navigate to="/admin/roles" replace />;
   }
-  if (role === 'ROLE_ADMIN' || role === 'ROLE_SUPER_ADMIN') return null;
+  if (role && role !== 'USER') return null;
   return <Navigate to="/403" replace />;
 }
 
@@ -46,24 +46,33 @@ export function PermissionGate({
   permission,
   children,
   fallback = null,
+  allowedRoles,
+  deniedRoles,
 }: {
   permission: string;
   children: React.ReactNode;
   fallback?: React.ReactNode;
+  allowedRoles?: string[];
+  deniedRoles?: string[];
 }) {
-  const { capabilityStatus } = useAuth();
+  const { capabilityStatus, role } = useAuth();
   const allowed = usePermission(permission);
   if (capabilityStatus === 'loading') return fallback ?? <CapabilityLoading />;
-  return allowed ? children : null;
+  if (!allowed || (allowedRoles && !allowedRoles.includes(role ?? '')) || deniedRoles?.includes(role ?? '')) {
+    return fallback;
+  }
+  return children;
 }
 
 export function RequirePermission({
   permission,
   allowedRoles,
+  deniedRoles,
   children,
 }: {
   permission: string;
   allowedRoles?: string[];
+  deniedRoles?: string[];
   children: React.ReactNode;
 }) {
   const { accessToken, isBootstrapping, capabilityStatus, role, refreshCapabilities } = useAuth();
@@ -75,7 +84,7 @@ export function RequirePermission({
   if (capabilityStatus === 'error') {
     return <CapabilityRetry onRetry={() => { void refreshCapabilities().catch(() => undefined); }} />;
   }
-  if (!allowed || (allowedRoles && !allowedRoles.includes(role ?? ''))) {
+  if (!allowed || (allowedRoles && !allowedRoles.includes(role ?? '')) || deniedRoles?.includes(role ?? '')) {
     return <Navigate to="/403" replace />;
   }
   return children;

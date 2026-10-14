@@ -53,7 +53,7 @@ class ChangePasswordIntegrationTests {
 
     @Test
     void userCanChangePasswordAndAllPreviouslyIssuedSessionsRemainUsable() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         MvcResult firstLogin = login(account.getEmail(), CURRENT_PASSWORD);
         String accessTokenFirst = readAccessToken(firstLogin);
         String refreshCookieFirst = refreshCookie(firstLogin);
@@ -90,7 +90,7 @@ class ChangePasswordIntegrationTests {
 
     @Test
     void wrongCurrentPasswordReturns400AndLeavesPasswordAndSessionsUnchanged() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String originalHash = account.getPasswordHash();
         long originalSessionVersion = account.getSessionVersion();
@@ -106,7 +106,7 @@ class ChangePasswordIntegrationTests {
 
     @Test
     void weakMismatchedAndReusedPasswordsReturnFieldValidationWithoutUpdatingAccount() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String originalHash = account.getPasswordHash();
 
@@ -127,34 +127,29 @@ class ChangePasswordIntegrationTests {
     }
 
     @Test
-    void requiresAuthenticationAndBothUserRoleAndPermission() throws Exception {
+    void requiresAuthenticationButNotSpecificRoleOrProfilePermission() throws Exception {
         changePassword("", CURRENT_PASSWORD, "NewPass2!", "NewPass2!")
                 .andExpect(status().isUnauthorized());
 
         Permission permission = permissionRepository.findByCode("account:change-password").orElseThrow();
-        Role userRole = roleRepository.findByCode("ROLE_USER").orElseThrow();
+        Role userRole = roleRepository.findByCode("USER").orElseThrow();
         userRole.getPermissions().remove(permission);
         roleRepository.saveAndFlush(userRole);
-        Account userWithoutPermission = createAccount("ROLE_USER");
+        Role adminRole = roleRepository.findByCode("ADMIN").orElseThrow();
+        adminRole.getPermissions().remove(permission);
+        roleRepository.saveAndFlush(adminRole);
+
+        Account userWithoutPermission = createAccount("USER");
         String userToken = readAccessToken(login(userWithoutPermission.getEmail(), CURRENT_PASSWORD));
         changePassword(userToken, CURRENT_PASSWORD, "NewPass2!", "NewPass2!")
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("PASSWORD_CHANGED"));
 
-        Role adminRole = roleRepository.findByCode("ROLE_ADMIN").orElseThrow();
-        adminRole.getPermissions().add(permission);
-        roleRepository.saveAndFlush(adminRole);
-        Account admin = createAccount("ROLE_ADMIN");
+        Account admin = createAccount("ADMIN");
         String adminToken = readAccessToken(login(admin.getEmail(), CURRENT_PASSWORD));
         changePassword(adminToken, CURRENT_PASSWORD, "NewPass2!", "NewPass2!")
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
-
-        Account superAdmin = createAccount("ROLE_SUPER_ADMIN");
-        String superAdminToken = readAccessToken(login(superAdmin.getEmail(), CURRENT_PASSWORD));
-        changePassword(superAdminToken, CURRENT_PASSWORD, "NewPass2!", "NewPass2!")
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("PASSWORD_CHANGED"));
     }
 
     private Account createAccount(String roleCode) {

@@ -14,6 +14,7 @@ import sparkminds.librarymanagement.member.dto.MemberProfilePatchRequest;
 import sparkminds.librarymanagement.member.entity.Member;
 import sparkminds.librarymanagement.member.exception.MemberProfilePatchException;
 import sparkminds.librarymanagement.member.repository.MemberRepository;
+import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -41,6 +42,9 @@ public class MemberProfileService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Không tìm thấy thành viên"));
+        if (!RoleAccessPolicy.USER.equals(member.getAccount().getRole().getCode())) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Không tìm thấy thành viên");
+        }
         if (!Objects.equals(request.getVersion(), member.getVersion())) {
             throw versionConflict();
         }

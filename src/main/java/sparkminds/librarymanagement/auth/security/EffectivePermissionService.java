@@ -6,6 +6,8 @@ import sparkminds.librarymanagement.auth.entity.Account;
 import sparkminds.librarymanagement.auth.entity.Permission;
 import sparkminds.librarymanagement.auth.entity.Role;
 import sparkminds.librarymanagement.auth.repository.PermissionRepository;
+import sparkminds.librarymanagement.auth.repository.RoleRepositoy;
+import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
 
 import java.util.List;
 
@@ -13,8 +15,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class EffectivePermissionService {
 
-    public static final String ROLE_SUPER_ADMIN = "ROLE_SUPER_ADMIN";
-
+    private final RoleRepositoy roleRepository;
     private final PermissionRepository permissionRepository;
 
     public List<String> resolve(Account account) {
@@ -22,7 +23,10 @@ public class EffectivePermissionService {
     }
 
     public List<String> resolve(Role role) {
-        if (ROLE_SUPER_ADMIN.equals(role.getCode())) {
+        if (!role.isEnabled()) {
+            return List.of();
+        }
+        if (RoleAccessPolicy.ADMIN.equals(role.getCode())) {
             return allPermissionCodes();
         }
         return role.getPermissions().stream()
@@ -32,7 +36,11 @@ public class EffectivePermissionService {
     }
 
     public List<String> resolveCurrentRoleCode(String roleCode) {
-        if (ROLE_SUPER_ADMIN.equals(roleCode)) {
+        Role role = roleRepository.findByCode(roleCode).orElse(null);
+        if (role == null || !role.isEnabled()) {
+            return List.of();
+        }
+        if (RoleAccessPolicy.ADMIN.equals(role.getCode())) {
             return allPermissionCodes();
         }
         return permissionRepository.findPermissionCodesByRoleCode(roleCode);

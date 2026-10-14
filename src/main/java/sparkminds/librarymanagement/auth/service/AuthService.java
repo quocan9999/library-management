@@ -69,7 +69,7 @@ public class AuthService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "AUTH_ACCOUNT_DISABLED", "Tài khoản hiện không thể đăng nhập");
         }
 
-        if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
+        if ("USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
             throw new BusinessException(
                     HttpStatus.FORBIDDEN,
                     "EMAIL_NOT_VERIFIED",

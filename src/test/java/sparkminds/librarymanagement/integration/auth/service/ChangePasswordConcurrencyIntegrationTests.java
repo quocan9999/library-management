@@ -59,7 +59,7 @@ class ChangePasswordConcurrencyIntegrationTests {
         account = new Account();
         account.setEmail(UUID.randomUUID() + "@example.com");
         account.setPasswordHash(passwordEncoder.encode(CURRENT_PASSWORD));
-        account.setRole(roleRepository.findByCode("ROLE_USER").orElseThrow());
+        account.setRole(roleRepository.findByCode("USER").orElseThrow());
         account.setEnabled(true);
         account.setEmailVerified(true);
         account = accountRepository.saveAndFlush(account);

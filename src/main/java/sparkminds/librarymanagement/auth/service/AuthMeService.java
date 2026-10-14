@@ -29,7 +29,7 @@ public class AuthMeService {
                 account.getUsername(),
                 account.getEmail(),
                 account.getRole().getCode(),
-                effectivePermissionService.resolve(account)
+                effectivePermissionService.resolveCurrentRoleCode(account.getRole().getCode())
         );
     }
 }

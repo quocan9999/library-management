@@ -37,7 +37,7 @@ describe('role API client', () => {
       requests.push({ method: config.method ?? '', url: config.url ?? '', body: config.data });
       if (config.url === '/api/v1/roles' && config.method === 'get') {
         return response(config, envelope('ROLE_LIST_SUCCESS', [
-          { code: 'ROLE_USER', description: 'Người dùng', version: 4, canEdit: true },
+          { code: 'USER', description: 'Người dùng', version: 4, canEdit: true },
         ]));
       }
       if (config.url === '/api/v1/permissions') {
@@ -45,9 +45,9 @@ describe('role API client', () => {
           { code: 'book:read', description: 'Xem sách', manageableByActor: true },
         ]));
       }
-      if (config.url === '/api/v1/roles/ROLE_USER/permissions' && config.method === 'get') {
+      if (config.url === '/api/v1/roles/USER/permissions' && config.method === 'get') {
         return response(config, envelope('ROLE_PERMISSIONS_SUCCESS', {
-          roleCode: 'ROLE_USER',
+          roleCode: 'USER',
           version: 4,
           assignedPermissions: [],
           effectivePermissions: [],
@@ -55,9 +55,9 @@ describe('role API client', () => {
           editable: true,
         }));
       }
-      if (config.url === '/api/v1/roles/ROLE_USER/permissions' && config.method === 'patch') {
+      if (config.url === '/api/v1/roles/USER/permissions' && config.method === 'patch') {
         return response(config, envelope('ROLE_PERMISSIONS_UPDATED', {
-          roleCode: 'ROLE_USER',
+          roleCode: 'USER',
           version: 5,
           assignedPermissions: ['book:read'],
           effectivePermissions: ['book:read'],
@@ -69,13 +69,13 @@ describe('role API client', () => {
     }) satisfies AxiosAdapter;
 
     await expect(roleApi.getRoles()).resolves.toEqual([
-      { code: 'ROLE_USER', description: 'Người dùng', version: 4, canEdit: true },
+      { code: 'USER', description: 'Người dùng', version: 4, canEdit: true },
     ]);
     await expect(roleApi.getPermissionCatalog()).resolves.toEqual([
       { code: 'book:read', description: 'Xem sách', manageableByActor: true },
     ]);
-    await expect(roleApi.getRolePermissions('ROLE_USER')).resolves.toMatchObject({ version: 4 });
-    await roleApi.updatePermissions('ROLE_USER', {
+    await expect(roleApi.getRolePermissions('USER')).resolves.toMatchObject({ version: 4 });
+    await roleApi.updatePermissions('USER', {
       expectedVersion: 4,
       addPermissions: ['book:read'],
       removePermissions: [],
@@ -84,8 +84,8 @@ describe('role API client', () => {
     expect(requests.map(({ method, url }) => [method, url])).toEqual([
       ['get', '/api/v1/roles'],
       ['get', '/api/v1/permissions'],
-      ['get', '/api/v1/roles/ROLE_USER/permissions'],
-      ['patch', '/api/v1/roles/ROLE_USER/permissions'],
+      ['get', '/api/v1/roles/USER/permissions'],
+      ['patch', '/api/v1/roles/USER/permissions'],
     ]);
     expect(JSON.parse(String(requests[3]?.body))).toEqual({
       expectedVersion: 4,

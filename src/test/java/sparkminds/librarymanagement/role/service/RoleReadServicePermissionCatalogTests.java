@@ -34,14 +34,14 @@ class RoleReadServicePermissionCatalogTests {
         RoleReadService service = new RoleReadService(
                 roleRepository, permissionRepository, effectivePermissionService, roleAccessPolicy, registry);
         Role role = new Role();
-        role.setCode("ROLE_ADMIN");
+        role.setCode("ADMIN");
         Account account = new Account();
         account.setId(5);
         account.setUsername("admin");
         account.setRole(role);
         CustomUserPrincipal actor = CustomUserPrincipal.from(account, List.of("role:read", "member:read"));
 
-        when(roleAccessPolicy.canReadRoleManagement("ROLE_ADMIN")).thenReturn(true);
+        when(roleAccessPolicy.canReadRoleManagement("ADMIN")).thenReturn(true);
         when(permissionRepository.findAllByOrderByCodeAsc()).thenReturn(catalogPermissions());
 
         List<PermissionCatalogResponse> response = service.getPermissionCatalog(actor);

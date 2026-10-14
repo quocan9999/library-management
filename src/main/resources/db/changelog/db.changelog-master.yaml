@@ -114,3 +114,7 @@ databaseChangeLog:
   - include:
       file: changes/029-account-session-version.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/030-dynamic-role-account-foundation.yaml
+      relativeToChangelogFile: true

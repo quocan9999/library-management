@@ -80,9 +80,10 @@ public class RoleReadService {
 
         Set<String> actorPermissions = permissionCodes(actor);
         List<String> effectivePermissions = effectivePermissionService.resolve(role);
-        List<String> assignedPermissions = RoleAccessPolicy.SUPER_ADMIN.equals(role.getCode())
-                ? effectivePermissions
-                : role.getPermissions().stream().map(Permission::getCode).sorted().toList();
+        List<String> assignedPermissions = role.getPermissions().stream()
+                .map(Permission::getCode)
+                .sorted()
+                .toList();
         boolean editable = roleAccessPolicy.canEditTarget(actor.getRoleCode(), role.getCode(), actorPermissions);
         List<String> editablePermissions = editable
                 ? roleAccessPolicy.editablePermissions(

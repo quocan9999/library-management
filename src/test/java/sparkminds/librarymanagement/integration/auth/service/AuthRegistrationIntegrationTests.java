@@ -149,7 +149,7 @@ class AuthRegistrationIntegrationTests {
 
         Account account = accountRepository.findByEmailIgnoreCase(email).orElseThrow();
         assertThat(account.getUsername()).isNull();
-        assertThat(roleRepository.findById(account.getRole().getId()).orElseThrow().getCode()).isEqualTo("ROLE_USER");
+        assertThat(roleRepository.findById(account.getRole().getId()).orElseThrow().getCode()).isEqualTo("USER");
         assertThat(account.isEmailVerified()).isFalse();
         assertThat(account.isEnabled()).isTrue();
         assertThat(passwordEncoder.matches("Strong1!", account.getPasswordHash())).isTrue();
@@ -224,7 +224,7 @@ class AuthRegistrationIntegrationTests {
 
         Account account = accountRepository.findByEmailIgnoreCase(email).orElseThrow();
         assertThat(account.isEmailVerified()).isFalse();
-        assertThat(roleRepository.findById(account.getRole().getId()).orElseThrow().getCode()).isEqualTo("ROLE_USER");
+        assertThat(roleRepository.findById(account.getRole().getId()).orElseThrow().getCode()).isEqualTo("USER");
         Member member = memberRepository.findByAccountId(account.getId()).orElseThrow();
         assertThat(member.getMemberCode()).matches("M[0-9]{6,}");
         var tokens = verificationTokenRepository.findAllByAccountId(account.getId());
@@ -445,7 +445,7 @@ class AuthRegistrationIntegrationTests {
         Account account = new Account();
         account.setEmail(email);
         account.setPasswordHash(passwordEncoder.encode("Existing1!"));
-        account.setRole(roleRepository.findByCode("ROLE_USER").orElseThrow());
+        account.setRole(roleRepository.findByCode("USER").orElseThrow());
         account.setEmailVerified(verified);
         accountRepository.saveAndFlush(account);
     }

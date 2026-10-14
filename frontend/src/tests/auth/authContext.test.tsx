@@ -77,7 +77,7 @@ describe('AuthProvider capability session', () => {
         }));
       }
       if (config.url === '/api/v1/auth/me' && config.headers.get('Authorization') === 'Bearer second-account-token') {
-        return response(config, success('AUTH_ME_SUCCESS', currentUser(2, 'ROLE_ADMIN', ['role:read'])));
+        return response(config, success('AUTH_ME_SUCCESS', currentUser(2, 'ADMIN', ['role:read'])));
       }
       if (config.url === '/api/v1/auth/logout') {
         return response(config, success('AUTH_LOGOUT_SUCCESS', null));
@@ -93,7 +93,7 @@ describe('AuthProvider capability session', () => {
 
     resolvePreviousMe?.(response(
       {} as Parameters<AxiosAdapter>[0],
-      success('AUTH_ME_SUCCESS', currentUser(1, 'ROLE_USER', ['book:read'])),
+      success('AUTH_ME_SUCCESS', currentUser(1, 'USER', ['book:read'])),
     ));
     await waitFor(() => expect(screen.getByLabelText('capabilities').textContent)
       .toContain('ready|2|role:read'));

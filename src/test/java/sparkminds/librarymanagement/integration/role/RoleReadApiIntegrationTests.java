@@ -77,15 +77,14 @@ class RoleReadApiIntegrationTests {
     }
 
     @Test
-    void superAdminLoginAndMeResolveEveryPermissionFromDatabaseWithoutExposingSecrets() throws Exception {
+    void adminLoginAndMeResolveEveryPermissionFromDatabaseWithoutRolePermissionRows() throws Exception {
         Permission futurePermission = new Permission();
         futurePermission.setCode("future:catalog:read");
         permissionRepository.saveAndFlush(futurePermission);
 
-        Role superAdminRole = roleRepository.findByCode("ROLE_SUPER_ADMIN").orElseThrow();
-        assertThat(superAdminRole.getPermissions()).isEmpty();
+        jdbcTemplate.update("DELETE rp FROM role_permissions rp JOIN roles r ON r.id = rp.role_id WHERE r.code = 'ADMIN'");
 
-        MvcResult login = login("superadmin", "superadmin")
+        MvcResult login = login("admin", "admin")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("AUTH_LOGIN_SUCCESS"))
                 .andReturn();
@@ -95,8 +94,8 @@ class RoleReadApiIntegrationTests {
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.username").value("superadmin"))
-                .andExpect(jsonPath("$.data.role").value("ROLE_SUPER_ADMIN"))
+                .andExpect(jsonPath("$.data.username").value("admin"))
+                .andExpect(jsonPath("$.data.role").value("ADMIN"))
                 .andExpect(jsonPath("$.data.permissions").isArray())
                 .andReturn();
 
@@ -107,78 +106,57 @@ class RoleReadApiIntegrationTests {
         assertThat(response).doesNotContain("passwordHash", "password_hash", "accessToken", "refreshToken", "$2a$");
         assertThat(me.getResponse().getCookie("refreshToken")).isNull();
 
-        Account account = accountRepository.findByUsername("superadmin").orElseThrow();
+        Account account = accountRepository.findByUsername("admin").orElseThrow();
         assertThat(account.getPasswordHash()).startsWith("$2a$12$");
-        assertThat(passwordEncoder.matches("superadmin", account.getPasswordHash())).isTrue();
+        assertThat(account.isSystemAccount()).isTrue();
+        assertThat(passwordEncoder.matches("admin", account.getPasswordHash())).isTrue();
     }
 
     @Test
-    void roleCatalogAndDetailsEnforceRankAndKeepSuperAdminReadOnly() throws Exception {
+    void adminRoleCatalogIsReadOnlyForAdminAndUserCannotEnterRoleManagement() throws Exception {
         Permission futurePermission = new Permission();
         futurePermission.setCode("future:catalog:read");
         permissionRepository.saveAndFlush(futurePermission);
 
-        String superAdminToken = accessToken("superadmin", "superadmin");
-        MvcResult superAdminRolesResponse = mockMvc.perform(get("/api/v1/roles")
-                        .header("Authorization", "Bearer " + superAdminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(3))
-                .andReturn();
-        List<Map<String, Object>> superAdminRoles = JsonPath.read(
-                superAdminRolesResponse.getResponse().getContentAsString(), "$.data");
-        assertThat(superAdminRoles).filteredOn(role -> "ROLE_SUPER_ADMIN".equals(role.get("code")))
-                .singleElement().extracting(role -> role.get("canEdit")).isEqualTo(false);
-
-        mockMvc.perform(get("/api/v1/roles/ROLE_SUPER_ADMIN/permissions")
-                        .header("Authorization", "Bearer " + superAdminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.editable").value(false))
-                .andExpect(jsonPath("$.data.version").value(0))
-                .andExpect(jsonPath("$.data.editablePermissions.length()").value(0))
-                .andExpect(jsonPath("$.data.effectivePermissions").isArray());
-
-        MvcResult superAdminUserDetails = mockMvc.perform(get("/api/v1/roles/ROLE_USER/permissions")
-                        .header("Authorization", "Bearer " + superAdminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.editable").value(true))
-                .andReturn();
-        List<String> superAdminEditablePermissions = JsonPath.read(
-                superAdminUserDetails.getResponse().getContentAsString(), "$.data.editablePermissions");
-        assertThat(superAdminEditablePermissions).contains("book:read", "account:change-email");
-        assertThat(superAdminEditablePermissions).doesNotContain(
-                "role:read", "role:update", "member:status:update", "config:read", "config:update",
-                "future:catalog:read");
-
-        MvcResult adminRoles = mockMvc.perform(get("/api/v1/roles")
-                        .header("Authorization", "Bearer " + accessToken("admin", "admin")))
+        String adminToken = accessToken("admin", "admin");
+        MvcResult rolesResponse = mockMvc.perform(get("/api/v1/roles")
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andReturn();
-        List<Map<String, Object>> visibleRoles = JsonPath.read(
-                adminRoles.getResponse().getContentAsString(), "$.data");
-        assertThat(visibleRoles).extracting(role -> role.get("code"))
-                .containsExactly("ROLE_ADMIN", "ROLE_USER");
-        assertThat(visibleRoles).filteredOn(role -> "ROLE_USER".equals(role.get("code")))
+        List<Map<String, Object>> roles = JsonPath.read(rolesResponse.getResponse().getContentAsString(), "$.data");
+        assertThat(roles).extracting(role -> role.get("code")).containsExactly("ADMIN", "USER");
+        assertThat(roles).filteredOn(role -> "ADMIN".equals(role.get("code")))
+                .singleElement().extracting(role -> role.get("canEdit")).isEqualTo(false);
+        assertThat(roles).filteredOn(role -> "USER".equals(role.get("code")))
                 .singleElement().extracting(role -> role.get("canEdit")).isEqualTo(true);
 
-        MvcResult adminUserDetails = mockMvc.perform(get("/api/v1/roles/ROLE_USER/permissions")
-                        .header("Authorization", "Bearer " + accessToken("admin", "admin")))
+        mockMvc.perform(get("/api/v1/roles/ADMIN/permissions")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.editable").value(false))
+                .andExpect(jsonPath("$.data.editablePermissions.length()").value(0))
+                .andExpect(jsonPath("$.data.effectivePermissions[?(@ == 'future:catalog:read')]").isNotEmpty());
+
+        MvcResult userDetails = mockMvc.perform(get("/api/v1/roles/USER/permissions")
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.editable").value(true))
                 .andReturn();
         List<String> adminEditablePermissions = JsonPath.read(
-                adminUserDetails.getResponse().getContentAsString(), "$.data.editablePermissions");
-        assertThat(adminEditablePermissions).contains("book:read", "book:create");
+                userDetails.getResponse().getContentAsString(), "$.data.editablePermissions");
+        assertThat(adminEditablePermissions).contains("book:read", "account:change-email");
         assertThat(adminEditablePermissions).doesNotContain(
-                "borrow:create", "borrow:return", "role:read", "role:update", "config:read", "config:update");
+                "role:read", "role:update", "member:status:update", "config:read", "config:update",
+                "future:catalog:read");
 
-        mockMvc.perform(get("/api/v1/roles/ROLE_SUPER_ADMIN/permissions")
-                        .header("Authorization", "Bearer " + accessToken("admin", "admin")))
+        mockMvc.perform(get("/api/v1/roles/SUPER_ADMIN/permissions")
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
 
         MvcResult permissionCatalogResponse = mockMvc.perform(get("/api/v1/permissions")
-                        .header("Authorization", "Bearer " + superAdminToken))
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.code == 'future:catalog:read')]").isNotEmpty())
                 .andExpect(jsonPath("$.data[?(@.code == 'member:status:update')]").isNotEmpty())
@@ -192,15 +170,20 @@ class RoleReadApiIntegrationTests {
                 .singleElement().extracting(permission -> permission.get("dependencies"))
                 .isEqualTo(List.of());
 
-        mockMvc.perform(get("/api/v1/roles")
-                        .header("Authorization", "Bearer " + accessToken("user", "user")))
+        setRolePermission("USER", "role:read", true);
+        try {
+            mockMvc.perform(get("/api/v1/roles")
+                            .header("Authorization", "Bearer " + accessToken("user", "user")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+        } finally {
+            setRolePermission("USER", "role:read", false);
+        }
     }
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void roleReadPermissionIsCheckedAgainFromDatabaseOnTheNextRequest() throws Exception {
+    void adminRetainsGlobalRoleReadPermissionWhenItsAssignmentRowIsRemoved() throws Exception {
         String token = accessToken("admin", "admin");
         jdbcTemplate.update("""
                 DELETE rp
@@ -208,13 +191,12 @@ class RoleReadApiIntegrationTests {
                 JOIN roles r ON r.id = rp.role_id
                 JOIN permissions p ON p.id = rp.permission_id
                 WHERE r.code = ? AND p.code = ?
-                """, "ROLE_ADMIN", "role:read");
+                """, "ADMIN", "role:read");
 
         try {
             mockMvc.perform(get("/api/v1/roles")
                             .header("Authorization", "Bearer " + token))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+                    .andExpect(status().isOk());
 
             MvcResult me = mockMvc.perform(get("/api/v1/auth/me")
                             .header("Authorization", "Bearer " + token))
@@ -222,7 +204,7 @@ class RoleReadApiIntegrationTests {
                     .andReturn();
             List<String> currentPermissions = JsonPath.read(
                     me.getResponse().getContentAsString(), "$.data.permissions");
-            assertThat(currentPermissions).doesNotContain("role:read");
+            assertThat(currentPermissions).contains("role:read");
         } finally {
             jdbcTemplate.update("""
                     INSERT INTO role_permissions (role_id, permission_id)
@@ -234,15 +216,19 @@ class RoleReadApiIntegrationTests {
                           SELECT 1 FROM role_permissions rp
                           WHERE rp.role_id = r.id AND rp.permission_id = p.id
                       )
-                    """, "role:read", "ROLE_ADMIN");
+                    """, "role:read", "ADMIN");
         }
     }
 
     @Test
-    void unknownRoleAndRoleNotVisibleToActorReturnNotFound() throws Exception {
-        String superAdminToken = accessToken("superadmin", "superadmin");
+    void unknownRoleAndRemovedSuperAdminRoleReturnNotFound() throws Exception {
+        String adminToken = accessToken("admin", "admin");
         mockMvc.perform(get("/api/v1/roles/ROLE_NOT_PRESENT/permissions")
-                        .header("Authorization", "Bearer " + superAdminToken))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
+        mockMvc.perform(get("/api/v1/roles/SUPER_ADMIN/permissions")
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
     }
@@ -250,24 +236,24 @@ class RoleReadApiIntegrationTests {
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void rerunningLiquibaseDoesNotRestoreManuallyChangedRolePermissionsOrDuplicateSeeds() throws Exception {
-        assertThat(rolePermissionCount("ROLE_ADMIN", "book:read")).isEqualTo(1);
+        assertThat(rolePermissionCount("ADMIN", "book:read")).isEqualTo(1);
         jdbcTemplate.update("""
                 DELETE rp
                 FROM role_permissions rp
                 JOIN roles r ON r.id = rp.role_id
                 JOIN permissions p ON p.id = rp.permission_id
                 WHERE r.code = ? AND p.code = ?
-                """, "ROLE_ADMIN", "book:read");
-        assertThat(rolePermissionCount("ROLE_ADMIN", "book:read")).isZero();
+                """, "ADMIN", "book:read");
+        assertThat(rolePermissionCount("ADMIN", "book:read")).isZero();
 
         try {
             springLiquibase.afterPropertiesSet();
 
-            assertThat(rolePermissionCount("ROLE_ADMIN", "book:read")).isZero();
+            assertThat(rolePermissionCount("ADMIN", "book:read")).isZero();
             assertThat(jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM roles WHERE code = 'ROLE_SUPER_ADMIN'", Integer.class)).isEqualTo(1);
+                    "SELECT COUNT(*) FROM roles WHERE code IN ('ROLE_SUPER_ADMIN', 'SUPER_ADMIN')", Integer.class)).isZero();
             assertThat(jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM accounts WHERE username = 'superadmin'", Integer.class)).isEqualTo(1);
+                    "SELECT COUNT(*) FROM accounts WHERE username = 'superadmin'", Integer.class)).isZero();
             assertThat(jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM permissions WHERE code IN ('role:read', 'role:update')", Integer.class))
                     .isEqualTo(2);
@@ -282,7 +268,7 @@ class RoleReadApiIntegrationTests {
                           SELECT 1 FROM role_permissions rp
                           WHERE rp.role_id = r.id AND rp.permission_id = p.id
                       )
-                    """, "book:read", "ROLE_ADMIN");
+                    """, "book:read", "ADMIN");
         }
     }
 
@@ -294,6 +280,30 @@ class RoleReadApiIntegrationTests {
                 JOIN permissions p ON p.id = rp.permission_id
                 WHERE r.code = ? AND p.code = ?
                 """, Integer.class, roleCode, permissionCode);
+    }
+
+    private void setRolePermission(String roleCode, String permissionCode, boolean assigned) {
+        if (assigned) {
+            jdbcTemplate.update("""
+                    INSERT INTO role_permissions (role_id, permission_id)
+                    SELECT r.id, p.id
+                    FROM roles r
+                    CROSS JOIN permissions p
+                    WHERE r.code = ? AND p.code = ?
+                      AND NOT EXISTS (
+                          SELECT 1 FROM role_permissions existing
+                          WHERE existing.role_id = r.id AND existing.permission_id = p.id
+                      )
+                    """, roleCode, permissionCode);
+        } else {
+            jdbcTemplate.update("""
+                    DELETE rp
+                    FROM role_permissions rp
+                    JOIN roles r ON r.id = rp.role_id
+                    JOIN permissions p ON p.id = rp.permission_id
+                    WHERE r.code = ? AND p.code = ?
+                    """, roleCode, permissionCode);
+        }
     }
 
     private org.springframework.test.web.servlet.ResultActions login(String username, String password)

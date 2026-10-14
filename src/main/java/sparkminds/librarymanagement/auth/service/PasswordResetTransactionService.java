@@ -30,7 +30,7 @@ public class PasswordResetTransactionService {
     @Transactional
     public Candidate createCandidate(String email) {
         Account account = accountRepository.findByEmailForUpdate(email).orElse(null);
-        if (account == null || !"ROLE_USER".equals(account.getRole().getCode())
+        if (account == null || !"USER".equals(account.getRole().getCode())
                 || !account.isEnabled() || !account.isEmailVerified()) {
             return null;
         }
@@ -66,7 +66,7 @@ public class PasswordResetTransactionService {
     public void reset(Integer tokenId, Integer accountId, String tokenHash, String newPassword) {
         Account account = accountRepository.findByIdForUpdate(accountId)
                 .orElseThrow(PasswordResetTransactionService::invalidToken);
-        if (!"ROLE_USER".equals(account.getRole().getCode()) || !account.isEnabled() || !account.isEmailVerified()) {
+        if (!"USER".equals(account.getRole().getCode()) || !account.isEnabled() || !account.isEmailVerified()) {
             throw invalidToken();
         }
 

@@ -127,29 +127,25 @@ class PasswordResetIntegrationTests {
     void returnsTheSameGenericResponseAndOnlyIssuesForEligibleUsers() throws Exception {
         String userEmail = uniqueEmail();
         String adminEmail = uniqueEmail();
-        String superAdminEmail = uniqueEmail();
         String disabledEmail = uniqueEmail();
         String unverifiedEmail = uniqueEmail();
-        Account user = createAccount(userEmail, "ROLE_USER", true, true);
-        createAccount(adminEmail, "ROLE_ADMIN", true, true);
-        createAccount(superAdminEmail, "ROLE_SUPER_ADMIN", true, true);
-        createAccount(disabledEmail, "ROLE_USER", false, true);
-        createAccount(unverifiedEmail, "ROLE_USER", true, false);
+        Account user = createAccount(userEmail, "USER", true, true);
+        createAccount(adminEmail, "ADMIN", true, true);
+        createAccount(disabledEmail, "USER", false, true);
+        createAccount(unverifiedEmail, "USER", true, false);
 
         MvcResult unknown = forgotRequest(uniqueEmail(), uniqueRemoteAddress()).andReturn();
         MvcResult eligible = forgotRequest(userEmail, uniqueRemoteAddress()).andReturn();
         MvcResult admin = forgotRequest(adminEmail, uniqueRemoteAddress()).andReturn();
-        MvcResult superAdmin = forgotRequest(superAdminEmail, uniqueRemoteAddress()).andReturn();
         MvcResult disabled = forgotRequest(disabledEmail, uniqueRemoteAddress()).andReturn();
         MvcResult unverified = forgotRequest(unverifiedEmail, uniqueRemoteAddress()).andReturn();
 
         assertSameGenericResponse(unknown, eligible);
         assertSameGenericResponse(unknown, admin);
-        assertSameGenericResponse(unknown, superAdmin);
         assertSameGenericResponse(unknown, disabled);
         assertSameGenericResponse(unknown, unverified);
         assertThat(countResetTokens(user)).isEqualTo(1);
-        assertThat(countResetTokens(adminEmail, superAdminEmail, disabledEmail, unverifiedEmail)).isZero();
+        assertThat(countResetTokens(adminEmail, disabledEmail, unverifiedEmail)).isZero();
         assertThat(sentMessages).hasSize(1);
         assertThat(sentMessages.get(0).getTo()).containsExactly(userEmail);
     }
@@ -157,7 +153,7 @@ class PasswordResetIntegrationTests {
     @Test
     void normalizesEmailAndSendsOnlyAHashedThirtyMinuteTokenByEmail() throws Exception {
         String email = uniqueEmail();
-        Account account = createAccount(email, "ROLE_USER", true, true);
+        Account account = createAccount(email, "USER", true, true);
         LocalDateTime beforeRequest = LocalDateTime.now(ZoneOffset.UTC);
 
         MvcResult result = forgotRequest("  " + email.toUpperCase() + "  ", uniqueRemoteAddress()).andReturn();
@@ -183,7 +179,7 @@ class PasswordResetIntegrationTests {
     @Test
     void mailFailureRemovesOnlyTheUnsentCandidateAndPreservesThePreviousToken() throws Exception {
         String email = uniqueEmail();
-        Account account = createAccount(email, "ROLE_USER", true, true);
+        Account account = createAccount(email, "USER", true, true);
         PasswordResetToken oldToken = createResetToken(account, "previous-raw-reset-token",
                 LocalDateTime.now(ZoneOffset.UTC).plusMinutes(30));
         doThrow(new MailSendException("simulated private transport detail"))
@@ -222,8 +218,8 @@ class PasswordResetIntegrationTests {
 
     @Test
     void invalidExpiredOrUsedResetTokensDoNotChangePasswordOrSessionVersion() throws Exception {
-        Account expiredAccount = createAccount(uniqueEmail(), "ROLE_USER", true, true);
-        Account usedAccount = createAccount(uniqueEmail(), "ROLE_USER", true, true);
+        Account expiredAccount = createAccount(uniqueEmail(), "USER", true, true);
+        Account usedAccount = createAccount(uniqueEmail(), "USER", true, true);
         String expiredOriginalHash = expiredAccount.getPasswordHash();
         String usedOriginalHash = usedAccount.getPasswordHash();
         long originalRefreshCount = refreshTokenRepository.count();
@@ -259,11 +255,10 @@ class PasswordResetIntegrationTests {
 
     @Test
     void doesNotResetAnAdminEvenIfAnAdminTokenRowExists() throws Exception {
-        Account admin = createAccount(uniqueEmail(), "ROLE_ADMIN", true, true);
-        Account superAdmin = createAccount(uniqueEmail(), "ROLE_SUPER_ADMIN", true, true);
-        Account disabled = createAccount(uniqueEmail(), "ROLE_USER", false, true);
-        Account unverified = createAccount(uniqueEmail(), "ROLE_USER", true, false);
-        List<Account> ineligibleAccounts = List.of(admin, superAdmin, disabled, unverified);
+        Account admin = createAccount(uniqueEmail(), "ADMIN", true, true);
+        Account disabled = createAccount(uniqueEmail(), "USER", false, true);
+        Account unverified = createAccount(uniqueEmail(), "USER", true, false);
+        List<Account> ineligibleAccounts = List.of(admin, disabled, unverified);
         List<String> rawTokens = ineligibleAccounts.stream().map(account -> "ineligible-" + UUID.randomUUID()).toList();
         List<PasswordResetToken> tokens = ineligibleAccounts.stream()
                 .map(account -> createResetToken(account, rawTokens.get(ineligibleAccounts.indexOf(account)),
@@ -288,7 +283,7 @@ class PasswordResetIntegrationTests {
 
     @Test
     void rejectsTheCurrentPasswordWithoutConsumingTheResetToken() throws Exception {
-        Account account = createAccount(uniqueEmail(), "ROLE_USER", true, true);
+        Account account = createAccount(uniqueEmail(), "USER", true, true);
         String originalHash = account.getPasswordHash();
         String rawToken = "reuse-" + UUID.randomUUID();
         PasswordResetToken token = createResetToken(account, rawToken, LocalDateTime.now(ZoneOffset.UTC).plusMinutes(30));
@@ -311,7 +306,7 @@ class PasswordResetIntegrationTests {
 
     @Test
     void rollsBackTokenUseWhenPasswordHashingFails() throws Exception {
-        Account account = createAccount(uniqueEmail(), "ROLE_USER", true, true);
+        Account account = createAccount(uniqueEmail(), "USER", true, true);
         String originalHash = account.getPasswordHash();
         String rawToken = "rollback-" + UUID.randomUUID();
         PasswordResetToken token = createResetToken(account, rawToken, LocalDateTime.now(ZoneOffset.UTC).plusMinutes(30));
@@ -330,7 +325,7 @@ class PasswordResetIntegrationTests {
     @Test
     void onlyNewestResetTokenWorksAndSuccessfulResetConsumesItOnce() throws Exception {
         String email = uniqueEmail();
-        Account account = createAccount(email, "ROLE_USER", true, true);
+        Account account = createAccount(email, "USER", true, true);
         LocalDateTime expiresAt = LocalDateTime.now(ZoneOffset.UTC).plusMinutes(30);
         String oldRawToken = "old-" + UUID.randomUUID();
         String newestRawToken = "new-" + UUID.randomUUID();
@@ -363,7 +358,7 @@ class PasswordResetIntegrationTests {
     @Test
     void successfulResetInvalidatesExistingAccessAndRefreshSessionsAndAllowsNewPasswordLogin() throws Exception {
         String email = uniqueEmail();
-        Account account = createAccount(email, "ROLE_USER", true, true);
+        Account account = createAccount(email, "USER", true, true);
         MvcResult login = login(email, "Existing1!").andExpect(status().isOk()).andReturn();
         String accessToken = new tools.jackson.databind.ObjectMapper()
                 .readTree(login.getResponse().getContentAsString()).get("data").get("accessToken").asText();
@@ -391,7 +386,7 @@ class PasswordResetIntegrationTests {
     @Test
     void concurrentSubmissionsOfOneResetTokenChangeThePasswordAndVersionOnlyOnce() throws Exception {
         String email = uniqueEmail();
-        Account account = createAccount(email, "ROLE_USER", true, true);
+        Account account = createAccount(email, "USER", true, true);
         String rawToken = requestResetLink(email);
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);

@@ -78,7 +78,7 @@ export function RoleManagementPage() {
         if (!mounted) return;
         setRoles(roleList);
         setCatalog(permissionCatalog);
-        const initialRole = roleList.find(({ code }) => code === 'ROLE_USER')
+        const initialRole = roleList.find(({ code }) => code === 'USER')
           ?? roleList.find(({ canEdit }) => canEdit)
           ?? roleList[0];
         roleCodeRef.current = initialRole?.code;
@@ -334,16 +334,16 @@ export function RoleManagementPage() {
                 onChange={handleRoleChange}
                 options={roles.map((role) => ({
                   value: role.code,
-                  label: role.code === 'ROLE_SUPER_ADMIN' ? 'Siêu quản trị viên'
-                    : role.code === 'ROLE_ADMIN' ? 'Quản trị viên' : 'Người dùng',
+                  label: role.code === 'ADMIN' ? 'Quản trị viên'
+                    : role.code === 'USER' ? 'Người dùng' : role.code.replaceAll('_', ' '),
                 }))}
               />
               {selectedRole && <span className="role-version">Phiên bản {rolePermissions?.version ?? selectedRole.version}</span>}
             </div>
 
             {selectedRole && <div className="role-readonly-note">
-              <strong>{selectedRole.code === 'ROLE_SUPER_ADMIN' ? 'Siêu quản trị viên'
-                : selectedRole.code === 'ROLE_ADMIN' ? 'Quản trị viên' : 'Người dùng'}</strong>
+              <strong>{selectedRole.code === 'ADMIN' ? 'Quản trị viên'
+                : selectedRole.code === 'USER' ? 'Người dùng' : selectedRole.code.replaceAll('_', ' ')}</strong>
               <span>{canEdit ? 'Các quyền có thể thay đổi được đánh dấu bên dưới.' : 'Vai trò này chỉ được xem trong phiên quản trị hiện tại.'}</span>
             </div>}
 
@@ -443,7 +443,7 @@ export function RoleManagementPage() {
             <h3>Quyền được gỡ ({removals.length})</h3>
             {removals.length ? <ul>{removals.map((code) => <li key={code}><code>{code}</code></li>)}</ul> : <p>Không có</p>}
           </section>
-          {roleCode === 'ROLE_ADMIN' && removals.some((code) => code === 'role:read' || code === 'role:update') && (
+          {roleCode === 'ADMIN' && removals.some((code) => code === 'role:read' || code === 'role:update') && (
             <Alert type="warning" showIcon title="Gỡ quyền quản lý vai trò có thể làm mất khả năng truy cập màn hình này." />
           )}
         </div>

@@ -38,6 +38,9 @@ public class Account {
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "is_system_account", nullable = false)
+    private boolean systemAccount;
+
     /** Tăng mỗi khi trạng thái tài khoản đổi để vô hiệu hóa JWT đã cấp trước đó. */
     @Column(name = "session_version", nullable = false)
     private long sessionVersion;

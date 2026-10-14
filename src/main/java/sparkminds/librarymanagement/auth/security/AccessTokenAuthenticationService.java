@@ -61,7 +61,7 @@ public class AccessTokenAuthenticationService {
             throw invalidToken();
         }
 
-        if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
+        if ("USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
             throw new ApiAuthenticationException(
                     HttpStatus.FORBIDDEN,
                     "EMAIL_NOT_VERIFIED",
@@ -70,7 +70,7 @@ public class AccessTokenAuthenticationService {
         }
 
         CustomUserPrincipal principal = CustomUserPrincipal.from(
-                account, effectivePermissionService.resolve(account));
+                account, effectivePermissionService.resolveCurrentRoleCode(account.getRole().getCode()));
         return UsernamePasswordAuthenticationToken.authenticated(
                 principal,
                 null,

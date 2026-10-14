@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   auth: {
     accessToken: 'active-user-token',
     isBootstrapping: false,
-    currentUser: { id: 17, username: 'reader', email: 'reader@example.com', role: 'ROLE_USER', permissions: ['account:change-email'] },
-    role: 'ROLE_USER',
+    currentUser: { id: 17, username: 'reader', email: 'reader@example.com', role: 'USER', permissions: ['account:change-email'] },
+    role: 'USER',
     permissions: ['account:change-email'],
     capabilityStatus: 'ready',
     refreshCapabilities: vi.fn(async () => undefined),
@@ -48,8 +48,8 @@ afterEach(() => {
   mocks.auth.refreshCapabilities.mockClear();
   Object.assign(mocks.auth, {
     accessToken: 'active-user-token',
-    currentUser: { id: 17, username: 'reader', email: 'reader@example.com', role: 'ROLE_USER', permissions: ['account:change-email'] },
-    role: 'ROLE_USER',
+    currentUser: { id: 17, username: 'reader', email: 'reader@example.com', role: 'USER', permissions: ['account:change-email'] },
+    role: 'USER',
     permissions: ['account:change-email'],
     isBootstrapping: false,
     capabilityStatus: 'ready',

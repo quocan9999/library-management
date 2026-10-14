@@ -80,7 +80,7 @@ public class AuthSessionService {
             );
         }
 
-        if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
+        if ("USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
             throw new BusinessException(
                     HttpStatus.FORBIDDEN,
                     "EMAIL_NOT_VERIFIED",

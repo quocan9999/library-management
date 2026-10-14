@@ -50,7 +50,7 @@ class SecurityFoundationIntegrationTests {
         Account adminAccount = accountRepository.findByUsername("admin").orElseThrow();
 
         assertThat(admin.getUsername()).isEqualTo("admin");
-        assertThat(adminAccount.getRole().getCode()).isEqualTo("ROLE_ADMIN");
+        assertThat(adminAccount.getRole().getCode()).isEqualTo("ADMIN");
         assertThat(admin.getPassword()).isNotEqualTo("admin");
         assertThat(admin.getAuthorities())
                 .extracting("authority")
@@ -69,7 +69,7 @@ class SecurityFoundationIntegrationTests {
         assertThat(user.getUsername()).isEqualTo("user");
         assertThat(userAccount.isEnabled()).isTrue();
         assertThat(userAccount.isEmailVerified()).isTrue();
-        assertThat(userAccount.getRole().getCode()).isEqualTo("ROLE_USER");
+        assertThat(userAccount.getRole().getCode()).isEqualTo("USER");
         assertThat(user.getPassword()).isNotEqualTo("user");
         assertThat(user.getAuthorities())
                 .extracting("authority")

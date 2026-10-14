@@ -103,9 +103,9 @@ public class EmailChangeTransactionService {
     private Account lockActiveUser(Integer accountId) {
         Account account = accountRepository.findByIdForUpdate(accountId)
                 .orElseThrow(EmailChangeTransactionService::invalidCode);
-        if (!"ROLE_USER".equals(account.getRole().getCode()) || !account.isEnabled()) {
+        if (!account.isEnabled()) {
             throw new BusinessException(HttpStatus.FORBIDDEN, "PERMISSION_DENIED",
-                    "Bạn không có quyền truy cập tài nguyên này");
+                    "Tài khoản hiện không thể sử dụng hồ sơ cá nhân");
         }
         return account;
     }

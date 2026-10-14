@@ -90,14 +90,14 @@ describe('permission revocation synchronization', () => {
           id: 5,
           username: 'admin',
           email: 'admin@example.com',
-          role: 'ROLE_ADMIN',
+          role: 'ADMIN',
           permissions,
         }));
       }
       if (config.url === '/api/v1/roles') {
         return response(config, success('ROLE_LIST_SUCCESS', [
-          { code: 'ROLE_ADMIN', description: 'Quản trị viên', version: 0, canEdit: false },
-          { code: 'ROLE_USER', description: 'Người dùng', version: 0, canEdit: true },
+          { code: 'ADMIN', description: 'Quản trị viên', version: 0, canEdit: false },
+          { code: 'USER', description: 'Người dùng', version: 0, canEdit: true },
         ]));
       }
       if (config.url === '/api/v1/permissions') {
@@ -105,9 +105,9 @@ describe('permission revocation synchronization', () => {
           { code: 'book:read', description: 'Xem sách', manageableByActor: true },
         ]));
       }
-      if (config.url === '/api/v1/roles/ROLE_USER/permissions') {
+      if (config.url === '/api/v1/roles/USER/permissions') {
         return response(config, success('ROLE_PERMISSIONS_SUCCESS', {
-          roleCode: 'ROLE_USER',
+          roleCode: 'USER',
           version: 0,
           assignedPermissions: [],
           effectivePermissions: [],
@@ -170,7 +170,7 @@ describe('permission revocation synchronization', () => {
           id: 5,
           username: 'admin',
           email: 'admin@example.com',
-          role: 'ROLE_ADMIN',
+          role: 'ADMIN',
           permissions: ['book:read'],
         }));
       }
@@ -201,7 +201,7 @@ describe('permission revocation synchronization', () => {
       id: 5,
       username: 'admin',
       email: 'admin@example.com',
-      role: 'ROLE_ADMIN',
+      role: 'ADMIN',
       permissions: ['role:read', 'role:update'],
     })));
     await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));

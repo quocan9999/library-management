@@ -4,7 +4,7 @@ import { useAuth, useOptionalAuth } from '../auth/AuthContext';
 import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
 import { SessionTabSync } from '../auth/SessionTabSync';
 import { readRegistrationEmail } from '../auth/registrationStorage';
-import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
+import { DefaultAccountRoute, RequirePermission } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
@@ -131,7 +131,7 @@ export function App() {
           <Route
             path="admin/roles"
             element={
-              <RequirePermission permission="role:read" allowedRoles={['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']}>
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
                 <RoleManagementPage />
               </RequirePermission>
             }
@@ -139,7 +139,7 @@ export function App() {
           <Route
             path="admin/members"
             element={
-              <RequirePermission permission="member:read">
+              <RequirePermission permission="member:read" deniedRoles={['USER']}>
                 <MemberListPage />
               </RequirePermission>
             }
@@ -147,22 +147,18 @@ export function App() {
           <Route
             path="admin/members/:id"
             element={
-              <RequirePermission permission="member:read">
+              <RequirePermission permission="member:read" deniedRoles={['USER']}>
                 <MemberDetailPage />
               </RequirePermission>
             }
           />
           <Route
             path="profile"
-            element={<RequireRole role="ROLE_USER"><ProfilePage /></RequireRole>}
+            element={<ProfilePage />}
           />
           <Route
             path="profile/change-password"
-            element={
-              <RequirePermission permission="account:change-password" allowedRoles={['ROLE_USER']}>
-                <ChangePasswordPage />
-              </RequirePermission>
-            }
+            element={<ChangePasswordPage />}
           />
           <Route
             path="profile/change-email"

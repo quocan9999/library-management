@@ -50,7 +50,7 @@ public class MemberAccountStatusService {
         Account account = accountRepository.findByIdForUpdate(accountId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Không tìm thấy tài khoản thành viên"));
-        if (!"ROLE_USER".equals(account.getRole().getCode())) {
+        if (!"USER".equals(account.getRole().getCode())) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Không tìm thấy thành viên");
         }
 

@@ -21,7 +21,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class MemberReadRepository {
 
-    private static final String MEMBER_ACCOUNT_FROM = " FROM members m JOIN accounts a ON a.id = m.account_id ";
+    private static final String MEMBER_ACCOUNT_FROM = " FROM members m JOIN accounts a ON a.id = m.account_id "
+            + "JOIN roles r ON r.id = a.role_id AND r.code = 'USER' ";
 
     private static final RowMapper<MemberListItemResponse> MEMBER_LIST_ROW = (rs, rowNum) ->
             new MemberListItemResponse(
@@ -91,6 +92,7 @@ public class MemberReadRepository {
                         WHERE l.member_id = m.id AND li.status = 'BORROWED') AS borrowed_item_count
                 FROM members m
                 JOIN accounts a ON a.id = m.account_id
+                JOIN roles r ON r.id = a.role_id AND r.code = 'USER'
                 WHERE m.id = ?
                 """, MEMBER_DETAIL_ROW, memberId);
         return rows.stream().findFirst();
@@ -98,7 +100,9 @@ public class MemberReadRepository {
 
     public boolean existsMember(Integer memberId) {
         Boolean exists = jdbcTemplate.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM members WHERE id = ?)", Boolean.class, memberId);
+                "SELECT EXISTS(SELECT 1 FROM members m JOIN accounts a ON a.id = m.account_id "
+                        + "JOIN roles r ON r.id = a.role_id AND r.code = 'USER' WHERE m.id = ?)",
+                Boolean.class, memberId);
         return Boolean.TRUE.equals(exists);
     }
 
@@ -119,6 +123,9 @@ public class MemberReadRepository {
                 SELECT COUNT(*)
                 FROM loan_items li
                 JOIN loans l ON l.id = li.loan_id
+                JOIN members m ON m.id = l.member_id
+                JOIN accounts a ON a.id = m.account_id
+                JOIN roles r ON r.id = a.role_id AND r.code = 'USER'
                 WHERE l.member_id = ?
                 """ + statusClause, Long.class, countArguments.toArray());
 
@@ -135,6 +142,9 @@ public class MemberReadRepository {
                 FROM loan_items li
                 JOIN loans l ON l.id = li.loan_id
                 JOIN books b ON b.id = li.book_id
+                JOIN members m ON m.id = l.member_id
+                JOIN accounts a ON a.id = m.account_id
+                JOIN roles r ON r.id = a.role_id AND r.code = 'USER'
                 WHERE l.member_id = ?
                 """ + statusClause + " ORDER BY l.borrowed_at DESC, l.id DESC, li.id DESC LIMIT ? OFFSET ?",
                 LOAN_HISTORY_ROW,

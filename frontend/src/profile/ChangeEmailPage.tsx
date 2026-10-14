@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { RequirePermission } from '../auth/permissions';
 import type { ApiEnvelope } from '../auth/types';
 import { profileApi } from './api';
 import { createChangeEmailSchema, changeEmailCodeSchema, type ChangeEmailFormInput, type ChangeEmailFormValues } from './changeEmailSchema';
@@ -87,7 +86,6 @@ export function ChangeEmailPage() {
   };
 
   return (
-    <RequirePermission permission="account:change-email" allowedRoles={['ROLE_USER']}>
     <main className="profile-page profile-page--form" aria-labelledby="change-email-title">
       <header className="profile-page__heading">
         <h1 id="change-email-title">Đổi email</h1>
@@ -179,6 +177,5 @@ export function ChangeEmailPage() {
         {changedEmail && <div className="profile-password-form__actions"><Link to="/profile">Quay lại hồ sơ</Link></div>}
       </section>
     </main>
-    </RequirePermission>
   );
 }

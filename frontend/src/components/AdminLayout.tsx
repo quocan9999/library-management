@@ -49,11 +49,10 @@ function CloseIcon() {
 function roleLabel(role: string | null): string {
   if (!role) return 'Đang tải vai trò';
   const labels: Record<string, string> = {
-    ROLE_SUPER_ADMIN: 'Siêu quản trị viên',
-    ROLE_ADMIN: 'Quản trị viên',
-    ROLE_USER: 'Người dùng',
+    ADMIN: 'Quản trị viên',
+    USER: 'Người dùng',
   };
-  return labels[role] ?? role.replace(/^ROLE_/, '').replaceAll('_', ' ');
+  return labels[role] ?? role.replaceAll('_', ' ');
 }
 
 export function AdminLayout() {
@@ -129,7 +128,7 @@ export function AdminLayout() {
         ref={sidebarRef}
         id="admin-sidebar"
         className={`admin-shell__sidebar${mobileMenuOpen ? ' admin-shell__sidebar--open' : ''}`}
-        aria-label={role === 'ROLE_USER' ? 'Điều hướng tài khoản' : 'Điều hướng quản trị'}
+        aria-label={role === 'USER' ? 'Điều hướng tài khoản' : 'Điều hướng quản trị'}
         role={mobileMenuOpen ? 'dialog' : undefined}
         aria-modal={mobileMenuOpen || undefined}
         onKeyDown={handleSidebarKeyDown}
@@ -145,10 +144,10 @@ export function AdminLayout() {
         </header>
 
         <p className="admin-shell__section-label">
-          {role === 'ROLE_USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
+          {role === 'USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
         </p>
         <nav className="admin-shell__nav" aria-label="Chính">
-          <PermissionGate permission="role:read" fallback={null}>
+          <PermissionGate permission="role:read" allowedRoles={['ADMIN']} fallback={null}>
             <NavLink
               to="/admin/roles"
               className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
@@ -158,7 +157,7 @@ export function AdminLayout() {
               <span>Quản lý vai trò</span>
             </NavLink>
           </PermissionGate>
-          <PermissionGate permission="member:read" fallback={null}>
+          <PermissionGate permission="member:read" deniedRoles={['USER']} fallback={null}>
             <NavLink
               to="/admin/members"
               className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
@@ -172,16 +171,14 @@ export function AdminLayout() {
 
         <footer className="admin-shell__footer">
           {logoutError && <Alert type="error" showIcon role="alert" title={logoutError} />}
-          {role === 'ROLE_USER' && (
-            <NavLink
-              to="/profile"
-              className={({ isActive }) => `admin-shell__profile-link${isActive ? ' is-active' : ''}`}
-              onClick={closeMobileMenu}
-            >
-              <ProfileIcon />
-              <span>Hồ sơ tài khoản</span>
-            </NavLink>
-          )}
+          <NavLink
+            to="/profile"
+            className={({ isActive }) => `admin-shell__profile-link${isActive ? ' is-active' : ''}`}
+            onClick={closeMobileMenu}
+          >
+            <ProfileIcon />
+            <span>Hồ sơ tài khoản</span>
+          </NavLink>
           <section className="admin-shell__profile" aria-label="Tài khoản đang đăng nhập">
             <span className="admin-shell__profile-icon"><ProfileIcon /></span>
             <span className="admin-shell__profile-copy">

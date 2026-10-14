@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
     id: 2,
     username: 'admin',
     email: 'admin@example.com',
-    role: 'ROLE_ADMIN',
+    role: 'ADMIN',
     permissions: ['role:read', 'role:update', 'book:read', 'book:import', 'member:read'],
   },
 }));
@@ -75,7 +75,6 @@ function configureRoleApi(options: {
   patchStatus?: number;
   patchCode?: string;
   version?: number;
-  visibleSuperAdmin?: boolean;
   userCanEdit?: boolean;
   deferPatch?: boolean;
   assignedPermissions?: string[];
@@ -89,17 +88,14 @@ function configureRoleApi(options: {
   apiClient.defaults.adapter = (async (config) => {
     requests.push({ method: config.method ?? '', url: config.url ?? '', body: config.data });
     if (config.url === '/api/v1/roles') {
-      const superAdmin = options.visibleSuperAdmin ?? mocks.currentUser.role === 'ROLE_SUPER_ADMIN';
       const roleList = [
-        ...(superAdmin ? [{ code: 'ROLE_SUPER_ADMIN', description: 'Siêu quản trị viên', version: 1, canEdit: false }] : []),
-        { code: 'ROLE_ADMIN', description: 'Quản trị viên', version: 3, canEdit: superAdmin },
-        { code: 'ROLE_USER', description: 'Người dùng', version: options.version ?? 7, canEdit: options.userCanEdit ?? true },
+        { code: 'ADMIN', description: 'Quản trị viên', version: 3, canEdit: false },
+        { code: 'USER', description: 'Người dùng', version: options.version ?? 7, canEdit: options.userCanEdit ?? true },
       ];
       roleCodes = roleList.map(({ code }) => code);
       return response(config, success('ROLE_LIST_SUCCESS', roleList));
     }
     if (config.url === '/api/v1/permissions') {
-      const superAdmin = mocks.currentUser.role === 'ROLE_SUPER_ADMIN';
       return response(config, success('PERMISSION_LIST_SUCCESS', [
         { code: 'role:read', description: 'Xem vai trò', manageableByActor: true, dependencies: [] },
         { code: 'role:update', description: 'Cập nhật quyền', manageableByActor: true, dependencies: ['role:read'] },
@@ -110,33 +106,29 @@ function configureRoleApi(options: {
         { code: 'book:import', description: 'Nhập sách', manageableByActor: true, dependencies: ['book:read'] },
         { code: 'member:read', description: 'Xem thành viên', manageableByActor: !options.unmanageableMemberRead, dependencies: [] },
         { code: 'member:create', description: 'Tạo thành viên', manageableByActor: true, dependencies: ['member:read'] },
-        { code: 'member:update', description: 'Cập nhật thành viên', manageableByActor: superAdmin, dependencies: ['member:read'] },
-        { code: 'member:delete', description: 'Xóa thành viên', manageableByActor: superAdmin, dependencies: ['member:read'] },
+        { code: 'member:update', description: 'Cập nhật thành viên', manageableByActor: true, dependencies: ['member:read'] },
+        { code: 'member:delete', description: 'Xóa thành viên', manageableByActor: true, dependencies: ['member:read'] },
         { code: 'future:review', description: 'Xem nghiệp vụ mới', manageableByActor: false, dependencies: [] },
       ]));
     }
     if (config.url?.startsWith('/api/v1/roles/') && config.url.endsWith('/permissions') && config.method === 'get') {
       detailReads += 1;
-      const targetRoleCode = config.url.split('/')[4] ?? 'ROLE_USER';
-      const ownSuperAdmin = targetRoleCode === 'ROLE_SUPER_ADMIN';
-      const assigned = ownSuperAdmin
-        ? ['role:read', 'role:update', 'book:read', 'book:create', 'book:delete', 'book:import', 'member:read']
-        : targetRoleCode === 'ROLE_ADMIN' ? ['role:read', 'role:update'] : options.assignedPermissions ?? ['book:read', 'book:delete'];
+      const targetRoleCode = config.url.split('/')[4] ?? 'USER';
+      const assigned = targetRoleCode === 'ADMIN' ? ['role:read', 'role:update'] : options.assignedPermissions ?? ['book:read', 'book:delete'];
       return response(config, success('ROLE_PERMISSIONS_SUCCESS', {
         roleCode: targetRoleCode,
-        version: targetRoleCode === 'ROLE_USER' ? options.version ?? 7 : 3,
+        version: targetRoleCode === 'USER' ? options.version ?? 7 : 3,
         assignedPermissions: assigned,
         effectivePermissions: assigned,
-        editablePermissions: ownSuperAdmin ? [] : targetRoleCode === 'ROLE_ADMIN'
+        editablePermissions: targetRoleCode === 'ADMIN'
           ? ['role:read', 'role:update']
-          : options.userCanEdit === false ? [] : mocks.currentUser.role === 'ROLE_SUPER_ADMIN'
-            ? ['book:read', 'book:create', 'book:update', 'book:import', 'member:read', 'member:create', 'member:update', 'member:delete']
-            : ['book:read', 'book:create', 'book:update', 'book:import', 'member:read', 'member:create'],
-        editable: !ownSuperAdmin && (targetRoleCode !== 'ROLE_ADMIN' || mocks.currentUser.role === 'ROLE_SUPER_ADMIN')
-          && (targetRoleCode !== 'ROLE_USER' || options.userCanEdit !== false),
+          : options.userCanEdit === false ? []
+            : ['book:read', 'book:create', 'book:update', 'book:import', 'member:read', 'member:create', 'member:update', 'member:delete'],
+        editable: targetRoleCode !== 'ADMIN'
+          && (targetRoleCode !== 'USER' || options.userCanEdit !== false),
       }));
     }
-    if (config.url === '/api/v1/roles/ROLE_USER/permissions' && config.method === 'patch') {
+    if (config.url === '/api/v1/roles/USER/permissions' && config.method === 'patch') {
       if (options.patchStatus) failure(config, options.patchStatus, options.patchCode ?? 'PERMISSION_DENIED', options.patchMessage);
       if (options.deferPatch) {
         return await new Promise((resolve) => {
@@ -144,7 +136,7 @@ function configureRoleApi(options: {
         });
       }
       return response(config, success('ROLE_PERMISSIONS_UPDATED', {
-        roleCode: 'ROLE_USER',
+        roleCode: 'USER',
         version: (options.version ?? 7) + 1,
         assignedPermissions: options.assignedPermissions ?? ['book:read', 'book:delete'],
         effectivePermissions: options.assignedPermissions ?? ['book:read', 'book:delete'],
@@ -169,7 +161,7 @@ beforeEach(() => {
     id: 2,
     username: 'admin',
     email: 'admin@example.com',
-    role: 'ROLE_ADMIN',
+    role: 'ADMIN',
     permissions: ['role:read', 'role:update', 'book:read', 'book:create', 'book:import', 'member:read', 'member:create'],
   });
   const nativeGetComputedStyle = window.getComputedStyle.bind(window);
@@ -210,7 +202,7 @@ describe('RoleManagementPage', () => {
     expect((screen.getByRole('checkbox', { name: /member:read/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole('checkbox', { name: /member:create/ }) as HTMLInputElement).checked).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
-    expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Quyền được thêm (2)' })).toBeTruthy();
+    expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Quyền được thêm (4)' })).toBeTruthy();
   });
 
   it('does not select an operation when the actor cannot grant its missing dependency', async () => {
@@ -339,43 +331,6 @@ describe('RoleManagementPage', () => {
     expect(screen.getByText('Vai trò này chỉ được xem trong phiên quản trị hiện tại.')).toBeTruthy();
   });
 
-  it('shows all three roles to SuperAdmin while keeping SuperAdmin permissions immutable', async () => {
-    const user = userEvent.setup();
-    Object.assign(mocks.currentUser, {
-      id: 1,
-      username: 'root',
-      email: null,
-      role: 'ROLE_SUPER_ADMIN',
-      permissions: ['role:read', 'role:update'],
-    });
-    const api = configureRoleApi({ visibleSuperAdmin: true });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
-
-    const selector = await screen.findByRole('combobox', { name: 'Vai trò' });
-    await waitFor(() => expect(api.roleCodes).toEqual(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_USER']));
-    await user.click(selector);
-    const ownRole = screen.getByRole('option', { name: 'Siêu quản trị viên' });
-    expect(ownRole).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Quản trị viên' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Người dùng' })).toBeTruthy();
-    await user.click(ownRole);
-
-    const immutablePermission = await screen.findByRole('checkbox', { name: /role:read/ });
-    expect((immutablePermission as HTMLInputElement).checked).toBe(true);
-    expect((immutablePermission as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText('Vai trò này chỉ được xem trong phiên quản trị hiện tại.')).toBeTruthy();
-
-    await user.click(selector);
-    await user.click(await screen.findByRole('option', { name: 'Quản trị viên' }));
-    const removablePermission = await screen.findByRole('checkbox', { name: /role:read/ });
-    expect((removablePermission as HTMLInputElement).disabled).toBe(false);
-    await user.click(screen.getByRole('checkbox', { name: /role:update/ }));
-    await user.click(removablePermission);
-    await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
-    expect(await screen.findByText('Gỡ quyền quản lý vai trò có thể làm mất khả năng truy cập màn hình này.')).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: 'Hủy' }));
-  });
-
   it('keeps USER read-only when an Admin has role:read but lacks role:update', async () => {
     Object.assign(mocks.currentUser, { permissions: ['role:read'] });
     configureRoleApi({ userCanEdit: false });
@@ -410,12 +365,12 @@ describe('RoleManagementPage', () => {
     const user = userEvent.setup();
     Object.assign(mocks.currentUser, {
       id: 1,
-      username: 'root',
+      username: 'admin',
       email: null,
-      role: 'ROLE_SUPER_ADMIN',
+      role: 'ADMIN',
       permissions: ['role:read', 'role:update'],
     });
-    const api = configureRoleApi({ deferPatch: true, visibleSuperAdmin: true });
+    const api = configureRoleApi({ deferPatch: true });
     render(<AppNotificationProvider><MemoryRouter><RoleManagementPage /></MemoryRouter></AppNotificationProvider>);
 
     await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
@@ -429,7 +384,7 @@ describe('RoleManagementPage', () => {
     expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
 
     api.resolvePendingPatch?.({
-      roleCode: 'ROLE_USER',
+      roleCode: 'USER',
       version: 8,
       assignedPermissions: ['book:read', 'book:create', 'book:delete'],
       effectivePermissions: ['book:read', 'book:create', 'book:delete'],

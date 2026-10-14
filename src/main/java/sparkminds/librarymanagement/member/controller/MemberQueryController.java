@@ -23,7 +23,7 @@ public class MemberQueryController {
     private final MemberQueryService memberQueryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('member:read')")
+    @PreAuthorize("hasAuthority('member:read') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<PagedResponse<MemberListItemResponse>>> list(
             @RequestParam(required = false) String fullName,
             @RequestParam(required = false) String memberCode,
@@ -49,7 +49,7 @@ public class MemberQueryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('member:read')")
+    @PreAuthorize("hasAuthority('member:read') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<MemberDetailResponse>> detail(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.success(
                 200,
@@ -60,7 +60,7 @@ public class MemberQueryController {
     }
 
     @GetMapping("/{id}/loan-history")
-    @PreAuthorize("hasAuthority('member:read')")
+    @PreAuthorize("hasAuthority('member:read') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<PagedResponse<LoanHistoryItemResponse>>> loanHistory(
             @PathVariable Integer id,
             @RequestParam(required = false) String status,

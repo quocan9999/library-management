@@ -22,7 +22,7 @@ public class MemberProfileController {
     private final MemberProfileService memberProfileService;
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAuthority('member:update')")
+    @PreAuthorize("hasAuthority('member:update') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<MemberDetailResponse>> patchProfile(
             @PathVariable Integer id,
             @Valid @RequestBody MemberProfilePatchRequest request

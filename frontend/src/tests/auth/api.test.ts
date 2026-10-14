@@ -77,7 +77,7 @@ describe('API base URL configuration', () => {
       }
       if (config.url === '/api/v1/auth/me') return response(config, {
         success: true, code: 'AUTH_ME_SUCCESS', status: 200, message: '', timestamp: new Date().toISOString(),
-        data: { id: 2, username: 'B', email: 'b@example.com', role: 'ROLE_USER', permissions: [] },
+        data: { id: 2, username: 'B', email: 'b@example.com', role: 'USER', permissions: [] },
       });
       throw new Error(`Unexpected request ${config.url}`);
     }) satisfies AxiosAdapter;
@@ -276,7 +276,7 @@ describe('authenticated API client', () => {
     setAccessToken('still-authorized-token');
     const unsubscribe = subscribeToCapabilityRefresh(() => { syncEvents += 1; });
     apiClient.defaults.adapter = (async (config) => {
-      if (config.url === '/api/v1/roles/ROLE_USER/permissions') {
+      if (config.url === '/api/v1/roles/USER/permissions') {
         mutationAttempts += 1;
         const body: ApiEnvelope<null> = {
           success: false,
@@ -298,7 +298,7 @@ describe('authenticated API client', () => {
     }) satisfies AxiosAdapter;
 
     try {
-      await expect(apiClient.patch('/api/v1/roles/ROLE_USER/permissions', {
+      await expect(apiClient.patch('/api/v1/roles/USER/permissions', {
         expectedVersion: 0,
         addPermissions: ['book:read'],
         removePermissions: [],
@@ -361,7 +361,7 @@ describe('authenticated API client', () => {
           id: 21,
           username: null,
           email: 'admin@example.com',
-          role: 'ROLE_ADMIN',
+          role: 'ADMIN',
           permissions: ['role:read', 'role:update'],
         },
         timestamp: new Date().toISOString(),
@@ -382,7 +382,7 @@ describe('authenticated API client', () => {
       id: 21,
       username: null,
       email: 'admin@example.com',
-      role: 'ROLE_ADMIN',
+      role: 'ADMIN',
       permissions: ['role:read', 'role:update'],
     });
   });
