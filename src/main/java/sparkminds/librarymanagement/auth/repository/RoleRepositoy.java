@@ -12,6 +12,8 @@ import java.util.Optional;
 public interface RoleRepositoy extends JpaRepository<Role, Short> {
     Optional<Role> findByCode(String code);
 
+    boolean existsByCodeIgnoreCase(String code);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select role from Role role where role.code = :code")
     Optional<Role> findByCodeForUpdate(@Param("code") String code);

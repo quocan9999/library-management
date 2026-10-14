@@ -46,6 +46,10 @@ public class EffectivePermissionService {
         return permissionRepository.findPermissionCodesByRoleCode(roleCode);
     }
 
+    public List<String> resolveAssignedRoleCode(String roleCode) {
+        return permissionRepository.findPermissionCodesByRoleCode(roleCode);
+    }
+
     public List<String> allPermissionCodes() {
         return permissionRepository.findAllByOrderByCodeAsc().stream()
                 .map(Permission::getCode)

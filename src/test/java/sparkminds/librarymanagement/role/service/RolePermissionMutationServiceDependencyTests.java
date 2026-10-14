@@ -97,13 +97,15 @@ class RolePermissionMutationServiceDependencyTests {
         when(roleAccessPolicy.canEditTarget(eq("ADMIN"), eq("USER"), any())).thenReturn(true);
         when(effectivePermissionService.resolveCurrentRoleCode("ADMIN"))
                 .thenReturn(List.of("role:read", "role:update", "member:create", "member:read"));
+        when(effectivePermissionService.resolveAssignedRoleCode("USER"))
+                .thenReturn(List.of("member:read"));
         when(effectivePermissionService.allPermissionCodes())
                 .thenReturn(List.of(
                         "role:read", "role:update", "member:read", "member:create", "member:update",
                         "member:delete", "member:status:update", "book:read", "book:create", "book:update",
                         "book:delete", "book:import"));
         when(roleAccessPolicy.editablePermissions(eq("ADMIN"), eq("USER"), any(), any()))
-                .thenReturn(List.of("member:read", "member:create"));
+                .thenReturn(List.of("member:read", "member:create", "member:delete", "borrow:return"));
         when(permissionRepository.findAllByCodeIn(any()))
                 .thenReturn(List.of(memberRead, memberCreate));
         when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(1);
@@ -114,6 +116,7 @@ class RolePermissionMutationServiceDependencyTests {
     void grantingOperationAlsoPersistsItsRequiredBasePermissionAndAuditsBoth() throws Exception {
         when(effectivePermissionService.resolveCurrentRoleCode("USER"))
                 .thenReturn(List.of(), List.of("member:create", "member:read"));
+        when(effectivePermissionService.resolveAssignedRoleCode("USER")).thenReturn(List.of());
 
         service.updatePermissions(actor, "USER", request(7, List.of("member:create"), List.of()));
 
@@ -132,6 +135,7 @@ class RolePermissionMutationServiceDependencyTests {
         when(roleAccessPolicy.editablePermissions(eq("ADMIN"), eq("USER"), any(), any()))
                 .thenReturn(List.of("member:create"));
         when(effectivePermissionService.resolveCurrentRoleCode("USER")).thenReturn(List.of());
+        when(effectivePermissionService.resolveAssignedRoleCode("USER")).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.updatePermissions(
                 actor, "USER", request(7, List.of("member:create"), List.of())))
@@ -144,6 +148,8 @@ class RolePermissionMutationServiceDependencyTests {
     @Test
     void basePermissionCannotBeRemovedWhileARegisteredDependentRemains() throws Exception {
         when(effectivePermissionService.resolveCurrentRoleCode("USER"))
+                .thenReturn(List.of("member:create", "member:read"));
+        when(effectivePermissionService.resolveAssignedRoleCode("USER"))
                 .thenReturn(List.of("member:create", "member:read"));
 
         assertThatThrownBy(() -> service.updatePermissions(
@@ -164,7 +170,9 @@ class RolePermissionMutationServiceDependencyTests {
     @Test
     void dependentAndBaseCanBeRemovedInTheSameDelta() throws Exception {
         when(effectivePermissionService.resolveCurrentRoleCode("USER"))
-                .thenReturn(List.of("member:create", "member:read"), List.of());
+                .thenReturn(List.of("member:create", "member:read", "borrow:return"), List.of("borrow:return"));
+        when(effectivePermissionService.resolveAssignedRoleCode("USER"))
+                .thenReturn(List.of("member:create", "member:read", "borrow:return"));
 
         service.updatePermissions(actor, "USER",
                 request(7, List.of(), List.of("member:create", "member:read")));
@@ -191,6 +199,7 @@ class RolePermissionMutationServiceDependencyTests {
     void noOpPermissionDeltaDoesNotWriteOrAdvanceRoleVersion() throws Exception {
         when(effectivePermissionService.resolveCurrentRoleCode("USER"))
                 .thenReturn(List.of("member:read"), List.of("member:read"));
+        when(effectivePermissionService.resolveAssignedRoleCode("USER")).thenReturn(List.of("member:read"));
 
         service.updatePermissions(actor, "USER", request(7, List.of("member:read"), List.of()));
 
