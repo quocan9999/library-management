@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-r
 import { useAuth, useOptionalAuth } from '../auth/AuthContext';
 import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
 import { SessionTabSync } from '../auth/SessionTabSync';
+import { readRegistrationEmail } from '../auth/registrationStorage';
 import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
 import { LoginPage } from '../pages/LoginPage';
@@ -37,6 +38,19 @@ function RedirectSignedInUser({ children }: { children: React.ReactNode }) {
   const { accessToken, isBootstrapping } = useAuth();
   if (isBootstrapping) return <SessionBootstrap />;
   return accessToken ? <Navigate to="/" replace /> : children;
+}
+
+function RequireAuthFlow({ children, registration = false }: { children: React.ReactNode; registration?: boolean }) {
+  const { accessToken, isBootstrapping } = useAuth();
+  const location = useLocation();
+  const state = location.state as { verificationRequestKey?: string; registrationCooldownUntil?: number } | null;
+  const hasFlow = registration
+    ? (Boolean(readRegistrationEmail()) || (typeof state?.registrationCooldownUntil === 'number'
+      && Number.isFinite(state.registrationCooldownUntil))) && !accessToken
+    : Boolean(new URLSearchParams(location.search).get('token'))
+      || (location.pathname === '/verify-email' && typeof state?.verificationRequestKey === 'string');
+  if (isBootstrapping) return <SessionBootstrap />;
+  return hasFlow ? children : <Navigate to={accessToken ? '/' : '/login'} replace />;
 }
 
 function CapabilityRouteSync() {
@@ -105,9 +119,9 @@ export function App() {
             </RedirectSignedInUser>
           }
         />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/check-email" element={<CheckEmailPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/reset-password" element={<RequireAuthFlow><ResetPasswordPage /></RequireAuthFlow>} />
+        <Route path="/check-email" element={<RequireAuthFlow registration><CheckEmailPage /></RequireAuthFlow>} />
+        <Route path="/verify-email" element={<RequireAuthFlow><VerifyEmailPage /></RequireAuthFlow>} />
         <Route path="/403" element={<ForbiddenPage />} />
         <Route
           path="/"

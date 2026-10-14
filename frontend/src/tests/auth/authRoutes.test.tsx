@@ -20,7 +20,10 @@ import { AuthProvider } from '../../auth/AuthContext';
 import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
 import { apiClient } from '../../auth/api';
 import type { ApiEnvelope, RegisterData } from '../../auth/types';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { RegisterPage } from '../../pages/RegisterPage';
+import { CheckEmailPage } from '../../pages/CheckEmailPage';
+import { VerifyEmailPage } from '../../pages/VerifyEmailPage';
 
 const originalAdapter = apiClient.defaults.adapter;
 
@@ -80,11 +83,15 @@ function LocationProbe() {
   return <output aria-label="current search">{location.search}</output>;
 }
 
-function renderApp(entry: string) {
+function renderPublicFlowPages(entry: string) {
   return render(
     <StrictMode>
       <MemoryRouter initialEntries={[entry]}>
-        <App />
+        <Routes>
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/check-email" element={<CheckEmailPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+        </Routes>
         <LocationProbe />
       </MemoryRouter>
     </StrictMode>,
@@ -242,7 +249,7 @@ describe('public registration and verification routes', () => {
     expect(getAccessToken()).toBe('account-B-token');
   });
 
-  it('does not call reset without a URL token and offers a new link', async () => {
+  it('does not call reset without a URL token and returns to login', async () => {
     let resetCalls = 0;
     apiClient.defaults.adapter = (async (config) => {
       if (config.url === '/api/v1/auth/refresh') apiFailure(config, 401, 'AUTH_REFRESH_TOKEN_MISSING');
@@ -252,8 +259,7 @@ describe('public registration and verification routes', () => {
 
     renderAppWithAuth('/reset-password');
 
-    expect(await screen.findByText('Liên kết không hợp lệ hoặc đã hết hạn')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Yêu cầu liên kết mới' }).getAttribute('href')).toBe('/forgot-password');
+    expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeTruthy();
     expect(resetCalls).toBe(0);
   });
 
@@ -293,7 +299,7 @@ describe('public registration and verification routes', () => {
   });
 
   it('renders the register form as a public route with password guidance and accessible labels', () => {
-    renderApp('/register');
+    renderPublicFlowPages('/register');
 
     expect(screen.getByRole('heading', { name: 'Tạo tài khoản' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeTruthy();
@@ -315,7 +321,7 @@ describe('public registration and verification routes', () => {
       throw new Error(`Unexpected request: ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    renderApp('/register');
+    renderPublicFlowPages('/register');
     await user.type(screen.getByRole('textbox', { name: 'Email' }), '  Reader@Example.COM  ');
     await user.type(screen.getByLabelText('Mật khẩu'), 'Strong1!');
     await user.type(screen.getByLabelText('Xác nhận mật khẩu'), 'Strong1!');
@@ -335,7 +341,7 @@ describe('public registration and verification routes', () => {
 
   it('waits for blur before showing email validation, then clears the error after correction', async () => {
     const user = userEvent.setup();
-    renderApp('/register');
+    renderPublicFlowPages('/register');
     const email = screen.getByRole('textbox', { name: 'Email' });
 
     await user.type(email, 'not-an-email');
@@ -357,7 +363,7 @@ describe('public registration and verification routes', () => {
       { email: 'invalid', password: 'weak' },
     )) satisfies AxiosAdapter;
 
-    renderApp('/register');
+    renderPublicFlowPages('/register');
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'reader@example.com');
     await user.type(screen.getByLabelText('Mật khẩu'), 'Strong1!');
     await user.type(screen.getByLabelText('Xác nhận mật khẩu'), 'Strong1!');
@@ -371,7 +377,7 @@ describe('public registration and verification routes', () => {
     const user = userEvent.setup();
     apiClient.defaults.adapter = (async (config) => apiFailure(config, 409, 'EMAIL_ALREADY_REGISTERED')) satisfies AxiosAdapter;
 
-    renderApp('/register');
+    renderPublicFlowPages('/register');
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'reader@example.com');
     await user.type(screen.getByLabelText('Mật khẩu'), 'Strong1!');
     await user.type(screen.getByLabelText('Xác nhận mật khẩu'), 'Strong1!');
@@ -392,7 +398,7 @@ describe('public registration and verification routes', () => {
       });
     }) satisfies AxiosAdapter;
 
-    renderApp('/register');
+    renderPublicFlowPages('/register');
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'reader@example.com');
     await user.type(screen.getByLabelText('Mật khẩu'), 'Strong1!');
     await user.type(screen.getByLabelText('Xác nhận mật khẩu'), 'Strong1!');
@@ -417,7 +423,7 @@ describe('public registration and verification routes', () => {
       apiFailure(config, 409, 'EMAIL_NOT_VERIFIED_REGISTERED');
     }) satisfies AxiosAdapter;
 
-    renderApp('/register');
+    renderPublicFlowPages('/register');
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'Reader@Example.com');
     await user.type(screen.getByLabelText('Mật khẩu'), 'Strong1!');
     await user.type(screen.getByLabelText('Xác nhận mật khẩu'), 'Strong1!');
@@ -439,7 +445,7 @@ describe('public registration and verification routes', () => {
       return response(config, success('VERIFICATION_EMAIL_REQUESTED', null));
     }) satisfies AxiosAdapter;
 
-    renderApp('/check-email');
+    renderPublicFlowPages('/check-email');
 
     expect(screen.getByText('reader@example.com')).toBeTruthy();
     expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
@@ -454,7 +460,7 @@ describe('public registration and verification routes', () => {
   });
 
   it('shows an email field when check-email has no session data', () => {
-    renderApp('/check-email');
+    renderPublicFlowPages('/check-email');
 
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeTruthy();
     expect(screen.queryByText(/reader@example.com/)).toBeNull();
@@ -474,7 +480,7 @@ describe('public registration and verification routes', () => {
     }) satisfies AxiosAdapter;
     window.sessionStorage.setItem('registrationEmail', 'reader@example.com');
 
-    renderApp('/verify-email?token=one-time-token');
+    renderPublicFlowPages('/verify-email?token=one-time-token');
 
     expect(await screen.findByText('Đang kiểm tra liên kết xác thực…')).toBeTruthy();
     await waitFor(() => expect(screen.getByLabelText('current search').textContent).toBe(''));
@@ -498,7 +504,7 @@ describe('public registration and verification routes', () => {
       throw new Error(`Unexpected request: ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    renderApp('/verify-email');
+    renderPublicFlowPages('/verify-email');
 
     expect(await screen.findByText('Liên kết xác thực không hợp lệ.')).toBeTruthy();
     expect(verifyCalls).toBe(0);
@@ -510,7 +516,7 @@ describe('public registration and verification routes', () => {
       apiFailure(config, 400, 'VERIFICATION_TOKEN_EXPIRED');
     }) satisfies AxiosAdapter;
 
-    renderApp('/verify-email?token=expired-token');
+    renderPublicFlowPages('/verify-email?token=expired-token');
 
     expect(await screen.findByText('Liên kết xác thực đã hết hạn.')).toBeTruthy();
     expect(screen.queryByText('Email đã được xác thực thành công.')).toBeNull();
@@ -530,7 +536,7 @@ describe('public registration and verification routes', () => {
       throw new Error(`Unexpected request: ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    renderApp('/verify-email?token=retry-token');
+    renderPublicFlowPages('/verify-email?token=retry-token');
 
     expect(await screen.findByText('Không thể kết nối để xác thực email. Vui lòng thử lại.')).toBeTruthy();
     expect(screen.queryByText('Email đã được xác thực thành công.')).toBeNull();
@@ -548,7 +554,7 @@ describe('public registration and verification routes', () => {
 
     for (const [code, message] of expected) {
       apiClient.defaults.adapter = (async (config) => apiFailure(config, 400, code)) satisfies AxiosAdapter;
-      const view = renderApp(`/verify-email?token=${code}`);
+      const view = renderPublicFlowPages(`/verify-email?token=${code}`);
       expect(await screen.findByText(message)).toBeTruthy();
       view.unmount();
     }
@@ -560,7 +566,7 @@ describe('public registration and verification routes', () => {
       apiFailure(config, 429, 'RATE_LIMITED', { 'Retry-After': '23' });
     }) satisfies AxiosAdapter;
 
-    renderApp('/check-email');
+    renderPublicFlowPages('/check-email');
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'reader@example.com');
     await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
 
@@ -575,7 +581,7 @@ describe('public registration and verification routes', () => {
       return response(config, success('VERIFICATION_EMAIL_REQUESTED', null));
     }) satisfies AxiosAdapter;
 
-    renderApp('/check-email');
+    renderPublicFlowPages('/check-email');
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'Reader@Example.com');
     await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
 
