@@ -89,8 +89,22 @@ export function App() {
             </RedirectSignedInUser>
           }
         />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route
+          path="/register"
+          element={
+            <RedirectSignedInUser>
+              <RegisterPage />
+            </RedirectSignedInUser>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <RedirectSignedInUser>
+              <ForgotPasswordPage />
+            </RedirectSignedInUser>
+          }
+        />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/check-email" element={<CheckEmailPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
