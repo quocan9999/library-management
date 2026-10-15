@@ -8,18 +8,18 @@ import { loginSchema, type LoginForm } from '../auth/loginSchema';
 import { getLoginError, mapLoginValidationErrors } from '../auth/messages';
 import type { LoginCredentials } from '../auth/types';
 import { AuthLayout } from '../components/AuthLayout';
-import { ResendVerificationForm } from './ResendVerificationForm';
+import { LoginVerificationNotice } from './LoginVerificationNotice';
 
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const accountDisabledNotice = (location.state as { accountDisabled?: unknown } | null)?.accountDisabled === true;
+  const [verificationIdentifier, setVerificationIdentifier] = useState('');
   const [serverError, setServerError] = useState<ReturnType<typeof getLoginError> | null>(null);
   const {
     control,
     handleSubmit,
-    getValues,
     setError,
     setValue,
     formState: { errors, isSubmitting },
@@ -46,14 +46,12 @@ export function LoginPage() {
       }
       const copy = getLoginError(error);
       if (copy.code === 'EMAIL_NOT_VERIFIED') {
+        setVerificationIdentifier(values.identifier.trim());
         setValue('password', '');
       }
       setServerError(copy);
     }
   };
-
-  const identifier = getValues('identifier').trim();
-  const resendEmail = identifier.includes('@') ? identifier : '';
 
   return (
     <AuthLayout ariaLabel="Đăng nhập hệ thống quản lý thư viện" centered>
@@ -71,19 +69,16 @@ export function LoginPage() {
 
         {serverError && (
           <div className="login-feedback">
-            <Alert
+            {serverError.code === 'EMAIL_NOT_VERIFIED' ? (
+              <LoginVerificationNotice identifier={verificationIdentifier} />
+            ) : <Alert
               className="login-alert"
               type="error"
               showIcon
               role="alert"
               title={serverError.title}
               description={serverError.description}
-            />
-            {serverError.code === 'EMAIL_NOT_VERIFIED' && (
-              <div className="login-resend">
-                <ResendVerificationForm compact secondary initialEmail={resendEmail} />
-              </div>
-            )}
+            />}
           </div>
         )}
 

@@ -79,7 +79,7 @@ describe('authentication error messages', () => {
   it('maps an unverified login to a distinct safe message and code', () => {
     expect(getLoginError(apiError(403, 'EMAIL_NOT_VERIFIED'))).toEqual({
       title: 'Email chưa được xác thực',
-      description: 'Hãy xác thực email trước khi đăng nhập. Bạn có thể gửi lại hướng dẫn ngay bên dưới.',
+      description: 'Hãy xác thực email trước khi đăng nhập. Vui lòng kiểm tra hộp thư và thư spam.',
       code: 'EMAIL_NOT_VERIFIED',
     });
   });

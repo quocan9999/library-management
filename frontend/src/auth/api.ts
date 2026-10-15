@@ -228,6 +228,15 @@ export const authApi = {
     assertSuccess(response.data, 'EMAIL_VERIFIED');
   },
 
+  async resendLoginVerification(identifier: string): Promise<void> {
+    const response = await apiClient.post<ApiEnvelope<null>>(
+      '/api/v1/auth/resend-login-verification',
+      { identifier },
+      publicAuthRequestConfig,
+    );
+    assertSuccess(response.data, 'VERIFICATION_EMAIL_REQUESTED');
+  },
+
   async resendVerification(email: string): Promise<void> {
     const response = await apiClient.post<ApiEnvelope<null>>(
       '/api/v1/auth/resend-verification',
