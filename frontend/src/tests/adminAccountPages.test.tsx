@@ -295,6 +295,31 @@ describe('admin account UI routes', () => {
     expect(document.querySelector('.admin-account-table-wrap')?.textContent).toContain('librarian@example.com');
   });
 
+  it('explains invalid create fields inline and clears each error after correction', async () => {
+    configureApi();
+    renderApp('/admin/accounts');
+    await waitFor(() => expect(buttonByText(document, 'Tạo tài khoản quản trị').disabled).toBe(false));
+    fireEvent.click(buttonByText(document, 'Tạo tài khoản quản trị'));
+    fireEvent.blur(inputById('admin-account-username'));
+    fireEvent.change(inputById('admin-account-email'), { target: { value: 'invalid-email' } });
+    fireEvent.change(inputById('admin-account-password'), { target: { value: 'admin2' } });
+    fireEvent.change(inputById('admin-account-password-confirm'), { target: { value: 'admin' } });
+    fireEvent.blur(inputById('admin-account-role'));
+    for (const field of ['username', 'email', 'password', 'password-confirm', 'role']) {
+      expect(document.getElementById(`admin-account-${field}-error`)?.textContent).toBeTruthy();
+      expect(inputById(`admin-account-${field}`).getAttribute('aria-invalid')).toBe('true');
+    }
+    expect(buttonByText(document, 'Tạo tài khoản').disabled).toBe(true);
+    fireEvent.change(inputById('admin-account-username'), { target: { value: 'newadmin' } });
+    fireEvent.change(inputById('admin-account-email'), { target: { value: 'newadmin@example.com' } });
+    fireEvent.change(inputById('admin-account-password'), { target: { value: 'StrongPass1!' } });
+    fireEvent.change(inputById('admin-account-password-confirm'), { target: { value: 'StrongPass1!' } });
+    openSelect('Nhóm quyền');
+    await chooseRoleOption('Thủ thư (LIBRARIAN)');
+    expect(document.querySelector('.admin-account-field-error')).toBeNull();
+    expect(buttonByText(document, 'Tạo tài khoản').disabled).toBe(false);
+  });
+
   it('requires a role and confirms ADMIN privilege before creating an unverified account', async () => {
     const api = configureApi();
     renderApp('/admin/accounts');

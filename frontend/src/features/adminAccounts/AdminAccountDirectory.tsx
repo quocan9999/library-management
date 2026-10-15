@@ -14,6 +14,7 @@ const PAGE_SIZE = 10;
 const PASSWORD_POLICY = /^(?=.{8,20}$)(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\p{P}\p{S}])\S+$/u;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type DirectoryMode = 'management' | 'assignments';
+type CreateField = 'username' | 'email' | 'password' | 'password-confirm' | 'role';
 type SortState = { field: string; direction: 'asc' | 'desc' };
 type FilterState = {
   username: string;
@@ -111,6 +112,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
   const [createPasswordConfirm, setCreatePasswordConfirm] = useState('');
   const [createRoleCode, setCreateRoleCode] = useState<string>();
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createTouched, setCreateTouched] = useState<Partial<Record<CreateField, boolean>>>({});
   const [confirmAdminCreate, setConfirmAdminCreate] = useState(false);
 
   const [detailTarget, setDetailTarget] = useState<AdminAccount | null>(null);
@@ -199,6 +201,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
   const closeCreate = () => {
     if (createSaving) return;
     setCreateOpen(false);
+    setCreateTouched({});
     setCreateError(null);
     setCreateUsername('');
     setCreateEmail('');
@@ -208,16 +211,37 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     setConfirmAdminCreate(false);
   };
 
-  const createFormValid = Boolean(
-    createUsername.trim()
-      && createUsername.trim().length <= 20
-      && EMAIL_PATTERN.test(createEmail.trim())
-      && createEmail.trim().length <= 255
-      && PASSWORD_POLICY.test(createPassword)
-      && createPassword === createPasswordConfirm
-      && createRoleCode
-      && activeAssignableRoles.some(({ code }) => code === createRoleCode),
-  );
+  const createValues: Record<CreateField, string> = {
+    username: createUsername, email: createEmail, password: createPassword,
+    'password-confirm': createPasswordConfirm, role: createRoleCode ?? '',
+  };
+  const createErrors: Record<CreateField, string | null> = {
+    username: !createUsername.trim() ? 'Vui lòng nhập tên đăng nhập.'
+      : createUsername.trim().length > 20 ? 'Tên đăng nhập tối đa 20 ký tự.' : null,
+    email: !createEmail.trim() ? 'Vui lòng nhập email.'
+      : !EMAIL_PATTERN.test(createEmail.trim()) || createEmail.trim().length > 255
+        ? 'Nhập email hợp lệ, tối đa 255 ký tự.' : null,
+    password: !createPassword ? 'Vui lòng nhập mật khẩu.'
+      : !PASSWORD_POLICY.test(createPassword)
+        ? 'Mật khẩu cần 8–20 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt; không có khoảng trắng.' : null,
+    'password-confirm': !createPasswordConfirm ? 'Vui lòng xác nhận mật khẩu.'
+      : createPassword !== createPasswordConfirm ? 'Mật khẩu xác nhận không khớp.' : null,
+    role: !createRoleCode ? 'Vui lòng chọn nhóm quyền.'
+      : !activeAssignableRoles.some(({ code }) => code === createRoleCode)
+        ? 'Chọn một nhóm đang hoạt động và khác USER.' : null,
+  };
+  const createFormValid = Object.values(createErrors).every((message) => message === null);
+  const visibleCreateError = (field: CreateField) =>
+    createTouched[field] || createValues[field] ? createErrors[field] : null;
+  const createFieldProps = (field: CreateField) => ({
+    'aria-invalid': Boolean(visibleCreateError(field)),
+    'aria-describedby': visibleCreateError(field) ? `admin-account-${field}-error` : undefined,
+    status: visibleCreateError(field) ? 'error' as const : undefined,
+    onBlur: () => setCreateTouched((current) => ({ ...current, [field]: true })),
+  });
+  const createFieldError = (field: CreateField) => visibleCreateError(field)
+    ? <p id={`admin-account-${field}-error`} className="admin-account-field-error" role="alert">{visibleCreateError(field)}</p>
+    : null;
 
   const submitCreate = async () => {
     if (!createFormValid || !createRoleCode || createSaving) {
@@ -248,6 +272,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
         roleCode: createRoleCode,
       });
       setCreateOpen(false);
+      setCreateTouched({});
       setCreateUsername('');
       setCreateEmail('');
       setCreatePassword('');
@@ -647,24 +672,40 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       >
         <div className="admin-account-form-grid">
           <label htmlFor="admin-account-username">Tên đăng nhập</label>
-          <Input id="admin-account-username" aria-label="Tên đăng nhập" maxLength={20} value={createUsername} onChange={(event) => { setCreateUsername(event.target.value); setCreateError(null); }} autoComplete="off" />
+          <div className="admin-account-form-field">
+            <Input id="admin-account-username" {...createFieldProps('username')} aria-label="Tên đăng nhập" maxLength={20} value={createUsername} onChange={(event) => { setCreateUsername(event.target.value); setCreateError(null); }} autoComplete="off" />
+            {createFieldError('username')}
+          </div>
           <label htmlFor="admin-account-email">Email</label>
-          <Input id="admin-account-email" aria-label="Email" type="email" maxLength={255} value={createEmail} onChange={(event) => { setCreateEmail(event.target.value); setCreateError(null); }} autoComplete="email" />
+          <div className="admin-account-form-field">
+            <Input id="admin-account-email" {...createFieldProps('email')} aria-label="Email" type="email" maxLength={255} value={createEmail} onChange={(event) => { setCreateEmail(event.target.value); setCreateError(null); }} autoComplete="email" />
+            {createFieldError('email')}
+          </div>
           <label htmlFor="admin-account-password">Mật khẩu</label>
-          <Input.Password id="admin-account-password" aria-label="Mật khẩu" value={createPassword} onChange={(event) => { setCreatePassword(event.target.value); setCreateError(null); }} autoComplete="new-password" />
+          <div className="admin-account-form-field">
+            <Input.Password id="admin-account-password" {...createFieldProps('password')} aria-label="Mật khẩu" value={createPassword} onChange={(event) => { setCreatePassword(event.target.value); setCreateError(null); }} autoComplete="new-password" />
+            {createFieldError('password')}
+          </div>
           <label htmlFor="admin-account-password-confirm">Xác nhận mật khẩu</label>
-          <Input.Password id="admin-account-password-confirm" aria-label="Xác nhận mật khẩu" value={createPasswordConfirm} onChange={(event) => { setCreatePasswordConfirm(event.target.value); setCreateError(null); }} autoComplete="new-password" />
+          <div className="admin-account-form-field">
+            <Input.Password id="admin-account-password-confirm" {...createFieldProps('password-confirm')} aria-label="Xác nhận mật khẩu" value={createPasswordConfirm} onChange={(event) => { setCreatePasswordConfirm(event.target.value); setCreateError(null); }} autoComplete="new-password" />
+            {createFieldError('password-confirm')}
+          </div>
           <label htmlFor="admin-account-role">Nhóm quyền</label>
-          <Select
-            id="admin-account-role"
-            aria-label="Nhóm quyền"
-            showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLocaleLowerCase().includes(input.toLocaleLowerCase()) }}
-            placeholder="Chọn nhóm đang hoạt động"
-            value={createRoleCode}
-            onChange={(value: string) => { setCreateRoleCode(value); setCreateError(null); setConfirmAdminCreate(false); }}
-            options={createRoleOptions}
-            notFoundContent="Không có nhóm đang hoạt động phù hợp"
-          />
+          <div className="admin-account-form-field">
+            <Select
+              {...createFieldProps('role')}
+              id="admin-account-role"
+              aria-label="Nhóm quyền"
+              showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLocaleLowerCase().includes(input.toLocaleLowerCase()) }}
+              placeholder="Chọn nhóm đang hoạt động"
+              value={createRoleCode}
+              onChange={(value: string) => { setCreateRoleCode(value); setCreateError(null); setConfirmAdminCreate(false); }}
+              options={createRoleOptions}
+              notFoundContent="Không có nhóm đang hoạt động phù hợp"
+            />
+            {createFieldError('role')}
+          </div>
           <p className="admin-account-form-hint">Tài khoản mới cần xác minh email trước khi đăng nhập. Mật khẩu gồm 8–20 ký tự, chữ hoa, chữ thường, số và ký tự đặc biệt; không có khoảng trắng.</p>
         </div>
         {createError && <Alert className="admin-account-inline-alert" type="error" showIcon role="alert" title={createError} />}

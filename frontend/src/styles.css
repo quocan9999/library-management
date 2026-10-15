@@ -1261,6 +1261,21 @@ input:focus-visible,
   font-weight: 600;
 }
 
+.admin-account-form-field {
+  min-width: 0;
+}
+
+.admin-account-form-field > .ant-select {
+  width: 100%;
+}
+
+.admin-account-field-error {
+  margin: 5px 0 0;
+  color: #d92d20;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .admin-account-form-hint {
   grid-column: 2;
   margin: -2px 0 0;
