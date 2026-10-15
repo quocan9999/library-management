@@ -27,7 +27,7 @@ public class MemberAdminController {
     private final MemberAdminService memberAdminService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('member:create')")
+    @PreAuthorize("hasAuthority('member:create') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<MemberDetailResponse>> create(@Valid @RequestBody CreateMemberRequest request) {
         MemberDetailResponse member = memberAdminService.create(request);
         return ResponseEntity.created(URI.create("/api/v1/members/" + member.id()))
@@ -41,7 +41,7 @@ public class MemberAdminController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('member:delete')")
+    @PreAuthorize("hasAuthority('member:delete') and principal.roleCode != 'USER'")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         memberAdminService.delete(id);
         return ResponseEntity.noContent().build();

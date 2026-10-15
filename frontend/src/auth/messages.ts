@@ -67,7 +67,7 @@ export function getLoginError(error: unknown): LoginErrorCopy {
     case 'EMAIL_NOT_VERIFIED':
       return {
         title: 'Email chưa được xác thực',
-        description: 'Hãy xác thực email trước khi đăng nhập. Bạn có thể gửi lại hướng dẫn ngay bên dưới.',
+        description: 'Hãy xác thực email trước khi đăng nhập. Vui lòng kiểm tra hộp thư và thư spam.',
         code: 'EMAIL_NOT_VERIFIED',
       };
     case 'VALIDATION_ERROR':

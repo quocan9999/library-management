@@ -33,10 +33,19 @@ public class ResendVerificationService {
      * Đẩy cả bước tra DB và SMTP vào worker để không lộ trạng thái tài khoản qua thời gian HTTP.
      */
     public void resend(String email) {
+        dispatch(() -> email);
+    }
+
+    public void resendForLogin(String identifier) {
+        dispatch(() -> transactionService.resolveLoginEmail(identifier));
+    }
+
+    private void dispatch(java.util.function.Supplier<String> emailSupplier) {
         try {
             mailExecutor.execute(() -> {
                 try {
-                    performResend(email);
+                    String email = emailSupplier.get();
+                    if (email != null) performResend(email);
                 } catch (RuntimeException exception) {
                     // Worker không in exception message/stacktrace có thể chứa email hoặc token.
                     log.error("Lỗi xử lý gửi lại email xác thực; loại lỗi={}",

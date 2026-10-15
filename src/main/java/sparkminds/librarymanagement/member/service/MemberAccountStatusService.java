@@ -50,13 +50,14 @@ public class MemberAccountStatusService {
         Account account = accountRepository.findByIdForUpdate(accountId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Không tìm thấy tài khoản thành viên"));
-        if (!"ROLE_USER".equals(account.getRole().getCode())) {
+        if (!"USER".equals(account.getRole().getCode())) {
             throw new BusinessException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Không tìm thấy thành viên");
         }
 
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         int changed = accountRepository.updateStatusAndAdvanceSessionVersion(
-                accountId, request.expectedEnabled(), request.enabled(), now);
+                accountId, request.expectedEnabled(), request.enabled(),
+                request.enabled() ? "ACCOUNT_ENABLED" : "ACCOUNT_DISABLED", now);
         if (changed != 1) {
             throw new BusinessException(
                     HttpStatus.CONFLICT,

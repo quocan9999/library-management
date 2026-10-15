@@ -23,6 +23,7 @@ interface ResendVerificationFormProps {
   initialCooldownSeconds?: number;
   hideEmailField?: boolean;
   compact?: boolean;
+  secondary?: boolean;
   inlineResend?: boolean;
   onRequested?: (email: string) => void;
 }
@@ -32,6 +33,7 @@ export function ResendVerificationForm({
   initialCooldownSeconds = 0,
   hideEmailField = false,
   compact = false,
+  secondary = false,
   inlineResend = false,
   onRequested,
 }: ResendVerificationFormProps) {
@@ -166,11 +168,12 @@ export function ResendVerificationForm({
         )}
 
         <Button
-          className="login-submit"
-          type="primary"
+          className={secondary ? undefined : 'login-submit'}
+          type={secondary ? 'default' : 'primary'}
           htmlType="submit"
-          size="large"
-          block
+          size={secondary ? 'middle' : 'large'}
+          block={!secondary}
+          style={secondary ? { alignSelf: 'flex-start' } : undefined}
           loading={isSubmitting}
           disabled={isSubmitting || cooldownSeconds > 0}
         >

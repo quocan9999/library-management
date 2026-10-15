@@ -95,6 +95,9 @@ public class RolePermissionMutationService {
         if (targetRole.getVersion() != delta.expectedVersion()) {
             throw versionConflict();
         }
+        if (!targetRole.isEnabled()) {
+            throw roleInactive();
+        }
 
         List<String> catalogCodes = effectivePermissionService.allPermissionCodes();
         permissionDependencyRegistry.validateCatalog(catalogCodes);
@@ -112,7 +115,7 @@ public class RolePermissionMutationService {
             throw new AccessDeniedException("Không được phép cấp hoặc thu hồi một số quyền được yêu cầu");
         }
 
-        List<String> assignedCodes = effectivePermissionService.resolveCurrentRoleCode(targetRoleCode);
+        List<String> assignedCodes = effectivePermissionService.resolveAssignedRoleCode(targetRoleCode);
         Set<String> assignedSet = new HashSet<>(assignedCodes);
         Set<String> requiredPermissions = permissionDependencyRegistry.requiredPermissionsFor(delta.addPermissions());
         List<String> unassignableDependencies = requiredPermissions.stream()
@@ -131,6 +134,10 @@ public class RolePermissionMutationService {
         Map<String, Set<String>> missingDependencies = permissionDependencyRegistry.missingDependencies(finalPermissions);
         if (!missingDependencies.isEmpty()) {
             throw dependencyConflict(missingDependencies);
+        }
+        if (finalPermissions.isEmpty()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "ROLE_PERMISSION_EMPTY",
+                    "Vai trò phải có ít nhất một quyền được gán");
         }
 
         List<String> permissionsToAdd = finalPermissions.stream()
@@ -162,7 +169,9 @@ public class RolePermissionMutationService {
 
         return new RolePermissionsResponse(
                 targetRoleCode,
+                targetRole.getDisplayName(),
                 currentVersion,
+                targetRole.isEnabled(),
                 updatedPermissions,
                 updatedPermissions,
                 updatedEditableCodes,
@@ -293,6 +302,11 @@ public class RolePermissionMutationService {
     private static BusinessException versionConflict() {
         return new BusinessException(HttpStatus.CONFLICT, "ROLE_VERSION_CONFLICT",
                 "Vai trò đã được cập nhật; hãy tải lại dữ liệu");
+    }
+
+    private static BusinessException roleInactive() {
+        return new BusinessException(HttpStatus.CONFLICT, "ROLE_INACTIVE",
+                "Nhóm quyền đang Inactive; chỉ có thể kích hoạt lại nhóm");
     }
 
     private static BusinessException roleNotFound() {

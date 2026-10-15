@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import sparkminds.librarymanagement.auth.dto.LoginRequest;
+import sparkminds.librarymanagement.auth.dto.LoginVerificationRequest;
 import sparkminds.librarymanagement.auth.dto.LoginResponse;
 import sparkminds.librarymanagement.auth.dto.AuthMeResponse;
 import sparkminds.librarymanagement.auth.dto.ForgotPasswordRequest;
@@ -79,6 +80,17 @@ public class AuthController {
                 "VERIFICATION_EMAIL_REQUESTED",
                 "Nếu email chưa được xác thực, hướng dẫn xác thực sẽ được gửi đến hộp thư.",
                 null
+        ));
+    }
+
+    @PostMapping("/resend-login-verification")
+    public ResponseEntity<ApiResponse<Void>> resendLoginVerification(
+            @Valid @RequestBody LoginVerificationRequest request
+    ) {
+        resendVerificationService.resendForLogin(request.identifier());
+        return ResponseEntity.ok(ApiResponse.success(
+                HttpStatus.OK.value(), "VERIFICATION_EMAIL_REQUESTED",
+                "Nếu email chưa được xác thực, hướng dẫn xác thực sẽ được gửi đến hộp thư.", null
         ));
     }
 

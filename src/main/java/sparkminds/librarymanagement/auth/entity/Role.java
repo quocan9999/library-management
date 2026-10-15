@@ -26,8 +26,14 @@ public class Role {
     @Column(name = "code", nullable = false, unique = true, length = 50)
     private String code;
 
+    @Column(name = "display_name", nullable = false, length = 100)
+    private String displayName;
+
     @Column(name = "description", length = 255)
     private String description;
+
+    @Column(name = "enabled", nullable = false)
+    private boolean enabled = true;
 
     @Version
     @Column(name = "version", nullable = false)

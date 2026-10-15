@@ -64,51 +64,28 @@ describe('login verification guidance', () => {
     expect(link.getAttribute('href')).toBe('/forgot-password');
   });
 
-  it('preserves the email, clears the password, and resends without reusing credentials', async () => {
+  it('automatically requests verification for the login identifier without asking for email or reusing the password', async () => {
     const user = userEvent.setup();
     loginMock.mockRejectedValue(unverifiedError());
     let resendBody = '';
     apiClient.defaults.adapter = (async (config) => {
+      expect(config.url).toBe('/api/v1/auth/resend-login-verification');
+      expect(config.withCredentials).toBe(false);
       resendBody = String(config.data);
       return response(config, {
-        success: true,
-        status: 200,
-        code: 'VERIFICATION_EMAIL_REQUESTED',
-        message: 'Requested.',
-        data: null,
-        timestamp: new Date().toISOString(),
+        success: true, status: 200, code: 'VERIFICATION_EMAIL_REQUESTED',
+        message: 'Requested.', data: null, timestamp: new Date().toISOString(),
       } satisfies ApiEnvelope<null>);
     }) satisfies AxiosAdapter;
-
     render(<MemoryRouter><LoginPage /></MemoryRouter>);
-    const identifier = screen.getByRole('textbox', { name: 'Tên đăng nhập hoặc email' });
-    await user.type(identifier, 'Reader@Example.com');
-    await user.type(screen.getByLabelText('Mật khẩu'), 'Strong1!');
-    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
-
-    expect(await screen.findByText('Email chưa được xác thực')).toBeTruthy();
-    expect((identifier as HTMLInputElement).value).toBe('Reader@Example.com');
-    expect((screen.getByLabelText('Mật khẩu') as HTMLInputElement).value).toBe('');
-
-    const resendEmail = screen.getByRole('textbox', { name: 'Email' });
-    expect((resendEmail as HTMLInputElement).value).toBe('Reader@Example.com');
-    await user.click(screen.getByRole('button', { name: 'Gửi lại email xác thực' }));
-
-    expect(await screen.findByText('Yêu cầu đã được tiếp nhận')).toBeTruthy();
-    expect(resendBody).toContain('reader@example.com');
-    expect(resendBody).not.toContain('Strong1!');
-  });
-
-  it('offers the inline resend form for a username without sending it as an email', async () => {
-    const user = userEvent.setup();
-    loginMock.mockRejectedValue(unverifiedError());
-    render(<MemoryRouter><LoginPage /></MemoryRouter>);
-
     await user.type(screen.getByRole('textbox', { name: 'Tên đăng nhập hoặc email' }), 'reader');
     await user.type(screen.getByLabelText('Mật khẩu'), 'Strong1!');
     await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
-
-    expect(await screen.findByText('Email chưa được xác thực')).toBeTruthy();
-    expect((screen.getByRole('textbox', { name: 'Email' }) as HTMLInputElement).value).toBe('');
+    expect(await screen.findByText('Chúng tôi đã gửi email với đường link xác thực email. Hãy vào hộp thư để kiểm tra.')).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
+    expect(screen.getByRole('button', { name: /gửi lại trong 60s/ }).hasAttribute('disabled')).toBe(true);
+    expect((screen.getByLabelText('Mật khẩu') as HTMLInputElement).value).toBe('');
+    expect(JSON.parse(resendBody)).toEqual({ identifier: 'reader' });
+    expect(resendBody).not.toContain('Strong1!');
   });
 });

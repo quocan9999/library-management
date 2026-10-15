@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,7 +27,6 @@ public class ProfileController {
     private final EmailChangeService emailChangeService;
 
     @PostMapping("/change-password")
-    @PreAuthorize("hasAuthority('account:change-password') and principal.roleCode == 'ROLE_USER'")
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @AuthenticationPrincipal CustomUserPrincipal principal,
             @Valid @RequestBody ChangePasswordRequest request
@@ -43,7 +41,6 @@ public class ProfileController {
     }
 
     @PostMapping("/change-email/request")
-    @PreAuthorize("hasAuthority('account:change-email') and principal.roleCode == 'ROLE_USER'")
     public ResponseEntity<ApiResponse<Void>> requestEmailChange(
             @AuthenticationPrincipal CustomUserPrincipal principal,
             @Valid @RequestBody ChangeEmailRequest request,
@@ -59,7 +56,6 @@ public class ProfileController {
     }
 
     @PostMapping("/change-email/verify")
-    @PreAuthorize("hasAuthority('account:change-email') and principal.roleCode == 'ROLE_USER'")
     public ResponseEntity<ApiResponse<Void>> verifyEmailChange(
             @AuthenticationPrincipal CustomUserPrincipal principal,
             @Valid @RequestBody VerifyChangeEmailRequest request,

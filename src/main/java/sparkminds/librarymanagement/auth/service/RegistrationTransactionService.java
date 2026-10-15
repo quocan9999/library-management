@@ -39,8 +39,8 @@ public class RegistrationTransactionService {
         account.setEmail(request.email());
         account.setUsername(null);
         account.setPasswordHash(passwordEncoder.encode(request.password()));
-        account.setRole(roleRepository.findByCode("ROLE_USER")
-                .orElseThrow(() -> new IllegalStateException("ROLE_USER is not configured")));
+        account.setRole(roleRepository.findByCode("USER")
+                .orElseThrow(() -> new IllegalStateException("USER role is not configured")));
         account.setEmailVerified(false);
         account.setEnabled(true);
         accountRepository.saveAndFlush(account);

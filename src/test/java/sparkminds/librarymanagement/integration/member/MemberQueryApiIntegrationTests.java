@@ -23,11 +23,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.auth.entity.Account;
+import sparkminds.librarymanagement.auth.entity.Permission;
 import sparkminds.librarymanagement.auth.entity.RefreshToken;
+import sparkminds.librarymanagement.auth.entity.Role;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
+import sparkminds.librarymanagement.auth.repository.PermissionRepository;
 import sparkminds.librarymanagement.auth.repository.RefreshTokenRepository;
+import sparkminds.librarymanagement.auth.repository.RoleRepositoy;
 import sparkminds.librarymanagement.auth.security.jwt.IssuedJwtToken;
 import sparkminds.librarymanagement.auth.security.jwt.JwtTokenService;
 import sparkminds.librarymanagement.auth.security.jwt.JwtTokenType;
@@ -57,6 +62,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -88,6 +94,12 @@ class MemberQueryApiIntegrationTests {
 
     @Autowired
     private AccountRepository accountRepository;
+
+    @Autowired
+    private RoleRepositoy roleRepository;
+
+    @Autowired
+    private PermissionRepository permissionRepository;
 
     @MockitoSpyBean
     private RefreshTokenRepository refreshTokenRepository;
@@ -144,9 +156,92 @@ class MemberQueryApiIntegrationTests {
         mockMvc.perform(get("/api/v1/members/1/loan-history"))
                 .andExpect(status().isUnauthorized());
 
-        list(login("superadmin", "superadmin"))
+        list(login("admin", "admin"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("MEMBER_LIST_SUCCESS"));
+    }
+
+    @Test
+    void userCannotReadAdminMemberApiEvenThoughUserHasMemberReadPermission() throws Exception {
+        int permissionBaseline = permissionLinkCount("USER", "member:read");
+        setPermission("USER", "member:read", true);
+        try {
+            list(login("user", "user"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+        } finally {
+            setPermission("USER", "member:read", permissionBaseline > 0);
+        }
+    }
+
+    @Test
+    void memberAdminApisHideMemberRowsLinkedToNonUserAccounts() throws Exception {
+        String adminToken = login("admin", "admin");
+        String marker = "MMV8-NONUSER-" + UUID.randomUUID().toString().substring(0, 8);
+        MemberFixture fixture = createMember("ADMIN", marker, "Admin Account Fixture", "0370000098",
+                LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
+
+        MvcResult listed = list(adminToken, "fullName", marker)
+                .andExpect(status().isOk()).andReturn();
+        assertThat(JsonPath.<Integer>read(body(listed), "$.data.totalElements")).isZero();
+        detail(adminToken, fixture.memberId()).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
+        history(adminToken, fixture.memberId()).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
+        patchProfile(adminToken, fixture.memberId(), "{\"version\":0,\"fullName\":\"Changed\"}")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
+        patchAccountStatus(adminToken, fixture.memberId(), true, false)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
+        mockMvc.perform(delete("/api/v1/members/{id}", fixture.memberId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM members WHERE id = ? AND full_name = 'Admin Account Fixture'",
+                Integer.class, fixture.memberId())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT enabled FROM accounts WHERE id = (SELECT account_id FROM members WHERE id = ?)",
+                Boolean.class, fixture.memberId())).isTrue();
+    }
+
+    @Test
+    void inactiveRoleKeepsAuthenticatedProfileAccessButHasNoBusinessPermissions() throws Exception {
+        String roleCode = "INACTIVE_TEST_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8)
+                .toUpperCase(java.util.Locale.ROOT);
+        Role role = new Role();
+        role.setCode(roleCode);
+        role.setDisplayName("Nhóm tạm ngưng");
+        role.setEnabled(false);
+        Permission memberRead = permissionRepository.findByCode("member:read").orElseThrow();
+        role.setPermissions(new HashSet<>(Set.of(memberRead)));
+        roleRepository.saveAndFlush(role);
+
+        Account account = new Account();
+        account.setUsername("inactive" + UUID.randomUUID().toString().replace("-", "").substring(0, 10));
+        account.setEmail("inactive-" + UUID.randomUUID() + "@example.test");
+        account.setPasswordHash(passwordEncoder.encode("Current1!"));
+        account.setRole(role);
+        account.setEnabled(true);
+        account.setEmailVerified(true);
+        Account saved = accountRepository.saveAndFlush(account);
+        String token = login(saved.getUsername(), "Current1!");
+
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value(roleCode))
+                .andExpect(jsonPath("$.data.permissions").isEmpty());
+        list(token).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+        mockMvc.perform(post("/api/v1/profile/change-password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Current1!\",\"newPassword\":\"NewPass2!\","
+                                + "\"confirmNewPassword\":\"NewPass2!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("PASSWORD_CHANGED"));
     }
 
     @Test
@@ -162,8 +257,8 @@ class MemberQueryApiIntegrationTests {
                 WHERE table_schema = DATABASE() AND table_name = 'members'
                   AND index_name = 'uk_members_phone' AND column_name = 'phone' AND non_unique = 0
                 """, Integer.class)).isEqualTo(1);
-        assertThat(permissionLinkCount("ROLE_ADMIN", "member:status:update")).isEqualTo(1);
-        assertThat(permissionLinkCount("ROLE_USER", "member:status:update")).isZero();
+        assertThat(permissionLinkCount("ADMIN", "member:status:update")).isEqualTo(1);
+        assertThat(permissionLinkCount("USER", "member:status:update")).isZero();
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM DATABASECHANGELOG
                 WHERE ID IN ('026-member-phone-unique', '027-member-version', '028-seed-member-status-permission')
@@ -297,7 +392,7 @@ class MemberQueryApiIntegrationTests {
         LoginSession firstDevice = loginSessionData("user", "user");
         LoginSession secondDevice = loginSessionData("user", "user");
         String adminToken = login("admin", "admin");
-        int userStatusPermission = permissionLinkCount("ROLE_USER", "member:status:update");
+        int userStatusPermission = permissionLinkCount("USER", "member:status:update");
 
         patchAccountStatus(adminToken, memberId, true, false)
                 .andExpect(status().isOk())
@@ -331,7 +426,7 @@ class MemberQueryApiIntegrationTests {
                 .andExpect(jsonPath("$.code").value("AUTH_ME_SUCCESS"));
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT session_version FROM accounts WHERE username = 'user'", Long.class)).isEqualTo(2L);
-        assertThat(permissionLinkCount("ROLE_USER", "member:status:update")).isEqualTo(userStatusPermission);
+        assertThat(permissionLinkCount("USER", "member:status:update")).isEqualTo(userStatusPermission);
     }
 
     @Test
@@ -370,13 +465,13 @@ class MemberQueryApiIntegrationTests {
 
     @Test
     void mergedRoleApiStillRejectsGrantingStatusPermissionToUser() throws Exception {
-        String superAdminToken = login("superadmin", "superadmin");
+        String superAdminToken = login("admin", "admin");
         long beforeVersion = jdbcTemplate.queryForObject(
-                "SELECT version FROM roles WHERE code = 'ROLE_USER'", Long.class);
+                "SELECT version FROM roles WHERE code = 'USER'", Long.class);
         String body = "{\"expectedVersion\":" + beforeVersion
                 + ",\"addPermissions\":[\"member:status:update\"],\"removePermissions\":[]}";
 
-        MvcResult result = mockMvc.perform(patch("/api/v1/roles/ROLE_USER/permissions")
+        MvcResult result = mockMvc.perform(patch("/api/v1/roles/USER/permissions")
                         .header("Authorization", "Bearer " + superAdminToken)
                         .contentType(APPLICATION_JSON)
                         .content(body))
@@ -385,28 +480,36 @@ class MemberQueryApiIntegrationTests {
         assertThat(result.getResponse().getStatus()).isEqualTo(403);
         assertThat(JsonPath.<String>read(result.getResponse().getContentAsString(), "$.code"))
                 .isEqualTo("PERMISSION_DENIED");
-        assertThat(permissionLinkCount("ROLE_USER", "member:status:update")).isZero();
+        assertThat(permissionLinkCount("USER", "member:status:update")).isZero();
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT version FROM roles WHERE code = 'ROLE_USER'", Long.class)).isEqualTo(beforeVersion);
+                "SELECT version FROM roles WHERE code = 'USER'", Long.class)).isEqualTo(beforeVersion);
     }
 
     @Test
-    void currentDatabasePermissionsAllowUserReadAndRevokeAdminReadWithoutRoleChecks() throws Exception {
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void userRemainsDeniedFromAdminApiWithPermissionAndAdminReadRemainsGlobal() throws Exception {
         String userToken = login("user", "user");
         String adminToken = login("admin", "admin");
+        boolean hadUserRead = permissionLinkCount("USER", "member:read") > 0;
+        boolean hadAdminRead = permissionLinkCount("ADMIN", "member:read") > 0;
 
-        setPermission("ROLE_USER", "member:read", false);
-        list(userToken).andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+        try {
+            setPermission("USER", "member:read", false);
+            list(userToken).andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
 
-        setPermission("ROLE_USER", "member:read", true);
-        list(userToken).andExpect(status().isOk());
+            setPermission("USER", "member:read", true);
+            list(userToken).andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
 
-        setPermission("ROLE_ADMIN", "member:read", false);
-        list(adminToken).andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+            setPermission("ADMIN", "member:read", false);
+            list(adminToken).andExpect(status().isOk());
 
-        list(login("superadmin", "superadmin")).andExpect(status().isOk());
+            list(login("admin", "admin")).andExpect(status().isOk());
+        } finally {
+            setPermission("USER", "member:read", hadUserRead);
+            setPermission("ADMIN", "member:read", hadAdminRead);
+        }
     }
 
     @Test
@@ -604,7 +707,7 @@ class MemberQueryApiIntegrationTests {
 
     @Test
     void patchUpdatesOnlyChangedProfileFieldsAndIncrementsVersionOnceWithoutChangingHistory() throws Exception {
-        String token = login("superadmin", "superadmin");
+        String token = login("admin", "admin");
         MemberFixture fixture = createMember("MMV8-P03-UPDATE", "Original Name", "0370000001",
                 LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
         int loanId = createLoan(fixture.memberId(), "MMV8-P03-LOAN",
@@ -642,7 +745,7 @@ class MemberQueryApiIntegrationTests {
 
     @Test
     void patchDistinguishesOmittedFieldsFromExplicitNullAndUpdatesAllProfileFields() throws Exception {
-        String token = login("superadmin", "superadmin");
+        String token = login("admin", "admin");
         MemberFixture fixture = createMember("MMV8-P03-NULLS", "Original Name", "0370000013",
                 LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
         jdbcTemplate.update("UPDATE members SET address = ? WHERE id = ?", "Original address", fixture.memberId());
@@ -710,7 +813,7 @@ class MemberQueryApiIntegrationTests {
 
     @Test
     void patchNormalizesBlankOptionalTextFieldsToNullAndKeepsOmittedBirthDate() throws Exception {
-        String token = login("superadmin", "superadmin");
+        String token = login("admin", "admin");
         MemberFixture fixture = createMember("MMV8-P03-BLANKS", "Original Name", "0370000014",
                 LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
         jdbcTemplate.update("UPDATE members SET address = ? WHERE id = ?", "Original address", fixture.memberId());
@@ -729,7 +832,7 @@ class MemberQueryApiIntegrationTests {
 
     @Test
     void patchNoOpPreservesVersionButStillRejectsAStaleClientVersion() throws Exception {
-        String token = login("superadmin", "superadmin");
+        String token = login("admin", "admin");
         MemberFixture fixture = createMember("MMV8-P03-NOOP", "Original Name", "0370000002",
                 LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
 
@@ -757,66 +860,66 @@ class MemberQueryApiIntegrationTests {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
 
-        String token = login("superadmin", "superadmin");
-        int adminPermissionBaseline = permissionLinkCount("ROLE_ADMIN", "member:update");
+        String token = login("admin", "admin");
+        int adminPermissionBaseline = permissionLinkCount("ADMIN", "member:update");
         try {
-            setPermission("ROLE_ADMIN", "member:update", false);
+            setPermission("ADMIN", "member:update", false);
             patchProfile(login("admin", "admin"), fixture.memberId(),
-                    "{\"version\":0,\"fullName\":\"Admin Denied\"}")
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+                    "{\"version\":0,\"fullName\":\"Admin Still Allowed\"}")
+                    .andExpect(status().isOk());
         } finally {
-            setPermission("ROLE_ADMIN", "member:update", adminPermissionBaseline > 0);
+            setPermission("ADMIN", "member:update", adminPermissionBaseline > 0);
         }
 
-        patchProfile(token, fixture.memberId(), "{\"version\":0,\"enabled\":false}")
+        patchProfile(token, fixture.memberId(), "{\"version\":1,\"enabled\":false}")
                 .andExpect(status().isBadRequest());
-        patchProfile(token, fixture.memberId(), "{\"version\":0,\"account\":{\"role\":\"ROLE_ADMIN\"}}")
+        patchProfile(token, fixture.memberId(), "{\"version\":1,\"account\":{\"role\":\"ADMIN\"}}")
                 .andExpect(status().isBadRequest());
-        patchProfile(token, fixture.memberId(), "{\"version\":0,\"fullName\":null,\"unknownField\":true}")
+        patchProfile(token, fixture.memberId(), "{\"version\":1,\"fullName\":null,\"unknownField\":true}")
                 .andExpect(status().isBadRequest());
         patchProfile(token, fixture.memberId(), "{\"fullName\":\"Missing version\"}")
                 .andExpect(status().isUnprocessableEntity());
 
         patchProfile(token, fixture.memberId(), """
-                {"version":0,"fullName":"Would partially save","dateOfBirth":"%s"}
+                {"version":1,"fullName":"Would partially save","dateOfBirth":"%s"}
                 """.formatted(LocalDate.now().minusYears(16).plusDays(1)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("MEMBER_PATCH_VALIDATION_ERROR"));
-        patchProfile(token, fixture.memberId(), "{\"version\":0,\"phone\":\"0123.456.789\"}")
+        patchProfile(token, fixture.memberId(), "{\"version\":1,\"phone\":\"0123.456.789\"}")
                 .andExpect(status().isUnprocessableEntity());
-        patchProfile(token, fixture.memberId(), "{\"version\":0,\"fullName\":\"%s\"}"
+        patchProfile(token, fixture.memberId(), "{\"version\":1,\"fullName\":\"%s\"}"
                         .formatted("x".repeat(151)))
                 .andExpect(status().isUnprocessableEntity());
-        patchProfile(token, fixture.memberId(), "{\"version\":0,\"address\":\"%s\"}"
+        patchProfile(token, fixture.memberId(), "{\"version\":1,\"address\":\"%s\"}"
                         .formatted("x".repeat(256)))
                 .andExpect(status().isUnprocessableEntity());
-        patchProfile(token, fixture.memberId(), "{\"version\":0,\"phone\":\"03AB123456\"}")
+        patchProfile(token, fixture.memberId(), "{\"version\":1,\"phone\":\"03AB123456\"}")
                 .andExpect(status().isUnprocessableEntity());
-        patchProfile(token, 99999999, "{\"version\":0,\"fullName\":\"Missing\"}")
+        patchProfile(token, 99999999, "{\"version\":1,\"fullName\":\"Missing\"}")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
 
         assertThat(jdbcTemplate.queryForObject("SELECT version FROM members WHERE id = ?", Long.class,
-                fixture.memberId())).isZero();
+                fixture.memberId())).isEqualTo(1L);
         assertThat(jdbcTemplate.queryForObject("SELECT full_name FROM members WHERE id = ?", String.class,
-                fixture.memberId())).isEqualTo("Original Name");
+                fixture.memberId())).isEqualTo("Admin Still Allowed");
 
-        int userPermissionBaseline = permissionLinkCount("ROLE_USER", "member:update");
+        int userPermissionBaseline = permissionLinkCount("USER", "member:update");
         try {
-            setPermission("ROLE_USER", "member:update", true);
+            setPermission("USER", "member:update", true);
             patchProfile(userToken, fixture.memberId(), "{\"version\":0,\"fullName\":\"User Allowed\"}")
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.fullName").value("User Allowed"))
-                    .andExpect(jsonPath("$.data.version").value(1));
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+            assertThat(jdbcTemplate.queryForObject("SELECT version FROM members WHERE id = ?", Long.class,
+                    fixture.memberId())).isEqualTo(1L);
         } finally {
-            setPermission("ROLE_USER", "member:update", userPermissionBaseline > 0);
+            setPermission("USER", "member:update", userPermissionBaseline > 0);
         }
     }
 
     @Test
     void patchNormalizesPhoneAndRejectsDuplicatesEvenWhenTheOtherAccountIsDisabled() throws Exception {
-        String token = login("superadmin", "superadmin");
+        String token = login("admin", "admin");
         MemberFixture target = createMember("MMV8-P03-PHONE-A", "Target", "0370000003",
                 LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
         createMember("MMV8-P03-PHONE-B", "Disabled duplicate", "0370000004",
@@ -1237,14 +1340,27 @@ class MemberQueryApiIntegrationTests {
             boolean enabled,
             LocalDateTime createdAt
     ) {
+        return createMember("USER", memberCode, fullName, phone, dateOfBirth, emailVerified, enabled, createdAt);
+    }
+
+    private MemberFixture createMember(
+            String roleCode,
+            String memberCode,
+            String fullName,
+            String phone,
+            LocalDate dateOfBirth,
+            boolean emailVerified,
+            boolean enabled,
+            LocalDateTime createdAt
+    ) {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         String username = "mmv8" + suffix;
         String email = "mmv8." + suffix + "@example.test";
         jdbcTemplate.update("""
                 INSERT INTO accounts (username, email, password_hash, role_id, email_verified, enabled)
                 SELECT ?, ?, 'fixture-password-hash', id, ?, ?
-                FROM roles WHERE code = 'ROLE_USER'
-                """, username, email, emailVerified, enabled);
+                FROM roles WHERE code = ?
+                """, username, email, emailVerified, enabled, roleCode);
         Integer accountId = jdbcTemplate.queryForObject(
                 "SELECT id FROM accounts WHERE username = ?", Integer.class, username);
         jdbcTemplate.update("""
@@ -1263,7 +1379,7 @@ class MemberQueryApiIntegrationTests {
         String email = "mmv8.p04." + suffix + "@example.test";
         jdbcTemplate.update("""
                 INSERT INTO accounts (username, email, password_hash, role_id, email_verified, enabled)
-                SELECT ?, ?, ?, id, true, true FROM roles WHERE code = 'ROLE_USER'
+                SELECT ?, ?, ?, id, true, true FROM roles WHERE code = 'USER'
                 """, username, email, passwordEncoder.encode("MmV8-TestLogin1!"));
         Integer accountId = jdbcTemplate.queryForObject(
                 "SELECT id FROM accounts WHERE username = ?", Integer.class, username);

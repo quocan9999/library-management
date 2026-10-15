@@ -12,10 +12,10 @@ const mocks = vi.hoisted(() => ({
       id: 17,
       username: 'reader',
       email: 'reader@example.com',
-      role: 'ROLE_USER',
+      role: 'USER',
       permissions: ['account:change-password'],
     } as { id: number; username: string | null; email: string; role: string; permissions: string[] } | null,
-    role: 'ROLE_USER' as string | null,
+    role: 'USER' as string | null,
     permissions: ['account:change-password'],
     capabilityStatus: 'ready',
     refreshCapabilities: vi.fn(async () => undefined),
@@ -45,20 +45,20 @@ afterEach(() => {
       id: 17,
       username: 'reader',
       email: 'reader@example.com',
-      role: 'ROLE_USER',
+      role: 'USER',
       permissions: ['account:change-password'],
     },
-    role: 'ROLE_USER',
+    role: 'USER',
     permissions: ['account:change-password'],
     isBootstrapping: false,
     capabilityStatus: 'ready',
   });
 });
 
-describe('USER profile routes', () => {
+describe('authenticated profile routes', () => {
   it.each([
-    ['ROLE_ADMIN', '/admin/roles'], ['ROLE_ADMIN', '/admin/members'],
-    ['ROLE_SUPER_ADMIN', '/admin/roles'], ['ROLE_SUPER_ADMIN', '/admin/members'],
+    ['ADMIN', '/admin/roles'], ['ADMIN', '/admin/members'],
+    ['LIBRARIAN', '/admin/roles'], ['LIBRARIAN', '/admin/members'],
   ])('still denies direct %s access to %s without permission', async (role, path) => {
     mocks.auth.role = role;
     mocks.auth.currentUser!.role = role;
@@ -85,46 +85,37 @@ describe('USER profile routes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' })).toBeTruthy();
     expect(within(screen.getByRole('region', { name: 'Email hiện tại' })).getByText('reader@example.com')).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Đổi mật khẩu' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Đổi mật khẩu' }).getAttribute('href')).toBe('/profile/change-password');
     expect(screen.getByRole('link', { name: 'Đổi email' }).getAttribute('href')).toBe('/profile/change-email');
   });
 
-  it('allows the email route only with USER role and change-email permission', async () => {
-    mocks.auth.permissions = ['account:change-email'];
-    mocks.auth.currentUser!.permissions = ['account:change-email'];
+  it('allows an admin account to reach email self-service without a profile permission', async () => {
+    mocks.auth.role = 'ADMIN';
+    mocks.auth.currentUser!.role = 'ADMIN';
+    mocks.auth.permissions = [];
+    mocks.auth.currentUser!.permissions = [];
     renderRoute('/profile/change-email');
     expect(await screen.findByRole('heading', { name: 'Đổi email' })).toBeTruthy();
-
-    cleanup();
-    mocks.auth.permissions = ['account:change-password'];
-    mocks.auth.currentUser!.permissions = ['account:change-password'];
-    renderRoute('/profile/change-email');
-    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
-    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
   });
 
-  it('allows direct password route only with USER role and change-password permission', async () => {
+  it('allows an admin account to reach password self-service without a profile permission', async () => {
+    mocks.auth.role = 'ADMIN';
+    mocks.auth.currentUser!.role = 'ADMIN';
+    mocks.auth.permissions = [];
+    mocks.auth.currentUser!.permissions = [];
     renderRoute('/profile/change-password');
     expect(await screen.findByRole('heading', { name: 'Đổi mật khẩu' })).toBeTruthy();
-
-    cleanup();
-    mocks.auth.permissions = ['account:change-email'];
-    mocks.auth.currentUser!.permissions = ['account:change-email'];
-    renderRoute('/profile/change-password');
-    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
-    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
   });
 
-  it.each(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'])('blocks %s from profile routes even if it has the permission', async (role) => {
+  it.each(['ADMIN', 'LIBRARIAN'])('allows %s to use the profile route with no permissions', async (role) => {
     mocks.auth.currentUser!.role = role;
     mocks.auth.role = role;
-    mocks.auth.currentUser!.permissions = ['account:change-password'];
-    mocks.auth.permissions = ['account:change-password'];
-    renderRoute('/profile/change-password');
+    mocks.auth.currentUser!.permissions = [];
+    mocks.auth.permissions = [];
+    renderRoute('/profile');
 
-    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: 'Đổi mật khẩu' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Hồ sơ tài khoản' })).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Hồ sơ tài khoản' })).toBeTruthy();
   });
 
   it('sends anonymous visitors to Login', async () => {

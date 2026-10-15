@@ -8,18 +8,18 @@ import { loginSchema, type LoginForm } from '../auth/loginSchema';
 import { getLoginError, mapLoginValidationErrors } from '../auth/messages';
 import type { LoginCredentials } from '../auth/types';
 import { AuthLayout } from '../components/AuthLayout';
-import { ResendVerificationForm } from './ResendVerificationForm';
+import { LoginVerificationNotice } from './LoginVerificationNotice';
 
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const accountDisabledNotice = (location.state as { accountDisabled?: unknown } | null)?.accountDisabled === true;
+  const [verificationIdentifier, setVerificationIdentifier] = useState('');
   const [serverError, setServerError] = useState<ReturnType<typeof getLoginError> | null>(null);
   const {
     control,
     handleSubmit,
-    getValues,
     setError,
     setValue,
     formState: { errors, isSubmitting },
@@ -46,14 +46,12 @@ export function LoginPage() {
       }
       const copy = getLoginError(error);
       if (copy.code === 'EMAIL_NOT_VERIFIED') {
+        setVerificationIdentifier(values.identifier.trim());
         setValue('password', '');
       }
       setServerError(copy);
     }
   };
-
-  const identifier = getValues('identifier').trim();
-  const resendEmail = identifier.includes('@') ? identifier : '';
 
   return (
     <AuthLayout ariaLabel="Đăng nhập hệ thống quản lý thư viện" centered>
@@ -66,21 +64,25 @@ export function LoginPage() {
           showIcon
           role="status"
           title="Phiên đăng nhập đã bị thu hồi"
-          description="Tài khoản thành viên đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được hỗ trợ."
+          description="Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên."
         />}
 
-        <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          {serverError && (
-            <Alert
+        {serverError && (
+          <div className="login-feedback">
+            {serverError.code === 'EMAIL_NOT_VERIFIED' ? (
+              <LoginVerificationNotice identifier={verificationIdentifier} />
+            ) : <Alert
               className="login-alert"
               type="error"
               showIcon
               role="alert"
               title={serverError.title}
               description={serverError.description}
-            />
-          )}
+            />}
+          </div>
+        )}
 
+        <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="form-field">
             <label htmlFor="identifier">Tên đăng nhập hoặc email</label>
             <Controller
@@ -144,12 +146,6 @@ export function LoginPage() {
             {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
           </Button>
         </form>
-
-        {serverError?.code === 'EMAIL_NOT_VERIFIED' && (
-          <div className="login-resend">
-            <ResendVerificationForm compact initialEmail={resendEmail} />
-          </div>
-        )}
 
         <p className="auth-alternate">
           Chưa có tài khoản? <Link to="/register">Đăng ký</Link>

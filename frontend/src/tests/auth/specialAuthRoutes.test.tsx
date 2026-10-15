@@ -30,7 +30,7 @@ function mount(path: string, signedIn: boolean, state?: { registrationCooldownUn
       return response('AUTH_TOKEN_REFRESHED', { accessToken: 'admin-token', tokenType: 'Bearer', accessTokenExpiresIn: 900 });
     }
     if (config.url === '/api/v1/auth/me') return response('AUTH_ME_SUCCESS', {
-      id: 1, username: 'admin', email: 'admin@example.com', role: 'ROLE_ADMIN', permissions: [],
+      id: 1, username: 'admin', email: 'admin@example.com', role: 'ADMIN', permissions: [],
     });
     if (config.url === '/api/v1/auth/verify-email') return response('EMAIL_VERIFIED', null);
     throw new Error(`Unexpected request ${config.url}`);

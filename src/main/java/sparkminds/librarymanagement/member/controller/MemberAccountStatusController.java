@@ -22,7 +22,7 @@ public class MemberAccountStatusController {
     private final MemberAccountStatusService memberAccountStatusService;
 
     @PatchMapping("/{id}/account-status")
-    @PreAuthorize("hasAuthority('member:status:update')")
+    @PreAuthorize("hasAuthority('member:status:update') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<MemberDetailResponse>> updateAccountStatus(
             @PathVariable Integer id,
             @Valid @RequestBody MemberAccountStatusRequest request

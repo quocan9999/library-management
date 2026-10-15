@@ -14,6 +14,7 @@ import sparkminds.librarymanagement.auth.security.EffectivePermissionService;
 import sparkminds.librarymanagement.role.dto.PermissionCatalogResponse;
 import sparkminds.librarymanagement.role.policy.PermissionDependencyRegistry;
 import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
+import sparkminds.librarymanagement.role.repository.RoleManagementReadRepository;
 
 import java.util.List;
 
@@ -27,21 +28,23 @@ class RoleReadServicePermissionCatalogTests {
     @Mock private PermissionRepository permissionRepository;
     @Mock private EffectivePermissionService effectivePermissionService;
     @Mock private RoleAccessPolicy roleAccessPolicy;
+    @Mock private RoleManagementReadRepository roleManagementReadRepository;
 
     @Test
     void permissionCatalogReturnsOnlyExplicitDependencies() {
         PermissionDependencyRegistry registry = new PermissionDependencyRegistry();
         RoleReadService service = new RoleReadService(
-                roleRepository, permissionRepository, effectivePermissionService, roleAccessPolicy, registry);
+                roleRepository, permissionRepository, effectivePermissionService, roleAccessPolicy, registry,
+                roleManagementReadRepository);
         Role role = new Role();
-        role.setCode("ROLE_ADMIN");
+        role.setCode("ADMIN");
         Account account = new Account();
         account.setId(5);
         account.setUsername("admin");
         account.setRole(role);
         CustomUserPrincipal actor = CustomUserPrincipal.from(account, List.of("role:read", "member:read"));
 
-        when(roleAccessPolicy.canReadRoleManagement("ROLE_ADMIN")).thenReturn(true);
+        when(roleAccessPolicy.canReadRoleManagement("ADMIN")).thenReturn(true);
         when(permissionRepository.findAllByOrderByCodeAsc()).thenReturn(catalogPermissions());
 
         List<PermissionCatalogResponse> response = service.getPermissionCatalog(actor);
@@ -49,6 +52,9 @@ class RoleReadServicePermissionCatalogTests {
         assertThat(response).filteredOn(permission -> "member:status:update".equals(permission.code()))
                 .singleElement().extracting(PermissionCatalogResponse::dependencies)
                 .isEqualTo(List.of("member:read"));
+        assertThat(response).filteredOn(permission -> "member:status:update".equals(permission.code()))
+                .singleElement().extracting(PermissionCatalogResponse::domain)
+                .isEqualTo("member");
         assertThat(response).filteredOn(permission -> "borrow:create".equals(permission.code()))
                 .singleElement().extracting(PermissionCatalogResponse::dependencies)
                 .isEqualTo(List.of());

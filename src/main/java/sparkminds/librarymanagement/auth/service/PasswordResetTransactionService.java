@@ -1,12 +1,14 @@
 package sparkminds.librarymanagement.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Validator;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.auth.entity.Account;
 import sparkminds.librarymanagement.auth.entity.PasswordResetToken;
+import sparkminds.librarymanagement.auth.dto.ForgotPasswordRequest;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.auth.repository.PasswordResetTokenRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
@@ -25,13 +27,17 @@ public class PasswordResetTransactionService {
     private final PasswordResetTokenService tokenService;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final Validator validator;
 
     /** Commit token candidate trước SMTP để không giữ DB lock trong lúc chờ mạng. */
     @Transactional
     public Candidate createCandidate(String email) {
+        if (!hasValidEmail(email)) {
+            return null;
+        }
+
         Account account = accountRepository.findByEmailForUpdate(email).orElse(null);
-        if (account == null || !"ROLE_USER".equals(account.getRole().getCode())
-                || !account.isEnabled() || !account.isEmailVerified()) {
+        if (!isEligibleForPasswordReset(account)) {
             return null;
         }
 
@@ -66,7 +72,7 @@ public class PasswordResetTransactionService {
     public void reset(Integer tokenId, Integer accountId, String tokenHash, String newPassword) {
         Account account = accountRepository.findByIdForUpdate(accountId)
                 .orElseThrow(PasswordResetTransactionService::invalidToken);
-        if (!"ROLE_USER".equals(account.getRole().getCode()) || !account.isEnabled() || !account.isEmailVerified()) {
+        if (!isEligibleForPasswordReset(account)) {
             throw invalidToken();
         }
 
@@ -93,6 +99,18 @@ public class PasswordResetTransactionService {
         token.setUsedAt(now);
         account.setPasswordHash(passwordEncoder.encode(newPassword));
         account.setSessionVersion(account.getSessionVersion() + 1);
+        account.setLastSessionChangeReason("PASSWORD_RESET");
+    }
+
+    private boolean isEligibleForPasswordReset(Account account) {
+        return account != null
+                && hasValidEmail(account.getEmail())
+                && account.isEnabled()
+                && account.isEmailVerified();
+    }
+
+    private boolean hasValidEmail(String email) {
+        return email != null && validator.validate(new ForgotPasswordRequest(email)).isEmpty();
     }
 
     private static BusinessException invalidToken() {

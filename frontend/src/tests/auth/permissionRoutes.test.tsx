@@ -13,10 +13,10 @@ const mocks = vi.hoisted(() => ({
       id: 4,
       username: null,
       email: 'reader@example.com',
-      role: 'ROLE_USER',
+      role: 'USER',
       permissions: ['role:read'],
     },
-    role: 'ROLE_USER',
+    role: 'USER',
     permissions: ['role:read'],
     capabilityStatus: 'ready',
     refreshCapabilities: vi.fn(async () => undefined),
@@ -26,6 +26,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../auth/AuthContext', () => ({
   useAuth: () => mocks.auth,
   useOptionalAuth: () => null,
+}));
+
+vi.mock('../../role/RoleManagementPage', () => ({
+  RoleManagementPage: () => <h1>Group management page</h1>,
+}));
+vi.mock('../../role/AuthorizationPages', () => ({
+  AuthorizationLandingPage: () => <h1>Authorization overview page</h1>,
+  AssignmentPlaceholderPage: () => <h1>Assignment placeholder page</h1>,
 }));
 
 const originalAdapter = apiClient.defaults.adapter;
@@ -39,6 +47,18 @@ afterEach(() => {
   cleanup();
   apiClient.defaults.adapter = originalAdapter;
   mocks.auth.refreshCapabilities.mockClear();
+  Object.assign(mocks.auth, {
+    accessToken: 'opaque-session-token',
+    role: 'USER',
+    currentUser: {
+      id: 4,
+      username: null,
+      email: 'reader@example.com',
+      role: 'USER',
+      permissions: ['role:read'],
+    },
+    permissions: ['role:read'],
+  });
 });
 
 describe('permission-protected routes', () => {
@@ -54,5 +74,56 @@ describe('permission-protected routes', () => {
     expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
     await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
     expect(roleApiCalls).toBe(0);
+  });
+
+  it('blocks a custom role from the authorization landing even when it has role:read', async () => {
+    Object.assign(mocks.auth, {
+      role: 'LIBRARIAN',
+      currentUser: { ...mocks.auth.currentUser, role: 'LIBRARIAN' },
+    });
+    render(<MemoryRouter initialEntries={['/admin/authorization']}><App /><LocationProbe /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
+    expect(screen.queryByRole('link', { name: 'Quản lý phân quyền' })).toBeNull();
+  });
+
+  it('blocks the assignment placeholder for a USER even when stale data grants RBAC permissions', async () => {
+    Object.assign(mocks.auth, {
+      role: 'USER',
+      currentUser: { ...mocks.auth.currentUser, role: 'USER', permissions: ['role:read', 'role:update'] },
+      permissions: ['role:read', 'role:update'],
+    });
+    render(<MemoryRouter initialEntries={['/admin/authorization/assignments']}><App /><LocationProbe /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));
+    expect(screen.queryByRole('heading', { name: 'Assignment placeholder page' })).toBeNull();
+  });
+
+  it('shows the authorization navigation to ADMIN by role and sends the legacy route to groups', async () => {
+    Object.assign(mocks.auth, {
+      role: 'ADMIN',
+      currentUser: { ...mocks.auth.currentUser, role: 'ADMIN' },
+      permissions: ['role:read'],
+    });
+    mocks.auth.currentUser.permissions = ['role:read'];
+    render(<MemoryRouter initialEntries={['/admin/roles']}><App /><LocationProbe /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Group management page' })).toBeTruthy();
+    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/admin/authorization/groups'));
+    expect(screen.getByRole('link', { name: 'Quản lý phân quyền' })).toBeTruthy();
+  });
+
+  it('keeps the admin navigation role-based when role:read is absent', async () => {
+    Object.assign(mocks.auth, {
+      role: 'ADMIN',
+      currentUser: { ...mocks.auth.currentUser, role: 'ADMIN', permissions: [] },
+      permissions: [],
+    });
+    render(<MemoryRouter initialEntries={['/admin/authorization']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Authorization overview page' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Quản lý phân quyền' })).toBeTruthy();
   });
 });

@@ -148,7 +148,7 @@ class MemberAdminLifecycleIntegrationTests {
         assertThat(jdbcTemplate.queryForObject("SELECT enabled FROM accounts WHERE id = ?", Boolean.class, accountId)).isTrue();
         Integer roleId = jdbcTemplate.queryForObject("SELECT role_id FROM accounts WHERE id = ?", Integer.class, accountId);
         assertThat(jdbcTemplate.queryForObject("SELECT code FROM roles WHERE id = ?", String.class, roleId))
-                .isEqualTo("ROLE_USER");
+                .isEqualTo("USER");
         String passwordHash = jdbcTemplate.queryForObject("SELECT password_hash FROM accounts WHERE id = ?", String.class, accountId);
         assertThat(passwordHash).isNotEqualTo(INITIAL_PASSWORD);
         assertThat(passwordEncoder.matches(INITIAL_PASSWORD, passwordHash)).isTrue();
@@ -360,18 +360,18 @@ class MemberAdminLifecycleIntegrationTests {
     }
 
     @Test
-    void userCanCreateAndDeleteOnlyAfterCurrentDatabasePermissionsAreGranted() throws Exception {
+    void userCannotUseMemberAdminApiEvenWhenPermissionsAreGranted() throws Exception {
         String actorEmail = fixtureEmail();
         String actorUsername = createLoginableUser(actorEmail);
         String actorToken = login(actorEmail, INITIAL_PASSWORD);
         String targetEmail = fixtureEmail();
         int baselineRolePermissionCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM role_permissions", Integer.class);
-        boolean hadCreate = hasRolePermission("ROLE_USER", "member:create");
-        boolean hadDelete = hasRolePermission("ROLE_USER", "member:delete");
+        boolean hadCreate = hasRolePermission("USER", "member:create");
+        boolean hadDelete = hasRolePermission("USER", "member:delete");
 
         try {
-            setRolePermission("ROLE_USER", "member:create", false);
-            setRolePermission("ROLE_USER", "member:delete", false);
+            setRolePermission("USER", "member:create", true);
+            setRolePermission("USER", "member:delete", true);
             postCreate(actorToken, targetEmail, INITIAL_PASSWORD, "")
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
@@ -381,41 +381,28 @@ class MemberAdminLifecycleIntegrationTests {
                             "/api/v1/members/{id}", targetMemberId)
                             .header("Authorization", "Bearer " + actorToken))
                     .andExpect(status().isForbidden());
-
-            setRolePermission("ROLE_USER", "member:create", true);
-            MvcResult created = postCreate(actorToken, fixtureEmail(), INITIAL_PASSWORD, "")
-                    .andExpect(status().isCreated())
-                    .andReturn();
-            int createdMemberId = JsonPath.read(created.getResponse().getContentAsString(), "$.data.id");
-            setRolePermission("ROLE_USER", "member:delete", true);
-            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
-                            "/api/v1/members/{id}", createdMemberId)
-                            .header("Authorization", "Bearer " + actorToken))
-                    .andExpect(status().isNoContent());
             assertThat(actorUsername).isNotBlank();
         } finally {
-            setRolePermission("ROLE_USER", "member:create", hadCreate);
-            setRolePermission("ROLE_USER", "member:delete", hadDelete);
+            setRolePermission("USER", "member:create", hadCreate);
+            setRolePermission("USER", "member:delete", hadDelete);
         }
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM role_permissions", Integer.class))
                 .isEqualTo(baselineRolePermissionCount);
     }
 
     @Test
-    void adminTokenLosesCreateCapabilityImmediatelyWhenDatabasePermissionIsRevoked() throws Exception {
+    void adminRetainsCreateCapabilityWhenDatabasePermissionRowIsRemoved() throws Exception {
         String email = fixtureEmail();
         String adminToken = login("admin", "admin");
-        boolean hadCreate = hasRolePermission("ROLE_ADMIN", "member:create");
+        boolean hadCreate = hasRolePermission("ADMIN", "member:create");
         int baselineRolePermissionCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM role_permissions", Integer.class);
         try {
-            setRolePermission("ROLE_ADMIN", "member:create", false);
-            postCreate(adminToken, email, INITIAL_PASSWORD, "")
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+            setRolePermission("ADMIN", "member:create", false);
+            postCreate(adminToken, email, INITIAL_PASSWORD, "").andExpect(status().isCreated());
             assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE email = ?", Integer.class, email))
-                    .isZero();
+                    .isEqualTo(1);
         } finally {
-            setRolePermission("ROLE_ADMIN", "member:create", hadCreate);
+            setRolePermission("ADMIN", "member:create", hadCreate);
         }
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM role_permissions", Integer.class))
                 .isEqualTo(baselineRolePermissionCount);
@@ -538,7 +525,7 @@ class MemberAdminLifecycleIntegrationTests {
     }
 
     private String loginAsSuperAdmin() throws Exception {
-        return login("superadmin", "superadmin");
+        return login("admin", "admin");
     }
 
     private String login(String identifier, String password) throws Exception {
@@ -617,7 +604,7 @@ class MemberAdminLifecycleIntegrationTests {
     private int createDirectFixtureMember(String email) {
         jdbcTemplate.update("""
                         INSERT INTO accounts (email, password_hash, role_id, email_verified, enabled)
-                        SELECT ?, ?, id, true, true FROM roles WHERE code = 'ROLE_USER'
+                        SELECT ?, ?, id, true, true FROM roles WHERE code = 'USER'
                         """,
                 email, passwordEncoder.encode("Fixture1!"));
         Integer accountId = jdbcTemplate.queryForObject(
@@ -635,7 +622,7 @@ class MemberAdminLifecycleIntegrationTests {
         String username = "mmv8u" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         jdbcTemplate.update("""
                         INSERT INTO accounts (username, email, password_hash, role_id, email_verified, enabled)
-                        SELECT ?, ?, ?, id, true, true FROM roles WHERE code = 'ROLE_USER'
+                        SELECT ?, ?, ?, id, true, true FROM roles WHERE code = 'USER'
                         """,
                 username, email, passwordEncoder.encode(INITIAL_PASSWORD));
         return username;

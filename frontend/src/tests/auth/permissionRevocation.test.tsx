@@ -6,7 +6,7 @@ import {
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../../app/App';
@@ -17,6 +17,29 @@ import { setAccessToken } from '../../auth/tokenStore';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const originalAdapter = apiClient.defaults.adapter;
+
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+beforeAll(() => {
+  Object.defineProperty(globalThis, 'ResizeObserver', { writable: true, value: ResizeObserverStub });
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: (media: string) => ({
+      matches: false,
+      media,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  });
+});
 
 function response<T>(config: InternalAxiosRequestConfig, data: T, status = 200): AxiosResponse<T> {
   return {
@@ -90,14 +113,14 @@ describe('permission revocation synchronization', () => {
           id: 5,
           username: 'admin',
           email: 'admin@example.com',
-          role: 'ROLE_ADMIN',
+          role: 'ADMIN',
           permissions,
         }));
       }
       if (config.url === '/api/v1/roles') {
         return response(config, success('ROLE_LIST_SUCCESS', [
-          { code: 'ROLE_ADMIN', description: 'Quản trị viên', version: 0, canEdit: false },
-          { code: 'ROLE_USER', description: 'Người dùng', version: 0, canEdit: true },
+          { code: 'ADMIN', description: 'Quản trị viên', version: 0, canEdit: false },
+          { code: 'USER', description: 'Người dùng', version: 0, canEdit: true },
         ]));
       }
       if (config.url === '/api/v1/permissions') {
@@ -105,9 +128,9 @@ describe('permission revocation synchronization', () => {
           { code: 'book:read', description: 'Xem sách', manageableByActor: true },
         ]));
       }
-      if (config.url === '/api/v1/roles/ROLE_USER/permissions') {
+      if (config.url === '/api/v1/roles/USER/permissions') {
         return response(config, success('ROLE_PERMISSIONS_SUCCESS', {
-          roleCode: 'ROLE_USER',
+          roleCode: 'USER',
           version: 0,
           assignedPermissions: [],
           effectivePermissions: [],
@@ -129,7 +152,7 @@ describe('permission revocation synchronization', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Quản lý vai trò' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Quản lý quyền theo nhóm' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Gọi endpoint bị từ chối' }));
 
     expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
@@ -170,7 +193,7 @@ describe('permission revocation synchronization', () => {
           id: 5,
           username: 'admin',
           email: 'admin@example.com',
-          role: 'ROLE_ADMIN',
+          role: 'ADMIN',
           permissions: ['book:read'],
         }));
       }
@@ -201,7 +224,7 @@ describe('permission revocation synchronization', () => {
       id: 5,
       username: 'admin',
       email: 'admin@example.com',
-      role: 'ROLE_ADMIN',
+      role: 'ADMIN',
       permissions: ['role:read', 'role:update'],
     })));
     await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/403'));

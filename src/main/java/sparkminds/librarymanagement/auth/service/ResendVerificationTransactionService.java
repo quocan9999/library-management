@@ -19,6 +19,12 @@ public class ResendVerificationTransactionService {
     private final VerificationTokenService tokenService;
     private final Clock clock;
 
+    @Transactional(readOnly = true)
+    public String resolveLoginEmail(String identifier) {
+        if (identifier.contains("@")) return identifier.trim().toLowerCase(java.util.Locale.ROOT);
+        return accountRepository.findByUsername(identifier).map(Account::getEmail).orElse(null);
+    }
+
     /** Commit ứng viên trước khi SMTP chạy để khóa DB không bị giữ trong lúc chờ mạng. */
     @Transactional
     public Candidate createCandidate(String email) {

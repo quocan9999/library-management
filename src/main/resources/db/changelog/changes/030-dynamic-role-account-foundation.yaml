@@ -1,0 +1,97 @@
+databaseChangeLog:
+  - changeSet:
+      id: 030-dynamic-role-account-foundation
+      author: codex
+      comment: "Chuẩn hóa Role động và đánh dấu tài khoản ADMIN hệ thống"
+      preConditions:
+        - onFail: HALT
+        - onError: HALT
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >
+              SELECT COUNT(*)
+              FROM accounts a
+              JOIN roles r ON r.id = a.role_id
+              JOIN members m ON m.account_id = a.id
+              WHERE r.code = 'ROLE_SUPER_ADMIN' AND a.username = 'superadmin'
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >
+              SELECT COUNT(*)
+              FROM accounts a
+              JOIN roles r ON r.id = a.role_id
+              WHERE r.code = 'ROLE_SUPER_ADMIN'
+                AND COALESCE(a.username, '') <> 'superadmin'
+      changes:
+        - addColumn:
+            tableName: roles
+            columns:
+              - column:
+                  name: display_name
+                  type: VARCHAR(100)
+
+        - sql:
+            dbms: mysql
+            sql: >
+              UPDATE roles
+              SET display_name = CASE code
+                WHEN 'ROLE_ADMIN' THEN 'Quản trị viên'
+                WHEN 'ROLE_USER' THEN 'Người dùng'
+                WHEN 'ROLE_SUPER_ADMIN' THEN 'Siêu quản trị viên'
+                ELSE LEFT(COALESCE(NULLIF(description, ''), code), 100)
+              END
+
+        - addNotNullConstraint:
+            tableName: roles
+            columnName: display_name
+            columnDataType: VARCHAR(100)
+
+        - addColumn:
+            tableName: roles
+            columns:
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+
+        - addColumn:
+            tableName: accounts
+            columns:
+              - column:
+                  name: is_system_account
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+        - sql:
+            dbms: mysql
+            sql: UPDATE roles SET code = 'ADMIN' WHERE code = 'ROLE_ADMIN'
+
+        - sql:
+            dbms: mysql
+            sql: UPDATE roles SET code = 'USER' WHERE code = 'ROLE_USER'
+
+        - sql:
+            dbms: mysql
+            sql: >
+              UPDATE accounts
+              SET is_system_account = TRUE
+              WHERE username = 'admin'
+                AND role_id = (SELECT id FROM roles WHERE code = 'ADMIN');
+
+        - sql:
+            dbms: mysql
+            sql: >
+              DELETE FROM role_permissions
+              WHERE role_id = (SELECT id FROM roles WHERE code = 'ROLE_SUPER_ADMIN');
+
+        - delete:
+            tableName: accounts
+            where: "username = 'superadmin' AND role_id = (SELECT id FROM roles WHERE code = 'ROLE_SUPER_ADMIN')"
+
+        - delete:
+            tableName: roles
+            where: "code = 'ROLE_SUPER_ADMIN'"

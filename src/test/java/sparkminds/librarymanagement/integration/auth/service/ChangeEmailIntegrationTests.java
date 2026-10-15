@@ -111,7 +111,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void sendsHashedTenMinuteCodeToNormalizedNewEmailWithoutChangingAccountEmail() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String newEmail = "  New.Address+Library@Example.COM  ";
 
@@ -142,9 +142,9 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void rejectsWrongCurrentPasswordSameEmailAndEmailOwnedByAnotherAccount() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
-        Account otherAccount = createAccount("ROLE_USER");
+        Account otherAccount = createAccount("USER");
 
         requestEmailChange(accessToken, "different@example.com", "WrongPass2!", nextClientIp())
                 .andExpect(status().isBadRequest())
@@ -166,7 +166,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void replacedCodeCannotChangeEmailAndSuccessfulCodeKeepsEveryExistingSession() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String originalEmail = account.getEmail();
         MvcResult firstLogin = login(originalEmail, CURRENT_PASSWORD);
         String firstAccessToken = readAccessToken(firstLogin);
@@ -227,7 +227,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void expiredCodeLeavesEmailAndSessionVersionUnchanged() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String originalEmail = account.getEmail();
         String newEmail = "expired-" + UUID.randomUUID() + "@example.com";
@@ -248,7 +248,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void failedEmailDeliveryDoesNotReturnSuccessOrLeaveUsablePendingCode() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         doThrow(new MailSendException("private SMTP detail"))
                 .when(javaMailSender).send(any(SimpleMailMessage.class));
@@ -267,7 +267,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void failedResendKeepsPreviouslyDeliveredCodeUsable() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String token = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String firstEmail = "first-delivered-" + UUID.randomUUID() + "@example.com";
         requestEmailChange(token, firstEmail, CURRENT_PASSWORD, nextClientIp()).andExpect(status().isOk());
@@ -289,7 +289,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void verifyDuringResendDoesNotHoldSmtpLockOrActivateCodeAfterEmailAlreadyChanged() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String token = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String firstEmail = "verify-during-send-" + UUID.randomUUID() + "@example.com";
         requestEmailChange(token, firstEmail, CURRENT_PASSWORD, nextClientIp()).andExpect(status().isOk());
@@ -322,7 +322,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void concurrentSuccessfulResendsLeaveOnlyOneUsableCode() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String token = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String prefix = UUID.randomUUID().toString();
         CountDownLatch sending = new CountDownLatch(2);
@@ -362,37 +362,36 @@ class ChangeEmailIntegrationTests {
     }
 
     @Test
-    void anonymousUserAndNonUserRoleCannotRequestEmailChangeEvenWithPermission() throws Exception {
+    void anonymousIsRejectedButAuthenticatedRolesCanRequestEmailChangeWithoutPermission() throws Exception {
         requestEmailChange("", "target@example.com", CURRENT_PASSWORD, nextClientIp())
                 .andExpect(status().isUnauthorized());
 
         permissionRepository.findByCode("account:change-email").orElseThrow();
-        removePermission("ROLE_USER", "account:change-email");
+        int userPermissionBaseline = permissionLinkCount("USER", "account:change-email");
+        int adminPermissionBaseline = permissionLinkCount("ADMIN", "account:change-email");
+        removePermission("USER", "account:change-email");
+        removePermission("ADMIN", "account:change-email");
         try {
-            Account userWithoutPermission = createAccount("ROLE_USER");
+            Account userWithoutPermission = createAccount("USER");
             String userToken = readAccessToken(login(userWithoutPermission.getEmail(), CURRENT_PASSWORD));
-            requestEmailChange(userToken, "missing-permission@example.com", CURRENT_PASSWORD, nextClientIp())
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
-        } finally {
-            addPermission("ROLE_USER", "account:change-email");
-        }
+            requestEmailChange(userToken, "user-target@example.com", CURRENT_PASSWORD, nextClientIp())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("EMAIL_CHANGE_CODE_SENT"));
 
-        addPermission("ROLE_ADMIN", "account:change-email");
-        try {
-            Account admin = createAccount("ROLE_ADMIN");
-            String adminToken = readAccessToken(login(admin.getEmail(), CURRENT_PASSWORD));
+            Account adminWithoutPermission = createAccount("ADMIN");
+            String adminToken = readAccessToken(login(adminWithoutPermission.getEmail(), CURRENT_PASSWORD));
             requestEmailChange(adminToken, "admin-target@example.com", CURRENT_PASSWORD, nextClientIp())
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("EMAIL_CHANGE_CODE_SENT"));
         } finally {
-            removePermission("ROLE_ADMIN", "account:change-email");
+            setPermission("USER", "account:change-email", userPermissionBaseline > 0);
+            setPermission("ADMIN", "account:change-email", adminPermissionBaseline > 0);
         }
     }
 
     @Test
     void rejectsMalformedCodeAndRateLimitsRepeatedGuessesWithoutChangingEmail() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String originalEmail = account.getEmail();
         requestEmailChange(accessToken, "rate-limit-" + UUID.randomUUID() + "@example.com", CURRENT_PASSWORD,
@@ -419,7 +418,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void appliesSendCooldownAndKeepsFirstCodeUsableWhenSecondSendIsThrottled() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String newEmail = "cooldown-" + UUID.randomUUID() + "@example.com";
 
@@ -439,7 +438,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void preservesUnverifiedFlagWhenVerifiedCodeChangesEmail() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String newEmail = "unverified-" + UUID.randomUUID() + "@example.com";
         jdbcTemplate.update("UPDATE accounts SET email_verified = false WHERE id = ?", account.getId());
@@ -460,8 +459,8 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void rechecksEmailOwnershipAtVerificationAndDoesNotConsumeCodeOnConflict() throws Exception {
-        Account account = createAccount("ROLE_USER");
-        Account owner = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
+        Account owner = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String targetEmail = "raced-" + UUID.randomUUID() + "@example.com";
 
@@ -479,8 +478,8 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void concurrentAccountsChangingToSameEmailAllowOnlyOneAndReturnConflictForOther() throws Exception {
-        Account first = createAccount("ROLE_USER");
-        Account second = createAccount("ROLE_USER");
+        Account first = createAccount("USER");
+        Account second = createAccount("USER");
         String firstToken = readAccessToken(login(first.getEmail(), CURRENT_PASSWORD));
         String secondToken = readAccessToken(login(second.getEmail(), CURRENT_PASSWORD));
         String targetEmail = "concurrent-" + UUID.randomUUID() + "@example.com";
@@ -512,7 +511,7 @@ class ChangeEmailIntegrationTests {
 
     @Test
     void concurrentVerificationOfOneCodeCanOnlyChangeEmailOnce() throws Exception {
-        Account account = createAccount("ROLE_USER");
+        Account account = createAccount("USER");
         String accessToken = readAccessToken(login(account.getEmail(), CURRENT_PASSWORD));
         String targetEmail = "double-verify-" + UUID.randomUUID() + "@example.com";
         requestEmailChange(accessToken, targetEmail, CURRENT_PASSWORD, nextClientIp()).andExpect(status().isOk());
@@ -631,6 +630,22 @@ class ChangeEmailIntegrationTests {
     private void removePermission(String roleCode, String permissionCode) {
         jdbcTemplate.update("DELETE FROM role_permissions WHERE role_id = ? AND permission_id = ?",
                 roleId(roleCode), permissionId(permissionCode));
+    }
+
+    private int permissionLinkCount(String roleCode, String permissionCode) {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM role_permissions
+                WHERE role_id = ? AND permission_id = ?
+                """, Integer.class, roleId(roleCode), permissionId(permissionCode));
+    }
+
+    private void setPermission(String roleCode, String permissionCode, boolean assigned) {
+        if (assigned) {
+            jdbcTemplate.update("INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)",
+                    roleId(roleCode), permissionId(permissionCode));
+        } else {
+            removePermission(roleCode, permissionCode);
+        }
     }
 
     private void addPermission(String roleCode, String permissionCode) {

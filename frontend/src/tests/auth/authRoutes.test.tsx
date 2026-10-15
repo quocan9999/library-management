@@ -233,7 +233,7 @@ describe('public registration and verification routes', () => {
         accessToken: 'account-B-token', tokenType: 'Bearer', accessTokenExpiresIn: 900,
       }));
       if (config.url === '/api/v1/auth/me') return response(config, success('AUTH_ME_SUCCESS', {
-        id: 2, username: 'admin-B', email: 'admin-B@example.com', role: 'ROLE_ADMIN', permissions: [],
+        id: 2, username: 'admin-B', email: 'admin-B@example.com', role: 'ADMIN', permissions: [],
       }));
       if (config.url === '/api/v1/auth/reset-password') return response(config, success('PASSWORD_RESET_SUCCESS', null));
       throw new Error(`Unexpected request: ${config.url}`);

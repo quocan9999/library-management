@@ -13,11 +13,15 @@ import sparkminds.librarymanagement.auth.repository.RoleRepositoy;
 import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
 import sparkminds.librarymanagement.auth.security.EffectivePermissionService;
 import sparkminds.librarymanagement.common.api.BusinessException;
+import sparkminds.librarymanagement.role.dto.RoleDetailResponse;
 import sparkminds.librarymanagement.role.dto.PermissionCatalogResponse;
 import sparkminds.librarymanagement.role.dto.RolePermissionsResponse;
+import sparkminds.librarymanagement.role.dto.RoleSearchItemResponse;
+import sparkminds.librarymanagement.role.dto.RoleSearchResponse;
 import sparkminds.librarymanagement.role.dto.RoleSummaryResponse;
 import sparkminds.librarymanagement.role.policy.PermissionDependencyRegistry;
 import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
+import sparkminds.librarymanagement.role.repository.RoleManagementReadRepository;
 
 import java.util.Collection;
 import java.util.List;
@@ -28,11 +32,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RoleReadService {
 
+    private static final int MAX_SEARCH_PAGE = 10_000;
+    private static final int MAX_SEARCH_SIZE = 100;
+
     private final RoleRepositoy roleRepository;
     private final PermissionRepository permissionRepository;
     private final EffectivePermissionService effectivePermissionService;
     private final RoleAccessPolicy roleAccessPolicy;
     private final PermissionDependencyRegistry permissionDependencyRegistry;
+    private final RoleManagementReadRepository roleManagementReadRepository;
 
     @Transactional(readOnly = true)
     public List<RoleSummaryResponse> getRoles(CustomUserPrincipal actor) {
@@ -43,11 +51,76 @@ public class RoleReadService {
                 .sorted((left, right) -> left.getCode().compareTo(right.getCode()))
                 .map(role -> new RoleSummaryResponse(
                         role.getCode(),
+                        role.getDisplayName(),
                         role.getDescription(),
+                        role.isEnabled(),
                         role.getVersion(),
-                        roleAccessPolicy.canEditTarget(actor.getRoleCode(), role.getCode(), actorPermissions)
+                        role.isEnabled()
+                                && roleAccessPolicy.canEditTarget(actor.getRoleCode(), role.getCode(), actorPermissions)
                 ))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public RoleSearchResponse searchRoles(
+            CustomUserPrincipal actor,
+            String query,
+            String status,
+            Integer page,
+            Integer size,
+            String sort,
+            String direction
+    ) {
+        ensureRoleManagementRank(actor);
+        int requestedPage = page == null ? 0 : page;
+        int requestedSize = size == null ? 10 : size;
+        if (requestedPage < 0 || requestedPage > MAX_SEARCH_PAGE
+                || requestedSize < 1 || requestedSize > MAX_SEARCH_SIZE
+                || (query != null && query.length() > 100)) {
+            throw roleSearchInvalid();
+        }
+
+        Boolean enabled = null;
+        if (status != null && !status.isBlank()) {
+            enabled = switch (status.trim().toUpperCase(java.util.Locale.ROOT)) {
+                case "ACTIVE" -> true;
+                case "INACTIVE" -> false;
+                default -> throw roleSearchInvalid();
+            };
+        }
+
+        String requestedSort = sort == null || sort.isBlank() ? "code" : sort;
+        if (!List.of("code", "displayName", "createdAt", "accountCount", "permissionCount", "enabled")
+                .contains(requestedSort)) {
+            throw roleSearchInvalid();
+        }
+        String requestedDirection = direction == null || direction.isBlank()
+                ? "ASC" : direction.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!List.of("ASC", "DESC").contains(requestedDirection)) {
+            throw roleSearchInvalid();
+        }
+
+        Collection<String> actorPermissions = permissionCodes(actor);
+        List<RoleSearchItemResponse> content = roleManagementReadRepository.search(
+                        query, enabled, requestedPage, requestedSize, requestedSort, requestedDirection).stream()
+                .map(row -> new RoleSearchItemResponse(
+                        row.code(), row.displayName(), row.description(), row.enabled(), row.version(),
+                        isSystemRole(row.code()), row.accountCount(), row.permissionCount(), row.createdAt(),
+                        row.enabled() && roleAccessPolicy.canEditTarget(actor.getRoleCode(), row.code(), actorPermissions)
+                ))
+                .toList();
+        long totalElements = roleManagementReadRepository.count(query, enabled);
+        return RoleSearchResponse.of(content, requestedPage, requestedSize, totalElements);
+    }
+
+    @Transactional(readOnly = true)
+    public RoleDetailResponse getRole(CustomUserPrincipal actor, String roleCode) {
+        ensureRoleManagementRank(actor);
+        RoleManagementReadRepository.RoleReadRow role = roleManagementReadRepository.findByCode(roleCode);
+        if (role == null) {
+            throw roleNotFound();
+        }
+        return toDetailResponse(role);
     }
 
     @Transactional(readOnly = true)
@@ -60,8 +133,10 @@ public class RoleReadService {
         return permissions.stream()
                 .map(permission -> new PermissionCatalogResponse(
                         permission.getCode(),
+                        permissionDomain(permission.getCode()),
                         permission.getDescription(),
-                        actorPermissions.contains(permission.getCode()),
+                        actorPermissions.contains(permission.getCode())
+                                && roleAccessPolicy.isAssignableToNonAdminRole(permission.getCode()),
                         permissionDependencyRegistry.directDependencies(permission.getCode()).stream().sorted().toList()
                 ))
                 .toList();
@@ -80,10 +155,12 @@ public class RoleReadService {
 
         Set<String> actorPermissions = permissionCodes(actor);
         List<String> effectivePermissions = effectivePermissionService.resolve(role);
-        List<String> assignedPermissions = RoleAccessPolicy.SUPER_ADMIN.equals(role.getCode())
-                ? effectivePermissions
-                : role.getPermissions().stream().map(Permission::getCode).sorted().toList();
-        boolean editable = roleAccessPolicy.canEditTarget(actor.getRoleCode(), role.getCode(), actorPermissions);
+        List<String> assignedPermissions = role.getPermissions().stream()
+                .map(Permission::getCode)
+                .sorted()
+                .toList();
+        boolean editable = role.isEnabled()
+                && roleAccessPolicy.canEditTarget(actor.getRoleCode(), role.getCode(), actorPermissions);
         List<String> editablePermissions = editable
                 ? roleAccessPolicy.editablePermissions(
                         actor.getRoleCode(),
@@ -94,7 +171,9 @@ public class RoleReadService {
 
         return new RolePermissionsResponse(
                 role.getCode(),
+                role.getDisplayName(),
                 role.getVersion(),
+                role.isEnabled(),
                 assignedPermissions,
                 effectivePermissions,
                 editablePermissions,
@@ -113,5 +192,30 @@ public class RoleReadService {
         return actor.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private static RoleDetailResponse toDetailResponse(RoleManagementReadRepository.RoleReadRow role) {
+        boolean systemRole = isSystemRole(role.code());
+        return new RoleDetailResponse(
+                role.code(), role.displayName(), role.description(), role.enabled(), role.version(),
+                systemRole, "ADMIN".equals(role.code()), role.accountCount(), role.permissionCount(), role.createdAt());
+    }
+
+    private static boolean isSystemRole(String roleCode) {
+        return "ADMIN".equals(roleCode) || "USER".equals(roleCode);
+    }
+
+    private static String permissionDomain(String permissionCode) {
+        int separator = permissionCode.indexOf(':');
+        return separator > 0 ? permissionCode.substring(0, separator) : "general";
+    }
+
+    private static BusinessException roleSearchInvalid() {
+        return new BusinessException(HttpStatus.BAD_REQUEST, "ROLE_SEARCH_INVALID",
+                "Bộ lọc, phân trang hoặc sắp xếp vai trò không hợp lệ");
+    }
+
+    private static BusinessException roleNotFound() {
+        return new BusinessException(HttpStatus.NOT_FOUND, "ROLE_NOT_FOUND", "Không tìm thấy vai trò");
     }
 }

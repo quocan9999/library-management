@@ -55,6 +55,9 @@ public class AuthSessionService {
             throw new BusinessException(HttpStatus.FORBIDDEN, "AUTH_ACCOUNT_DISABLED", "Tài khoản hiện không thể đăng nhập");
         }
         if (claims.sessionVersion() != account.getSessionVersion()) {
+            if ("ROLE_CHANGED".equals(account.getLastSessionChangeReason())) {
+                throw refreshError("AUTH_ROLE_CHANGED", "Vai trò đã thay đổi, vui lòng đăng nhập lại");
+            }
             throw refreshError("AUTH_REFRESH_TOKEN_REVOKED", "Refresh Token đã bị thu hồi");
         }
 
@@ -80,7 +83,7 @@ public class AuthSessionService {
             );
         }
 
-        if ("ROLE_USER".equals(account.getRole().getCode()) && !account.isEmailVerified()) {
+        if (!account.isSystemAccount() && account.getEmail() != null && !account.isEmailVerified()) {
             throw new BusinessException(
                     HttpStatus.FORBIDDEN,
                     "EMAIL_NOT_VERIFIED",

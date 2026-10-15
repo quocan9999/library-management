@@ -128,6 +128,35 @@ class AuthResendVerificationIntegrationTests {
     }
 
     @Test
+    void loginResendSharesEmailAndIpLimitsWithRegistrationResend() throws Exception {
+        Account account = createAccount(uniqueEmail(), false);
+        account.setUsername("pending" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        accountRepository.saveAndFlush(account);
+        String ip = uniqueRemoteAddress();
+        String payload = objectMapper.writeValueAsString(java.util.Map.of("identifier", account.getUsername()));
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/v1/auth/resend-login-verification")
+                    .with(request -> { request.setRemoteAddr(ip); return request; })
+                    .contentType(APPLICATION_JSON).content(payload))
+                    .andExpect(status().isOk());
+            resend(account.getEmail(), uniqueRemoteAddress());
+            resendTestClock.advance(Duration.ofSeconds(60));
+        }
+        verify(javaMailSender, times(5)).send(any(SimpleMailMessage.class));
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/v1/auth/resend-login-verification")
+                    .with(request -> { request.setRemoteAddr(ip); return request; })
+                    .contentType(APPLICATION_JSON).content(payload)).andExpect(status().isOk());
+        }
+        mockMvc.perform(post("/api/v1/auth/resend-verification")
+                .with(request -> { request.setRemoteAddr(ip); return request; })
+                .contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(java.util.Map.of("email", account.getEmail()))))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+        verify(javaMailSender, times(5)).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
     void returnsIdenticalGenericResponseForUnknownVerifiedAndUnverifiedAccounts() throws Exception {
         String verifiedEmail = uniqueEmail();
         Account verified = createAccount(verifiedEmail, true);
@@ -379,7 +408,7 @@ class AuthResendVerificationIntegrationTests {
         Account account = new Account();
         account.setEmail(email);
         account.setPasswordHash(passwordEncoder.encode("Existing1!"));
-        account.setRole(roleRepository.findByCode("ROLE_USER").orElseThrow());
+        account.setRole(roleRepository.findByCode("USER").orElseThrow());
         account.setEnabled(true);
         account.setEmailVerified(verified);
         return accountRepository.saveAndFlush(account);

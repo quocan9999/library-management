@@ -6,8 +6,14 @@ import {
   type AxiosResponse,
 } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ACCOUNT_DISABLED_EVENT, apiClient, authApi } from '../../auth/api';
+import {
+  ACCOUNT_DISABLED_EVENT,
+  ACCOUNT_SESSION_REVOKED_EVENT,
+  apiClient,
+  authApi,
+} from '../../auth/api';
 import { clearRevokedSessionAfterReset } from '../../auth/passwordResetSession';
+import { SESSION_TAB_EVENT_KEY } from '../../auth/sessionTabEvents';
 import { getAccessToken, setAccessToken } from '../../auth/tokenStore';
 import type { ApiEnvelope, LoginData, RegisterData } from '../../auth/types';
 
@@ -63,6 +69,7 @@ afterEach(() => {
   delete apiClient.defaults.headers.common.Authorization;
   setAccessToken(null);
   window.sessionStorage.clear();
+  window.localStorage.removeItem(SESSION_TAB_EVENT_KEY);
 });
 
 describe('API base URL configuration', () => {
@@ -77,7 +84,7 @@ describe('API base URL configuration', () => {
       }
       if (config.url === '/api/v1/auth/me') return response(config, {
         success: true, code: 'AUTH_ME_SUCCESS', status: 200, message: '', timestamp: new Date().toISOString(),
-        data: { id: 2, username: 'B', email: 'b@example.com', role: 'ROLE_USER', permissions: [] },
+        data: { id: 2, username: 'B', email: 'b@example.com', role: 'USER', permissions: [] },
       });
       throw new Error(`Unexpected request ${config.url}`);
     }) satisfies AxiosAdapter;
@@ -203,6 +210,78 @@ describe('authenticated API client', () => {
     expect(refreshUsedCredentials).toBe(true);
   });
 
+  it('does not install another account returned by the shared refresh cookie', async () => {
+    const expiredAccountA = `header.${btoa(JSON.stringify({ sub: 'account-a' }))}.signature`;
+    const refreshedAccountB = `header.${btoa(JSON.stringify({ sub: 'account-b' }))}.signature`;
+    setAccessToken(expiredAccountA);
+    let protectedAttempts = 0;
+    let revokedEvents = 0;
+    const onSessionRevoked = () => { revokedEvents += 1; };
+    window.addEventListener(ACCOUNT_SESSION_REVOKED_EVENT, onSessionRevoked);
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') return refreshedResponse(config, refreshedAccountB);
+      if (config.url === '/protected') {
+        protectedAttempts += 1;
+        if (config.headers.get('Authorization') === `Bearer ${expiredAccountA}`) {
+          unauthorized(config, 'AUTH_TOKEN_EXPIRED');
+        }
+        return response(config, { ok: true });
+      }
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    try {
+      await expect(apiClient.get('/protected')).rejects.toThrow(
+        'The current session belongs to a different account.',
+      );
+    } finally {
+      window.removeEventListener(ACCOUNT_SESSION_REVOKED_EVENT, onSessionRevoked);
+    }
+
+    expect(protectedAttempts).toBe(1);
+    expect(getAccessToken()).toBeNull();
+    expect(revokedEvents).toBe(1);
+    expect(JSON.parse(window.localStorage.getItem(SESSION_TAB_EVENT_KEY) ?? '{}').type).toBe('session-revoked');
+  });
+
+  it('preserves a newer same-tab login while an expired request refresh is pending', async () => {
+    const expiredAccountA = `header.${btoa(JSON.stringify({ sub: 'account-a' }))}.signature`;
+    const refreshedAccountA = `header.${btoa(JSON.stringify({ sub: 'account-a' }))}.signature`;
+    const newerAccountB = `header.${btoa(JSON.stringify({ sub: 'account-b' }))}.signature`;
+    setAccessToken(expiredAccountA);
+    let protectedAttempts = 0;
+    let resolveRefresh!: (value: ReturnType<typeof refreshedResponse>) => void;
+    let refreshRequestConfig!: Parameters<AxiosAdapter>[0];
+    let signalRefreshStarted!: () => void;
+    const refreshStarted = new Promise<void>((resolve) => { signalRefreshStarted = resolve; });
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') {
+        signalRefreshStarted();
+        return new Promise((resolve) => {
+          refreshRequestConfig = config;
+          resolveRefresh = resolve;
+        });
+      }
+      if (config.url === '/protected') {
+        protectedAttempts += 1;
+        if (config.headers.get('Authorization') === `Bearer ${expiredAccountA}`) {
+          unauthorized(config, 'AUTH_TOKEN_EXPIRED');
+        }
+        return response(config, { ok: true });
+      }
+      throw new Error(`Unexpected request: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    const pendingRequest = apiClient.get('/protected');
+    await refreshStarted;
+    setAccessToken(newerAccountB);
+    resolveRefresh(refreshedResponse(refreshRequestConfig, refreshedAccountA));
+
+    await expect(pendingRequest).rejects.toThrow('The session changed while refreshing.');
+    expect(getAccessToken()).toBe(newerAccountB);
+    expect(protectedAttempts).toBe(1);
+  });
+
   it('does not refresh for a 401 response whose API code is not AUTH_TOKEN_EXPIRED', async () => {
     let refreshAttempts = 0;
     apiClient.defaults.adapter = (async (config) => {
@@ -217,6 +296,38 @@ describe('authenticated API client', () => {
       response: { data: { code: 'AUTH_TOKEN_INVALID' } },
     });
     expect(refreshAttempts).toBe(0);
+  });
+
+  it('clears and broadcasts a role-changed session without trying another refresh', async () => {
+    let protectedAttempts = 0;
+    let refreshAttempts = 0;
+    let roleChangedEvents = 0;
+    const onRoleChanged = () => { roleChangedEvents += 1; };
+    window.addEventListener('auth:role-changed', onRoleChanged);
+    setAccessToken('stale-role-session');
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/auth/refresh') {
+        refreshAttempts += 1;
+        return unauthorized(config, 'AUTH_ROLE_CHANGED');
+      }
+      protectedAttempts += 1;
+      return unauthorized(config, 'AUTH_ROLE_CHANGED');
+    }) satisfies AxiosAdapter;
+
+    try {
+      await expect(apiClient.get('/api/v1/protected')).rejects.toMatchObject({
+        response: { status: 401, data: { code: 'AUTH_ROLE_CHANGED' } },
+      });
+    } finally {
+      window.removeEventListener('auth:role-changed', onRoleChanged);
+    }
+
+    expect(getAccessToken()).toBeNull();
+    expect(protectedAttempts).toBe(1);
+    expect(refreshAttempts).toBe(0);
+    expect(roleChangedEvents).toBe(1);
+    expect(JSON.parse(window.localStorage.getItem(SESSION_TAB_EVENT_KEY) ?? 'null')?.type)
+      .toBe('session-revoked');
   });
 
   it('shares one refresh request across concurrent expired requests', async () => {
@@ -276,7 +387,7 @@ describe('authenticated API client', () => {
     setAccessToken('still-authorized-token');
     const unsubscribe = subscribeToCapabilityRefresh(() => { syncEvents += 1; });
     apiClient.defaults.adapter = (async (config) => {
-      if (config.url === '/api/v1/roles/ROLE_USER/permissions') {
+      if (config.url === '/api/v1/roles/USER/permissions') {
         mutationAttempts += 1;
         const body: ApiEnvelope<null> = {
           success: false,
@@ -298,7 +409,7 @@ describe('authenticated API client', () => {
     }) satisfies AxiosAdapter;
 
     try {
-      await expect(apiClient.patch('/api/v1/roles/ROLE_USER/permissions', {
+      await expect(apiClient.patch('/api/v1/roles/USER/permissions', {
         expectedVersion: 0,
         addPermissions: ['book:read'],
         removePermissions: [],
@@ -361,7 +472,7 @@ describe('authenticated API client', () => {
           id: 21,
           username: null,
           email: 'admin@example.com',
-          role: 'ROLE_ADMIN',
+          role: 'ADMIN',
           permissions: ['role:read', 'role:update'],
         },
         timestamp: new Date().toISOString(),
@@ -382,7 +493,7 @@ describe('authenticated API client', () => {
       id: 21,
       username: null,
       email: 'admin@example.com',
-      role: 'ROLE_ADMIN',
+      role: 'ADMIN',
       permissions: ['role:read', 'role:update'],
     });
   });

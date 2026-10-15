@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError, AxiosHeaders, type AxiosAdapter } from 'axios';
 import { App } from '../../app/App';
@@ -20,16 +20,16 @@ afterEach(() => {
 });
 function Probe() {
   const { refreshCapabilities } = useAuth();
+  const navigate = useNavigate();
   return <><output data-testid="path">{useLocation().pathname}</output>
-    <button onClick={() => { void refreshCapabilities({ force: true }); }}>Reload permissions</button></>;
+    <button onClick={() => { void refreshCapabilities({ force: true }); }}>Reload permissions</button>
+    <button onClick={() => navigate('/')}>Go home</button></>;
 }
 
 describe('default route for administrators without permissions', () => {
   it.each([
-    ['ROLE_ADMIN', 'member:read', 'Members page'],
-    ['ROLE_SUPER_ADMIN', 'member:read', 'Members page'],
-    ['ROLE_ADMIN', 'role:read', 'Roles page'],
-    ['ROLE_SUPER_ADMIN', 'role:read', 'Roles page'],
+    ['ADMIN', 'member:read', 'Members page'],
+    ['ADMIN', 'role:read', 'Quản lý phân quyền'],
   ])('keeps empty content after %s login and opens the existing page when %s is restored', async (role, restoredPermission, heading) => {
     const user = userEvent.setup();
     let permissions: string[] = [];
@@ -57,7 +57,7 @@ describe('default route for administrators without permissions', () => {
     await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
     await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/'));
     const nav = screen.getByRole('navigation', { name: 'Chính' });
-    expect(within(nav).queryAllByRole('link')).toHaveLength(0);
+    expect(within(nav).getByRole('link', { name: 'Quản lý phân quyền' })).toBeTruthy();
     expect(view.container.querySelector('.admin-shell__content')?.textContent).toBe('');
     expect(screen.getByRole('region', { name: 'Tài khoản đang đăng nhập' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Đăng xuất' })).toBeTruthy();
@@ -67,5 +67,39 @@ describe('default route for administrators without permissions', () => {
     await user.click(screen.getByRole('button', { name: 'Đăng xuất' }));
     expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeTruthy();
     expect(logoutCalls).toBe(1);
+  });
+
+  it('routes a custom non-USER role to permitted member work but never to role management', async () => {
+    const user = userEvent.setup();
+    let permissions = ['member:read'];
+    apiClient.defaults.adapter = (async (config) => {
+      const response = (code: string, data: unknown, status = 200) => ({
+        config, status, statusText: 'OK', headers: new AxiosHeaders(),
+        data: { success: status === 200, status, code, data, message: '', timestamp: new Date().toISOString() },
+      });
+      if (config.url === '/api/v1/auth/refresh') {
+        throw new AxiosError('missing', undefined, config, undefined, response('AUTH_REFRESH_TOKEN_MISSING', null, 401));
+      }
+      if (config.url === '/api/v1/auth/login') return response('AUTH_LOGIN_SUCCESS', {
+        accessToken: 'custom-role-token', tokenType: 'Bearer', accessTokenExpiresIn: 900,
+      });
+      if (config.url === '/api/v1/auth/me') return response('AUTH_ME_SUCCESS', {
+        id: 12, username: 'librarian', email: 'librarian@example.com', role: 'LIBRARIAN', permissions,
+      });
+      throw new Error(`Unexpected request ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    const view = render(<MemoryRouter initialEntries={['/login']}><AuthProvider><App /><Probe /></AuthProvider></MemoryRouter>);
+    await user.type(await screen.findByLabelText('Tên đăng nhập hoặc email'), 'librarian@example.com');
+    await user.type(screen.getByLabelText('Mật khẩu'), 'Current1!');
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    expect(await screen.findByRole('heading', { name: 'Members page' })).toBeTruthy();
+
+    permissions = ['role:read'];
+    await user.click(screen.getByRole('button', { name: 'Reload permissions' }));
+    await user.click(screen.getByRole('button', { name: 'Go home' }));
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/'));
+    expect(screen.queryByRole('heading', { name: 'Roles page' })).toBeNull();
+    expect(view.container.querySelector('.admin-shell__content')?.textContent).toBe('');
   });
 });

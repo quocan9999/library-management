@@ -1,7 +1,11 @@
 import { useEffect } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useOptionalAuth } from '../auth/AuthContext';
-import { ACCOUNT_DISABLED_EVENT } from '../auth/api';
+import {
+  ACCOUNT_DISABLED_EVENT,
+  ACCOUNT_ROLE_CHANGED_EVENT,
+  ACCOUNT_SESSION_REVOKED_EVENT,
+} from '../auth/api';
 import { SessionTabSync } from '../auth/SessionTabSync';
 import { readRegistrationEmail } from '../auth/registrationStorage';
 import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
@@ -11,6 +15,8 @@ import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { RoleManagementPage } from '../role/RoleManagementPage';
+import { AuthorizationLandingPage } from '../role/AuthorizationPages';
+import { AdminAccountAssignmentPage, AdminAccountManagementPage } from '../features/adminAccounts/AdminAccountDirectory';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
@@ -18,6 +24,7 @@ import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { ProfilePage } from '../profile/ProfilePage';
 import { ChangePasswordPage } from '../profile/ChangePasswordPage';
 import { ChangeEmailPage } from '../profile/ChangeEmailPage';
+import { useAppNotification } from '../components/AppNotificationProvider';
 
 function SessionBootstrap() {
   return (
@@ -64,14 +71,43 @@ function CapabilityRouteSync() {
   return null;
 }
 
-function DisabledAccountRouteSync() {
+function SessionRevokedRouteSync() {
   const navigate = useNavigate();
+  const { notify } = useAppNotification();
   useEffect(() => {
-    // Chuyển state vào trang đăng nhập để thông báo lý do phiên bị thu hồi ngay trong lần điều hướng này.
-    const redirect = () => navigate('/login', { replace: true, state: { accountDisabled: true } });
-    window.addEventListener(ACCOUNT_DISABLED_EVENT, redirect);
-    return () => window.removeEventListener(ACCOUNT_DISABLED_EVENT, redirect);
-  }, [navigate]);
+    const handleDisabled = () => {
+      navigate('/login', { replace: true, state: { accountDisabled: true } });
+      notify('error', {
+        key: 'auth-account-disabled',
+        title: 'Tài khoản đã bị vô hiệu hóa',
+        description: 'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.',
+      });
+    };
+    const handleRoleChanged = () => {
+      navigate('/login', { replace: true, state: { accountRoleChanged: true } });
+      notify('warning', {
+        key: 'auth-role-changed',
+        title: 'Nhóm quyền đã thay đổi',
+        description: 'Nhóm quyền của tài khoản đã thay đổi. Vui lòng đăng nhập lại để tiếp tục.',
+      });
+    };
+    const handleSessionRevoked = () => {
+      navigate('/login', { replace: true, state: { sessionRevoked: true } });
+      notify('warning', {
+        key: 'auth-session-revoked',
+        title: 'Phiên đăng nhập đã kết thúc',
+        description: 'Phiên đăng nhập này không còn hiệu lực. Vui lòng đăng nhập lại.',
+      });
+    };
+    window.addEventListener(ACCOUNT_DISABLED_EVENT, handleDisabled);
+    window.addEventListener(ACCOUNT_ROLE_CHANGED_EVENT, handleRoleChanged);
+    window.addEventListener(ACCOUNT_SESSION_REVOKED_EVENT, handleSessionRevoked);
+    return () => {
+      window.removeEventListener(ACCOUNT_DISABLED_EVENT, handleDisabled);
+      window.removeEventListener(ACCOUNT_ROLE_CHANGED_EVENT, handleRoleChanged);
+      window.removeEventListener(ACCOUNT_SESSION_REVOKED_EVENT, handleSessionRevoked);
+    };
+  }, [navigate, notify]);
   return null;
 }
 
@@ -93,7 +129,7 @@ export function App() {
     <>
       <CapabilityRouteSync />
       <SessionTabSync />
-      <DisabledAccountRouteSync />
+      <SessionRevokedRouteSync />
       <Routes>
         <Route
           path="/login"
@@ -128,18 +164,33 @@ export function App() {
           element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
         >
           <Route index element={<DefaultAccountRoute />} />
-          <Route
-            path="admin/roles"
-            element={
-              <RequirePermission permission="role:read" allowedRoles={['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']}>
+          <Route path="admin/roles" element={<RequireRole role="ADMIN"><Navigate to="/admin/authorization/groups" replace /></RequireRole>} />
+          <Route path="admin/authorization" element={<RequireRole role="ADMIN"><AuthorizationLandingPage /></RequireRole>} />
+          <Route path="admin/authorization/groups" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
                 <RoleManagementPage />
               </RequirePermission>
-            }
-          />
+            </RequireRole>
+          } />
+          <Route path="admin/accounts" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
+                <AdminAccountManagementPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
+          <Route path="admin/authorization/assignments" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
+                <AdminAccountAssignmentPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
           <Route
             path="admin/members"
             element={
-              <RequirePermission permission="member:read">
+              <RequirePermission permission="member:read" deniedRoles={['USER']}>
                 <MemberListPage />
               </RequirePermission>
             }
@@ -147,22 +198,18 @@ export function App() {
           <Route
             path="admin/members/:id"
             element={
-              <RequirePermission permission="member:read">
+              <RequirePermission permission="member:read" deniedRoles={['USER']}>
                 <MemberDetailPage />
               </RequirePermission>
             }
           />
           <Route
             path="profile"
-            element={<RequireRole role="ROLE_USER"><ProfilePage /></RequireRole>}
+            element={<ProfilePage />}
           />
           <Route
             path="profile/change-password"
-            element={
-              <RequirePermission permission="account:change-password" allowedRoles={['ROLE_USER']}>
-                <ChangePasswordPage />
-              </RequirePermission>
-            }
+            element={<ChangePasswordPage />}
           />
           <Route
             path="profile/change-email"

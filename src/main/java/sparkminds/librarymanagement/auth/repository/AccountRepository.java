@@ -30,15 +30,20 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
     @Query("""
             update Account account
             set account.enabled = :enabled, account.sessionVersion = account.sessionVersion + 1,
-                account.updatedAt = :updatedAt
+                account.lastSessionChangeReason = :reason, account.updatedAt = :updatedAt
             where account.id = :accountId and account.enabled = :expectedEnabled
             """)
     int updateStatusAndAdvanceSessionVersion(
             @Param("accountId") Integer accountId,
             @Param("expectedEnabled") boolean expectedEnabled,
             @Param("enabled") boolean enabled,
+            @Param("reason") String reason,
             @Param("updatedAt") LocalDateTime updatedAt
     );
+
+    @Query("select account from Account account where account.id in :accountIds order by account.id")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    java.util.List<Account> findAllByIdInForUpdate(@Param("accountIds") java.util.Collection<Integer> accountIds);
 
     @Query("select role.code from Account account join account.role role where account.id = :accountId")
     Optional<String> findRoleCodeByAccountId(@Param("accountId") Integer accountId);
@@ -48,6 +53,8 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
     Optional<Account> findByEmailForUpdate(@Param("email") String email);
 
     boolean existsByUsername(String username);
+
+    boolean existsByUsernameIgnoreCase(String username);
 
     boolean existsByEmail(String email);
 
