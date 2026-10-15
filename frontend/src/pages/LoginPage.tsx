@@ -69,8 +69,8 @@ export function LoginPage() {
           description="Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên."
         />}
 
-        <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          {serverError && (
+        {serverError && (
+          <div className="login-feedback">
             <Alert
               className="login-alert"
               type="error"
@@ -79,8 +79,15 @@ export function LoginPage() {
               title={serverError.title}
               description={serverError.description}
             />
-          )}
+            {serverError.code === 'EMAIL_NOT_VERIFIED' && (
+              <div className="login-resend">
+                <ResendVerificationForm compact secondary initialEmail={resendEmail} />
+              </div>
+            )}
+          </div>
+        )}
 
+        <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="form-field">
             <label htmlFor="identifier">Tên đăng nhập hoặc email</label>
             <Controller
@@ -144,12 +151,6 @@ export function LoginPage() {
             {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
           </Button>
         </form>
-
-        {serverError?.code === 'EMAIL_NOT_VERIFIED' && (
-          <div className="login-resend">
-            <ResendVerificationForm compact initialEmail={resendEmail} />
-          </div>
-        )}
 
         <p className="auth-alternate">
           Chưa có tài khoản? <Link to="/register">Đăng ký</Link>

@@ -455,6 +455,10 @@ input:focus-visible,
   text-underline-offset: 3px;
 }
 
+.login-feedback {
+  margin-bottom: 24px;
+}
+
 .login-resend {
   margin-top: 14px;
 }
