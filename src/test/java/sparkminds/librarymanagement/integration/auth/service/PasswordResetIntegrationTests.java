@@ -26,6 +26,8 @@ import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.auth.repository.PasswordResetTokenRepository;
 import sparkminds.librarymanagement.auth.repository.RefreshTokenRepository;
 import sparkminds.librarymanagement.auth.repository.RoleRepositoy;
+import sparkminds.librarymanagement.auth.entity.Role;
+import sparkminds.librarymanagement.auth.service.PasswordResetTransactionService;
 import sparkminds.librarymanagement.auth.service.VerificationTokenService;
 
 import java.time.LocalDateTime;
@@ -87,8 +89,12 @@ class PasswordResetIntegrationTests {
     @MockitoBean(name = "verificationMailExecutor")
     private TaskExecutor mailExecutor;
 
-    private final List<String> testEmails = new CopyOnWriteArrayList<>();
+    private final List<Integer> testAccountIds = new CopyOnWriteArrayList<>();
+    private final List<String> testRoleCodes = new CopyOnWriteArrayList<>();
     private final List<SimpleMailMessage> sentMessages = new CopyOnWriteArrayList<>();
+
+    @Autowired
+    private PasswordResetTransactionService passwordResetTransactionService;
 
     @BeforeEach
     void runMailWorkerInline() {
@@ -105,13 +111,19 @@ class PasswordResetIntegrationTests {
 
     @AfterEach
     void removeOnlyRowsCreatedByThisTest() {
-        for (String email : testEmails) {
-            jdbcTemplate.update("DELETE t FROM password_reset_tokens t JOIN accounts a ON a.id = t.account_id WHERE LOWER(a.email) = LOWER(?)", email);
-            jdbcTemplate.update("DELETE t FROM email_verification_tokens t JOIN accounts a ON a.id = t.account_id WHERE LOWER(a.email) = LOWER(?)", email);
-            jdbcTemplate.update("DELETE m FROM members m JOIN accounts a ON a.id = m.account_id WHERE LOWER(a.email) = LOWER(?)", email);
-            jdbcTemplate.update("DELETE FROM accounts WHERE LOWER(email) = LOWER(?)", email);
+        for (Integer accountId : testAccountIds) {
+            jdbcTemplate.update("DELETE FROM password_reset_tokens WHERE account_id = ?", accountId);
+            jdbcTemplate.update("DELETE FROM email_verification_tokens WHERE account_id = ?", accountId);
+            jdbcTemplate.update("DELETE FROM refresh_tokens WHERE account_id = ?", accountId);
+            jdbcTemplate.update("DELETE FROM members WHERE account_id = ?", accountId);
+            jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
         }
-        testEmails.clear();
+        for (String roleCode : testRoleCodes) {
+            jdbcTemplate.update("DELETE FROM role_permissions WHERE role_id = (SELECT id FROM roles WHERE code = ?)", roleCode);
+            jdbcTemplate.update("DELETE FROM roles WHERE code = ?", roleCode);
+        }
+        testAccountIds.clear();
+        testRoleCodes.clear();
     }
 
     @Test
@@ -145,9 +157,11 @@ class PasswordResetIntegrationTests {
         assertSameGenericResponse(unknown, disabled);
         assertSameGenericResponse(unknown, unverified);
         assertThat(countResetTokens(user)).isEqualTo(1);
-        assertThat(countResetTokens(adminEmail, disabledEmail, unverifiedEmail)).isZero();
-        assertThat(sentMessages).hasSize(1);
-        assertThat(sentMessages.get(0).getTo()).containsExactly(userEmail);
+        assertThat(countResetTokens(adminEmail)).isEqualTo(1);
+        assertThat(countResetTokens(disabledEmail, unverifiedEmail)).isZero();
+        assertThat(sentMessages).hasSize(2);
+        assertThat(sentMessages).extracting(message -> message.getTo()[0])
+                .containsExactlyInAnyOrder(userEmail, adminEmail);
     }
 
     @Test
@@ -254,11 +268,10 @@ class PasswordResetIntegrationTests {
     }
 
     @Test
-    void doesNotResetAnAdminEvenIfAnAdminTokenRowExists() throws Exception {
-        Account admin = createAccount(uniqueEmail(), "ADMIN", true, true);
+    void doesNotResetDisabledOrUnverifiedAccountsEvenIfTokenRowsExist() throws Exception {
         Account disabled = createAccount(uniqueEmail(), "USER", false, true);
         Account unverified = createAccount(uniqueEmail(), "USER", true, false);
-        List<Account> ineligibleAccounts = List.of(admin, disabled, unverified);
+        List<Account> ineligibleAccounts = List.of(disabled, unverified);
         List<String> rawTokens = ineligibleAccounts.stream().map(account -> "ineligible-" + UUID.randomUUID()).toList();
         List<PasswordResetToken> tokens = ineligibleAccounts.stream()
                 .map(account -> createResetToken(account, rawTokens.get(ineligibleAccounts.indexOf(account)),
@@ -359,6 +372,53 @@ class PasswordResetIntegrationTests {
     void successfulResetInvalidatesExistingAccessAndRefreshSessionsAndAllowsNewPasswordLogin() throws Exception {
         String email = uniqueEmail();
         Account account = createAccount(email, "USER", true, true);
+        assertSuccessfulResetFlow(account, email);
+    }
+
+    @Test
+    void systemAdminCanRequestAndUseItsOwnPasswordResetToken() throws Exception {
+        String email = uniqueEmail();
+        Account account = createAccount(email, "ADMIN", true, true, true);
+
+        assertSuccessfulResetFlow(account, email);
+    }
+
+    @Test
+    void accountWithDynamicRoleCanRequestAndUsePasswordResetToken() throws Exception {
+        String email = uniqueEmail();
+        Role role = createDynamicRole(true);
+        Account account = createAccount(email, role.getCode(), true, true);
+
+        assertSuccessfulResetFlow(account, email);
+    }
+
+    @Test
+    void accountWithInactiveRoleCanStillRequestAndUsePasswordResetToken() throws Exception {
+        String email = uniqueEmail();
+        Role role = createDynamicRole(false);
+        Account account = createAccount(email, role.getCode(), true, true);
+
+        assertSuccessfulResetFlow(account, email);
+    }
+
+    @Test
+    void systemAdminWithoutEmailDoesNotIssueResetTokenOrReturnServerError() throws Exception {
+        Account account = createAccount(null, "ADMIN", true, true, true);
+        Account malformedEmailAccount = createAccount("not-an-email", "USER", true, true);
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":null}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        assertThat(passwordResetTransactionService.createCandidate(null)).isNull();
+        assertThat(countResetTokens(account)).isZero();
+        assertThat(passwordResetTransactionService.createCandidate("not-an-email")).isNull();
+        assertThat(countResetTokens(malformedEmailAccount)).isZero();
+    }
+
+    private void assertSuccessfulResetFlow(Account account, String email) throws Exception {
         MvcResult login = login(email, "Existing1!").andExpect(status().isOk()).andReturn();
         String accessToken = new tools.jackson.databind.ObjectMapper()
                 .readTree(login.getResponse().getContentAsString()).get("data").get("accessToken").asText();
@@ -468,14 +528,39 @@ class PasswordResetIntegrationTests {
     }
 
     private Account createAccount(String email, String roleCode, boolean enabled, boolean verified) {
-        testEmails.add(email);
+        return createAccount(email, roleCode, enabled, verified, false);
+    }
+
+    private Account createAccount(
+            String email,
+            String roleCode,
+            boolean enabled,
+            boolean verified,
+            boolean systemAccount
+    ) {
         Account account = new Account();
         account.setEmail(email);
+        if (email == null) {
+            account.setUsername("reset" + UUID.randomUUID().toString().replace("-", "").substring(0, 8));
+        }
         account.setPasswordHash(passwordEncoder.encode("Existing1!"));
         account.setRole(roleRepository.findByCode(roleCode).orElseThrow());
         account.setEnabled(enabled);
         account.setEmailVerified(verified);
-        return accountRepository.saveAndFlush(account);
+        account.setSystemAccount(systemAccount);
+        Account savedAccount = accountRepository.saveAndFlush(account);
+        testAccountIds.add(savedAccount.getId());
+        return savedAccount;
+    }
+
+    private Role createDynamicRole(boolean enabled) {
+        Role role = new Role();
+        role.setCode("RESET_TEST_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        role.setDisplayName("Nhóm thử đặt lại mật khẩu");
+        role.setEnabled(enabled);
+        Role savedRole = roleRepository.saveAndFlush(role);
+        testRoleCodes.add(savedRole.getCode());
+        return savedRole;
     }
 
     private PasswordResetToken createResetToken(Account account, String rawToken, LocalDateTime expiresAt) {
@@ -487,7 +572,10 @@ class PasswordResetIntegrationTests {
     }
 
     private int countResetTokens(Account account) {
-        return countResetTokens(account.getEmail());
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM password_reset_tokens WHERE account_id = ?",
+                Integer.class,
+                account.getId());
     }
 
     private int countResetTokens(String... emails) {
