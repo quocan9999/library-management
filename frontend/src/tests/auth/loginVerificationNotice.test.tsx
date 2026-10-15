@@ -29,7 +29,7 @@ describe('automatic login verification notice', () => {
     await act(async () => { render(<LoginVerificationNotice identifier="reader" />); });
     act(() => vi.advanceTimersByTime(60_000));
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'gửi lại' })); });
-    expect(screen.queryByText(/Yêu cầu gửi lại email xác thực đã được tiếp nhận/)).toBeNull();
+    expect(screen.queryByText('Chúng tôi đã gửi email với đường link xác thực email. Hãy vào hộp thư để kiểm tra.')).toBeNull();
     expect(screen.getByText('Không thể gửi yêu cầu lúc này. Vui lòng thử lại.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'gửi lại' }).hasAttribute('disabled')).toBe(false);
   });
@@ -41,7 +41,7 @@ describe('automatic login verification notice', () => {
     });
     await act(async () => { render(<LoginVerificationNotice identifier="reader" />); });
     expect(screen.getByRole('button', { name: 'gửi lại trong 120s' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.queryByText(/Yêu cầu gửi lại email xác thực đã được tiếp nhận/)).toBeNull();
+    expect(screen.queryByText('Chúng tôi đã gửi email với đường link xác thực email. Hãy vào hộp thư để kiểm tra.')).toBeNull();
     expect(screen.getByText('Vui lòng chờ trước khi thử gửi lại email xác thực.')).toBeTruthy();
     act(() => vi.advanceTimersByTime(60_000));
     expect(screen.getByRole('button', { name: 'gửi lại trong 60s' }).hasAttribute('disabled')).toBe(true);

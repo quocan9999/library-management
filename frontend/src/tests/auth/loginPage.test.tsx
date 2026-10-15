@@ -81,7 +81,7 @@ describe('login verification guidance', () => {
     await user.type(screen.getByRole('textbox', { name: 'Tên đăng nhập hoặc email' }), 'reader');
     await user.type(screen.getByLabelText('Mật khẩu'), 'Strong1!');
     await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
-    expect(await screen.findByText(/Yêu cầu gửi lại email xác thực đã được tiếp nhận/)).toBeTruthy();
+    expect(await screen.findByText('Chúng tôi đã gửi email với đường link xác thực email. Hãy vào hộp thư để kiểm tra.')).toBeTruthy();
     expect(screen.queryByRole('textbox', { name: 'Email' })).toBeNull();
     expect(screen.getByRole('button', { name: /gửi lại trong 60s/ }).hasAttribute('disabled')).toBe(true);
     expect((screen.getByLabelText('Mật khẩu') as HTMLInputElement).value).toBe('');
