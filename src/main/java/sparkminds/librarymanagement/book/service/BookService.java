@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.book.dto.BookDetailResponse;
 import sparkminds.librarymanagement.book.dto.CreateBookRequest;
 import sparkminds.librarymanagement.book.dto.UpdateBookRequest;
+import sparkminds.librarymanagement.book.logging.BookOperationLog;
 import sparkminds.librarymanagement.book.repository.BookRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
@@ -30,6 +31,7 @@ public class BookService {
      * @return thông tin sách vừa tạo
      * @throws BusinessException nếu ISBN đã tồn tại hoặc cần xác nhận sách tương tự
      */
+    @BookOperationLog("book.create")
     public BookDetailResponse create(CreateBookRequest request) {
         try {
             return transactionService.create(request);
@@ -49,11 +51,14 @@ public class BookService {
 
     /** Trả DTO chi tiết trong transaction chỉ đọc để Entity không bị lộ qua API. */
     @Transactional(readOnly = true)
+    @BookOperationLog("book.detail")
     public BookDetailResponse get(Integer id) {
         return bookRepository.findById(id)
                 .map(BookMapper::toDetail)
                 .orElseThrow(BookTransactionService::bookNotFound);
-}
+    }
+
+    @BookOperationLog("book.update")
     public BookDetailResponse update(Integer id, UpdateBookRequest request) {
         try {
             return transactionService.update(id, request);
@@ -77,6 +82,7 @@ public class BookService {
      * @param id ID sách cần xóa
      * @throws BusinessException nếu không tìm thấy sách hoặc có lịch sử mượn
      */
+    @BookOperationLog("book.delete")
     public void delete(Integer id) {
         try {
             transactionService.delete(id);

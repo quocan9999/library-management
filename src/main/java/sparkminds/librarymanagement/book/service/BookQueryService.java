@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.book.dto.BookListItemResponse;
+import sparkminds.librarymanagement.book.logging.BookOperationLog;
 import sparkminds.librarymanagement.book.repository.BookRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.common.api.PagedResponse;
@@ -54,6 +55,7 @@ public class BookQueryService {
      * @return trang BookListItem đã lọc và sắp xếp ổn định
      * @throws BusinessException nếu tham số tìm kiếm không hợp lệ
      */
+    @BookOperationLog("book.search")
     public PagedResponse<BookListItemResponse> search(
             String q,
             String publisher,

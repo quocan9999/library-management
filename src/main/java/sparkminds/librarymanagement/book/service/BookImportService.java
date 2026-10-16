@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import sparkminds.librarymanagement.book.dto.BookImportErrorResponse;
 import sparkminds.librarymanagement.book.dto.BookImportReportResponse;
+import sparkminds.librarymanagement.book.logging.BookOperationLog;
 import sparkminds.librarymanagement.book.repository.BookRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
 
@@ -39,6 +40,7 @@ public class BookImportService {
      * @return số dòng và tối đa 100 lỗi chi tiết; omittedErrorCount cho biết số chi tiết đã lược bỏ
      * @throws BusinessException nếu bản thân file không hợp lệ
      */
+    @BookOperationLog("book.import")
     public BookImportReportResponse importFile(MultipartFile file) {
         validateFilename(file);
         if (file.getSize() == 0) {
