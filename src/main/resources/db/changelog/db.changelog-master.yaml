@@ -126,3 +126,7 @@ databaseChangeLog:
   - include:
       file: changes/032-add-books-version.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/033-book-similarity-lock.yaml
+      relativeToChangelogFile: true

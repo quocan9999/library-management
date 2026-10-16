@@ -8,6 +8,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import sparkminds.librarymanagement.member.exception.MemberProfilePatchException;
 
@@ -40,6 +44,31 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidRequestParameter(MethodArgumentTypeMismatchException exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_PARAMETER", "Tham số yêu cầu không hợp lệ", null);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingRequestPart(MissingServletRequestPartException exception) {
+        return error(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PART", "Thiếu file cần tải lên", null);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingRequestParameter(MissingServletRequestParameterException exception) {
+        return error(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PARAMETER", "Thiếu tham số yêu cầu", null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException exception) {
+        return error(HttpStatus.PAYLOAD_TOO_LARGE, "BOOK_IMPORT_FILE_TOO_LARGE", "File tải lên vượt quá giới hạn cho phép", null);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipart(MultipartException exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof MaxUploadSizeExceededException) {
+                return error(HttpStatus.PAYLOAD_TOO_LARGE, "BOOK_IMPORT_FILE_TOO_LARGE", "File tải lên vượt quá giới hạn cho phép", null);
+            }
+        }
+        return error(HttpStatus.BAD_REQUEST, "INVALID_MULTIPART_REQUEST", "Yêu cầu tải file không hợp lệ", null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

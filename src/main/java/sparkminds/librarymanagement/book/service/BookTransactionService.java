@@ -43,10 +43,12 @@ public class BookTransactionService {
         if (isbn != null && bookRepository.existsByIsbn(isbn)) {
             throw isbnConflict();
         }
-        if (isbn == null
-                && !request.confirmSimilar()
-                && bookSimilarityRepository.existsWithoutIsbn(title, author)) {
-            throw similarBookConfirmationRequired();
+        if (isbn == null) {
+            // Giữ lock đến commit để hai create không ISBN không thể vượt qua cùng một lần kiểm tra.
+            bookSimilarityRepository.acquireNoIsbnCreationLock();
+            if (!request.confirmSimilar() && bookSimilarityRepository.existsWithoutIsbn(title, author)) {
+                throw similarBookConfirmationRequired();
+            }
         }
 
         Book book = new Book();
