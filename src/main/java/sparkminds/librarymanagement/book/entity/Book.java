@@ -51,6 +51,11 @@ public class Book {
     @Column(name = "late_fee_per_day", nullable = false, precision = 12, scale = 2)
     private BigDecimal lateFeePerDay;
 
+    /** Ngăn hai Admin ghi đè thay đổi khi cùng mở một phiên bản thông tin sách. */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

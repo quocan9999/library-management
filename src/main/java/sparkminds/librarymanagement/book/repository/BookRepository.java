@@ -17,4 +17,6 @@ public interface BookRepository extends JpaRepository<Book, Integer> {
 
     // Kiểm tra ISBN đã tồn tại hay chưa.
     boolean existsByIsbn(String isbn);
+
+    boolean existsByIsbnAndIdNot(String isbn, Integer id);
 }

@@ -122,3 +122,7 @@ databaseChangeLog:
   - include:
       file: changes/031-account-session-change-reason.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/032-add-books-version.yaml
+      relativeToChangelogFile: true

@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 032-add-books-version
+      author: codex
+      comment: "Bổ sung optimistic locking cho cập nhật thông tin sách."
+      changes:
+        - addColumn:
+            tableName: books
+            columns:
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: books
+            columnName: version
