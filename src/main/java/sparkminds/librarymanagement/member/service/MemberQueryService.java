@@ -5,10 +5,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.common.api.BusinessException;
+import sparkminds.librarymanagement.common.api.PagedResponse;
 import sparkminds.librarymanagement.member.dto.LoanHistoryItemResponse;
 import sparkminds.librarymanagement.member.dto.MemberDetailResponse;
 import sparkminds.librarymanagement.member.dto.MemberListItemResponse;
-import sparkminds.librarymanagement.member.dto.PagedResponse;
 import sparkminds.librarymanagement.member.repository.MemberReadRepository;
 import sparkminds.librarymanagement.member.service.MemberSearchCriteria.LoanItemStatusFilter;
 

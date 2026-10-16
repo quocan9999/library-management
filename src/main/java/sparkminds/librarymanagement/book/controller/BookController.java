@@ -13,12 +13,16 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import sparkminds.librarymanagement.book.dto.BookDetailResponse;
+import sparkminds.librarymanagement.book.dto.BookListItemResponse;
 import sparkminds.librarymanagement.book.dto.CreateBookRequest;
 import sparkminds.librarymanagement.book.dto.UpdateBookRequest;
 import sparkminds.librarymanagement.book.service.BookService;
+import sparkminds.librarymanagement.book.service.BookQueryService;
 import sparkminds.librarymanagement.common.api.ApiResponse;
+import sparkminds.librarymanagement.common.api.PagedResponse;
 
 import java.net.URI;
 
@@ -28,6 +32,27 @@ import java.net.URI;
 public class BookController {
 
     private final BookService bookService;
+    private final BookQueryService bookQueryService;
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('book:read') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<PagedResponse<BookListItemResponse>>> list(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String publisher,
+            @RequestParam(required = false) String publishedFrom,
+            @RequestParam(required = false) String publishedTo,
+            @RequestParam(required = false) String availability,
+            @RequestParam(required = false) String page,
+            @RequestParam(required = false) String size,
+            @RequestParam(required = false) String sort
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                HttpStatus.OK.value(),
+                "BOOK_LIST_SUCCESS",
+                "Lấy danh sách sách thành công",
+                bookQueryService.search(q, publisher, publishedFrom, publishedTo, availability, page, size, sort)
+        ));
+    }
 
     @PostMapping
     @PreAuthorize("hasAuthority('book:create') and principal.roleCode != 'USER'")

@@ -9,10 +9,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import sparkminds.librarymanagement.common.api.ApiResponse;
+import sparkminds.librarymanagement.common.api.PagedResponse;
 import sparkminds.librarymanagement.member.dto.LoanHistoryItemResponse;
 import sparkminds.librarymanagement.member.dto.MemberDetailResponse;
 import sparkminds.librarymanagement.member.dto.MemberListItemResponse;
-import sparkminds.librarymanagement.member.dto.PagedResponse;
 import sparkminds.librarymanagement.member.service.MemberQueryService;
 
 @RestController

@@ -4,10 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import sparkminds.librarymanagement.common.api.PagedResponse;
 import sparkminds.librarymanagement.member.dto.LoanHistoryItemResponse;
 import sparkminds.librarymanagement.member.dto.MemberDetailResponse;
 import sparkminds.librarymanagement.member.dto.MemberListItemResponse;
-import sparkminds.librarymanagement.member.dto.PagedResponse;
 import sparkminds.librarymanagement.member.service.MemberSearchCriteria;
 
 import java.sql.ResultSet;
