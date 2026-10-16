@@ -1,0 +1,24 @@
+# HANDOFF — Phase 04: Frontend Admin Book Management
+
+- **Branch / workspace:** `feature/book-management` / `E:\SparkMinds\library-management` (existing root checkout; no worktree or branch created).
+- **Code commit:** `c231b91` (`feat(book): hoàn thiện giao diện quản trị sách`).
+- **Đã đọc:** `MASTER_SPEC.md` §§3.2, 7; `spec/PHASE_04_FRONTEND_ADMIN.md`; `HANDOFF_PHASE_03.md`; `DESIGN.md`; `AdminLayout.tsx`; member feature/API/tests; auth permissions; App routes; Book backend DTOs/controllers/query and import contract.
+- **Tóm tắt thay đổi:** Thêm menu và route Book có permission guard; trang danh sách với quick search debounce 450 ms, hủy request cũ, bộ lọc nâng cao chỉ áp dụng khi bấm, sort whitelist theo API, phân trang 10; trang chi tiết; form tạo/sửa có kiểm tra ISBN và lỗi field 422; phí VND hiển thị có phân nhóm nhưng gửi số; báo xác nhận cho sách tương tự không ISBN; xử lý version conflict và delete có lịch sử; import CSV có precheck, báo cáo từng dòng, số lỗi bị lược và hướng dẫn tạo thủ công cho bản ghi cần xác nhận.
+- **File đã tạo/sửa:**
+  - Tạo `frontend/src/features/books/{api.ts,types.ts,formatting.ts,BookListPage.tsx,BookDetailPage.tsx,BookFormModal.tsx,BookImportModal.tsx}`.
+  - Tạo `frontend/src/tests/books/{BookRoutes.test.tsx,BookListPage.test.tsx,BookDetailPage.test.tsx,bookFormatting.test.ts}`.
+  - Sửa `frontend/src/app/App.tsx`, `frontend/src/components/AdminLayout.tsx`, `frontend/src/styles.css`.
+- **API / DB / FE contract:** Không đổi backend API, permission contract hoặc schema. FE gọi các API đã có (`GET/POST /api/v1/books`, `GET/PUT/DELETE /api/v1/books/{id}`, `POST /api/v1/books/import`) qua Axios client dùng chung. Gửi `version` khi PUT, multipart field `file` khi import; giữ nguyên envelope và enum/error codes của backend. Permission hiển thị tương ứng `book:read/create/update/delete/import`; route từ chối `USER`.
+- **Liquibase:** Phase04 không tạo changeset và không chạy ứng dụng/test backend. Changeset của các phase trước là `032-add-books-version.yaml` và `033-book-similarity-lock.yaml`; test DB `library_management_test` đã được cập nhật ở Phase03 theo handoff trước.
+- **Tests / kiểm tra đã chạy:**
+  - `npm test -- src/tests/books` — 4 file, 12 test pass.
+  - `npm test` — 36 file, 250 test pass.
+  - `npm run build` — TypeScript và Vite build pass; Vite cảnh báo bundle JS minified khoảng 1.51 MB vượt ngưỡng 500 kB.
+  - `npx eslint src/features/books src/app/App.tsx src/components/AdminLayout.tsx src/tests/books` — pass.
+  - `npm run lint` — **fail với 11 lỗi hiện hữu ngoài phần Book** trong `CheckEmailPage.tsx`, `ForgotPasswordPage.tsx`, `RegisterPage.tsx`, `ResendVerificationForm.tsx` (các rule purity/refs của `react-hooks`). Các file này không thay đổi trong commit Phase04.
+  - `git diff --cached --check` — pass trước khi commit.
+- **Test chưa chạy / lý do:** Backend/MySQL integration chưa chạy ở Phase04 vì không có thay đổi backend; full backend integration/regression thuộc Phase05.
+- **Nghiệm thu:** Permission/menu/guard; debounce và race handling; filters/pagination; numeric VND; 422/409; import all-failed HTTP 200; test đầy đủ; build đạt. Điều kiện `npm run lint` toàn repo chưa đạt do các lỗi ngoài phạm vi nêu trên.
+- **Known issues / edge cases còn mở:** Không có lỗi Book đã biết. Còn 11 lỗi lint không thuộc phần này và cảnh báo kích thước bundle ở build; Phase05 nên ghi nhận mà không mở rộng refactor auth không liên quan nếu chưa được yêu cầu.
+- **Quyết định pending / user confirmation:** Không có.
+- **Hướng dẫn Phase05:** Đọc `MASTER_SPEC.md` §§4–8, `spec/PHASE_05_INTEGRATION_QUALITY.md`, `HANDOFF_PHASE_01.md` đến `HANDOFF_PHASE_04.md`. Xác nhận `.env` và Docker `mysql-test` đúng quy định trước khi chạy backend tests; kiểm tra logging/Log4j2/AOP, Springdoc/OpenAPI, security và các race/data-integrity matrix được liệt kê trong spec. Không push/merge/PR.
