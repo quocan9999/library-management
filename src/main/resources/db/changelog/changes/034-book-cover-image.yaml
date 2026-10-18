@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: 034-book-cover-image
+      author: codex
+      comment: "Lưu URL HTTPS và public ID của ảnh bìa trên Cloudinary; sách cũ giữ giá trị null."
+      changes:
+        - addColumn:
+            tableName: books
+            columns:
+              - column:
+                  name: cover_image_url
+                  type: VARCHAR(2048)
+              - column:
+                  name: cover_image_public_id
+                  type: VARCHAR(255)
+      rollback:
+        - dropColumn:
+            tableName: books
+            columnName: cover_image_public_id
+        - dropColumn:
+            tableName: books
+            columnName: cover_image_url

@@ -1,4 +1,4 @@
-package sparkminds.librarymanagement.member.dto;
+package sparkminds.librarymanagement.common.api;
 
 import java.util.List;
 

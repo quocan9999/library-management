@@ -19,6 +19,8 @@ import { AuthorizationLandingPage } from '../role/AuthorizationPages';
 import { AdminAccountAssignmentPage, AdminAccountManagementPage } from '../features/adminAccounts/AdminAccountDirectory';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
+import { BookDetailPage } from '../features/books/BookDetailPage';
+import { BookListPage } from '../features/books/BookListPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { ProfilePage } from '../profile/ProfilePage';
@@ -187,6 +189,22 @@ export function App() {
               </RequirePermission>
             </RequireRole>
           } />
+          <Route
+            path="admin/books"
+            element={
+              <RequirePermission permission="book:read" deniedRoles={['USER']}>
+                <BookListPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="admin/books/:id"
+            element={
+              <RequirePermission permission="book:read" deniedRoles={['USER']}>
+                <BookDetailPage />
+              </RequirePermission>
+            }
+          />
           <Route
             path="admin/members"
             element={

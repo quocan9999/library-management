@@ -1,0 +1,23 @@
+# HANDOFF — Phase 05: Integration, API Docs và Quality Review
+
+- **Branch / workspace:** `feature/book-management` / `E:\SparkMinds\library-management` (repository gốc; không tạo worktree hoặc branch mới).
+- **Code commit:** `01bc97c` (`feat(book): bổ sung OpenAPI và logging nghiệp vụ`).
+- **Đã đọc:** Objective file được chỉ định; `MASTER_SPEC.md` §§4–9; `spec/PHASE_05_INTEGRATION_QUALITY.md`; `HANDOFF_PHASE_01.md` đến `HANDOFF_PHASE_04.md`; cấu hình security, API/DTO/service, Liquibase và frontend hiện tại.
+- **Tóm tắt thay đổi:** Thêm Log4j2 console và rolling file; aspect ghi mã thao tác sách, kết quả, thời lượng và loại exception nhưng không ghi tham số, response hay exception message. Thêm OpenAPI cho API quản lý sách, schema JWT bearer, ví dụ request/error cho CRUD và import CSV. Swagger UI/API docs được cho phép truy cập công khai; API nghiệp vụ vẫn yêu cầu đăng nhập và giữ nguyên permission checks hiện có.
+- **File chính đã tạo/sửa:** `pom.xml`, `.gitignore`, `src/main/resources/log4j2-spring.xml`, `config/OpenApiConfig.java`, `book/logging/BookOperationLog.java`, `book/logging/BookOperationLoggingAspect.java`, Book controllers/services và `integration/book/BookOpenApiIntegrationTests.java`.
+- **API / security:** Tài liệu hóa `GET/POST /api/v1/books`, `GET/PUT/DELETE /api/v1/books/{id}` và `POST /api/v1/books/import`. Chỉ mở `/v3/api-docs`, `/swagger-ui.html`, `/swagger-ui/**`; kiểm thử xác nhận Swagger UI truy cập được và `GET /api/v1/books` vẫn trả 401 khi thiếu token.
+- **Logging / bảo mật dữ liệu:** Log sự kiện có allowlist gồm operation code tĩnh, outcome, duration và exception class. Không log ISBN, nội dung CSV, query, DTO, arguments, exception message hoặc token. Console và rolling file UTF-8; file xoay theo ngày/kích thước, giữ tối đa 14 file; thư mục `logs/` được ignore.
+- **Liquibase / database:** Phase05 không thay đổi schema, không thêm changeset và không thay đổi `ddl-auto=none`. Full backend suite dùng test database `library_management_test` theo `.env` của repository và service `mysql-test`; không chạy test trên database ứng dụng.
+- **Tests / kiểm tra đã chạy:**
+  - Trước Phase05, full backend baseline — 287 test pass.
+  - `mvnw test` sau Phase05 — **291 test pass, 0 failure/error/skip**; bao gồm regression các nhóm auth, role/permission, book, member và OpenAPI.
+  - `BookOpenApiIntegrationTests` — 4 test pass; kiểm tra OpenAPI schema/examples, Swagger public/API authenticated và redaction ở console/file log.
+  - `npm test` chạy standalone — **36 file, 250 test pass**. Lần chạy đồng thời với backend/build/lint trước đó có 2 test UI timeout/assertion; chạy lại riêng đã pass toàn bộ.
+  - `npm run build` — pass; Vite cảnh báo bundle JavaScript minified khoảng 1.51 MB vượt ngưỡng 500 kB.
+  - `npm run lint` — **fail với 11 lỗi hiện hữu ngoài phạm vi Book** tại `CheckEmailPage.tsx`, `ForgotPasswordPage.tsx`, `RegisterPage.tsx`, `ResendVerificationForm.tsx` (rule `react-hooks/purity`/`refs`). Phase05 không sửa các file này.
+  - `git diff --cached --check` — pass trước commit.
+- **Dependency:** Thêm Springdoc OpenAPI UI `3.1.0`, Boot Log4j2 starter và AspectJ starter; dependency tree đã kiểm tra không còn `spring-boot-starter-logging`/Logback.
+- **Nghiệm thu:** Contract OpenAPI có schema, bearer JWT, mô tả permission/status/error/examples; tài liệu công khai không mở API nghiệp vụ; log thao tác không làm lộ dữ liệu đầu vào/đầu ra; backend regression và frontend suite pass.
+- **Known issues / edge cases còn mở:** 11 lỗi lint auth/email tồn tại như ghi nhận ở handoff Phase04; bundle JS lớn hơn ngưỡng cảnh báo Vite. Không có thay đổi DB ở Phase05. Chưa thực hiện kiểm thử tải chuyên biệt.
+- **Quyết định pending / user confirmation:** Không có.
+- **Kết quả Git:** Code Phase05 được commit tại `01bc97c`; tài liệu handoff này được commit riêng ngay sau đó. Không push, merge hoặc tạo Pull Request.

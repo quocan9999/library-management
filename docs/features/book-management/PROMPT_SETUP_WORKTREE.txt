@@ -1,0 +1,6 @@
+Bạn đang ở repo library-management. Chỉ làm SETUP cho feature Book Management, KHÔNG CODE.
+1. Đọc docs/features/book-management/SETUP_WORKTREE.md, AGENTS.md, repo status.
+2. Trước khi tạo branch/worktree, xác nhận người dùng đã chọn chế độ worktree hay branch-only; không tự đoán. Base là origin/develop trừ khi user đổi.
+3. Setup sạch đúng nhánh, cách ly .env, database test và ports theo AGENTS.md; tuyệt đối không sửa repo/DB khác, không commit secrets.
+4. Xác nhận đường dẫn, nhánh, base commit, env/db/test isolation đã setup; chưa chạy implementation.
+5. DỪNG HOÀN TOÀN. Không viết code, không commit feature, không push, không tạo PR.

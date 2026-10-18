@@ -21,6 +21,13 @@ function MembersIcon() {
   </svg>;
 }
 
+function BooksIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+    <path d="M4.5 5.5c3.7-.8 6.2 0 7.5 1.6v12c-1.3-1.6-3.8-2.4-7.5-1.6v-12ZM19.5 5.5c-3.7-.8-6.2 0-7.5 1.6v12c1.3-1.6 3.8-2.4 7.5-1.6v-12Z" />
+    <path d="M7 9c1.2-.2 2.2-.1 3 .4M7 12c1.2-.2 2.2-.1 3 .4m7-3.4c-1.2-.2-2.2-.1-3 .4m3 2.6c-1.2-.2-2.2-.1-3 .4" />
+  </svg>;
+}
+
 function AdminAccountsIcon() {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
     <circle cx="8" cy="8" r="3" />
@@ -155,6 +162,16 @@ export function AdminLayout() {
           {role === 'USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
         </p>
         <nav className="admin-shell__nav" aria-label="Chính">
+          <PermissionGate permission="book:read" deniedRoles={['USER']} fallback={null}>
+            <NavLink
+              to="/admin/books"
+              className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <BooksIcon />
+              <span>Quản lý sách</span>
+            </NavLink>
+          </PermissionGate>
           <PermissionGate permission="member:read" deniedRoles={['USER']} fallback={null}>
             <NavLink
               to="/admin/members"

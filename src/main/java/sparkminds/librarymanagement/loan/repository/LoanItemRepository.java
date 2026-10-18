@@ -15,4 +15,6 @@ public interface LoanItemRepository extends JpaRepository<LoanItem, Integer> {
 
     // Kiểm tra sách đã tồn tại trong phiếu mượn hay chưa.
     boolean existsByLoanIdAndBookId(Integer loanId, Integer bookId);
+
+    boolean existsByBookId(Integer bookId);
 }

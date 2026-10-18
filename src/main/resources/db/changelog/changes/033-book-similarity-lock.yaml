@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 033-book-similarity-lock
+      author: codex
+      comment: "Tạo khóa singleton để tuần tự hóa thao tác kiểm tra và thêm sách không ISBN tương tự."
+      changes:
+        - createTable:
+            tableName: book_similarity_lock
+            columns:
+              - column:
+                  name: id
+                  type: TINYINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+        - insert:
+            tableName: book_similarity_lock
+            columns:
+              - column:
+                  name: id
+                  valueNumeric: 1
+      rollback:
+        - dropTable:
+            tableName: book_similarity_lock

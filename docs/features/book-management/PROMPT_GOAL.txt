@@ -1,0 +1,8 @@
+Triển khai feature Admin Book Management theo docs/features/book-management/.
+- Đọc AGENTS.md, MASTER_SPEC.md, reference/CODING_COMMENT_GUIDELINES.md, INITIAL_CONTEXT.md, rồi **chỉ** spec phase hiện tại (`spec/PHASE_01...` trước), handoff mới nhất; không đọc tất cả phase trong mỗi lượt nếu không cần.
+- Code khớp develop hiện tại; tôn trọng API contract, Book schema 14 bảng và Liquibase changeset mới. Không làm Borrow/Reservation/Return, không thêm book_copies/ảnh bìa.
+- Tuân thủ MASTER_SPEC §9: 22B CSV bỏ qua dòng trùng title+author không ISBN; 23B `book_code` tuần tự B000001 sinh an toàn theo ID; 24A file CSV đúng định dạng nhưng mọi dòng lỗi vẫn trả 200 kèm report. Khi phát hiện mâu thuẫn schema/requirement mới, DỪNG và hỏi user, không tự đổi nghiệp vụ.
+- Comment rõ ràng bằng tiếng Việt, JavaDoc cho nghiệp vụ quan trọng: hàm làm gì, xử lý chính, vì sao, input/output/exception khi hữu ích. Không spam comment từng dòng.
+- Thực hiện tuần tự Phase 01→05: code, validate/negative/security/integration tests thật, self-review, commit Conventional Commits tiếng Việt (chính xác một dòng trống giữa header/body; body bullet liên tiếp), ghi handoff, rồi mới tiếp tục phase kế.
+- Test DB riêng theo AGENTS.md, không sửa/yêu cầu sửa tests cho qua, không thay code/API ngoài scope nếu không cần.
+- Không push/merge/tạo PR. Cuối cùng báo rõ phase nào xong, commit hashes, tests thực chạy và các điểm còn mở.
