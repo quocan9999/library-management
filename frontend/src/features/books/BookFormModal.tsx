@@ -16,8 +16,8 @@ interface BookFormValues {
   publisher: string;
   publishedDate: Dayjs | null;
   totalQuantity: number | null;
-  borrowFee: number | null;
-  lateFeePerDay: number | null;
+  borrowFee: string;
+  lateFeePerDay: string;
 }
 
 function toFormValues(book?: BookDetail): BookFormValues {
@@ -28,8 +28,8 @@ function toFormValues(book?: BookDetail): BookFormValues {
     publisher: book?.publisher ?? '',
     publishedDate: book?.publishedDate ? dayjs(book.publishedDate) : null,
     totalQuantity: book?.totalQuantity ?? 0,
-    borrowFee: book?.borrowFee ?? 0,
-    lateFeePerDay: book?.lateFeePerDay ?? 0,
+    borrowFee: formatVndInput(book?.borrowFee ?? 0),
+    lateFeePerDay: formatVndInput(book?.lateFeePerDay ?? 0),
   };
 }
 
@@ -53,6 +53,11 @@ function errorMessage(error: unknown): string {
 }
 
 function buildInput(values: BookFormValues): BookWriteInput {
+  const borrowFee = parseVndInput(values.borrowFee);
+  const lateFeePerDay = parseVndInput(values.lateFeePerDay);
+  if (borrowFee === null || lateFeePerDay === null) {
+    throw new Error('Phí phải được validation thành công trước khi tạo request.');
+  }
   return {
     title: values.title.trim(),
     author: values.author.trim(),
@@ -60,9 +65,15 @@ function buildInput(values: BookFormValues): BookWriteInput {
     publisher: values.publisher.trim() || null,
     publishedDate: values.publishedDate?.format('YYYY-MM-DD') ?? null,
     totalQuantity: values.totalQuantity ?? 0,
-    borrowFee: values.borrowFee ?? 0,
-    lateFeePerDay: values.lateFeePerDay ?? 0,
+    borrowFee,
+    lateFeePerDay,
   };
+}
+
+async function validateFeeInput(_: unknown, value?: string) {
+  if (value && parseVndInput(value) === null) {
+    throw new Error('Nhập số tiền không âm, tối đa 2 chữ số thập phân sau dấu phẩy.');
+  }
 }
 
 export function BookFormModal({
@@ -104,8 +115,8 @@ export function BookFormModal({
     setSaving(true);
     setConflict(false);
     setReloadError(null);
-    const input = buildInput(values);
     try {
+      const input = buildInput(values);
       const saved = book
         ? await bookApi.updateBook(book.id, { ...input, version: book.version } satisfies BookUpdateInput, coverFile)
         : await bookApi.createBook({ ...input, confirmSimilar: similarConfirmation }, coverFile);
@@ -243,20 +254,18 @@ export function BookFormModal({
           <Form.Item
             label="Phí mượn (VND)"
             name="borrowFee"
-            getValueProps={(value: number | null) => ({ value: formatVndInput(value) })}
-            getValueFromEvent={(event: ChangeEvent<HTMLInputElement>) => parseVndInput(event.target.value)}
-            rules={[{ required: true, type: 'number', min: 0, message: 'Phí mượn phải từ 0 VND trở lên.' }]}
+            getValueFromEvent={(event: ChangeEvent<HTMLInputElement>) => formatVndInput(event.target.value)}
+            rules={[{ required: true, message: 'Phí mượn phải từ 0 VND trở lên.' }, { validator: validateFeeInput }]}
           >
-            <Input inputMode="numeric" aria-label="Phí mượn (VND)" />
+            <Input inputMode="decimal" aria-label="Phí mượn (VND)" />
           </Form.Item>
           <Form.Item
             label="Phí trễ mỗi ngày (VND)"
             name="lateFeePerDay"
-            getValueProps={(value: number | null) => ({ value: formatVndInput(value) })}
-            getValueFromEvent={(event: ChangeEvent<HTMLInputElement>) => parseVndInput(event.target.value)}
-            rules={[{ required: true, type: 'number', min: 0, message: 'Phí trễ phải từ 0 VND trở lên.' }]}
+            getValueFromEvent={(event: ChangeEvent<HTMLInputElement>) => formatVndInput(event.target.value)}
+            rules={[{ required: true, message: 'Phí trễ phải từ 0 VND trở lên.' }, { validator: validateFeeInput }]}
           >
-            <Input inputMode="numeric" aria-label="Phí trễ mỗi ngày (VND)" />
+            <Input inputMode="decimal" aria-label="Phí trễ mỗi ngày (VND)" />
           </Form.Item>
         </div>
       </Modal>

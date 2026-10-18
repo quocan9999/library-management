@@ -1,20 +1,33 @@
 const isbnCharacters = /^[0-9xX\-\s]+$/;
+const feeTextPattern = /^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/;
+const vndFormatter = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 20 });
 
-/** VND is displayed with Vietnamese grouping separators; API calls keep the numeric amount. */
+/** Hiển thị cả phần lẻ hợp lệ từ API, không làm tròn phí thành số nguyên VND. */
 export function formatVnd(value: number): string {
-  return `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(value)} ₫`;
+  return `${formatVndInput(value)} ₫`;
 }
 
-export function formatVndInput(value: number | null | undefined): string {
+/** Giữ dấu phẩy đang nhập, số 0 cuối phần lẻ và input sai để form báo lỗi thay vì âm thầm sửa giá trị. */
+export function formatVndInput(value: number | string | null | undefined): string {
+  if (typeof value === 'string') {
+    const text = value.trim();
+    const [whole, fraction] = text.split(',');
+    const completeText = text.endsWith(',') ? text.slice(0, -1) : text;
+    if (parseVndInput(completeText) === null) return value;
+    const grouped = vndFormatter.format(Number(whole.replace(/\./g, '')));
+    return fraction === undefined ? grouped : `${grouped},${fraction}`;
+  }
   if (value === null || value === undefined || !Number.isFinite(value)) return '';
-  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(value);
+  return vndFormatter.format(value);
 }
 
 export function parseVndInput(value: string): number | null {
-  const digits = value.replace(/[.\s]/g, '');
-  if (!digits || !/^\d+$/.test(digits)) return null;
-  const amount = Number(digits);
-  return Number.isSafeInteger(amount) ? amount : null;
+  const text = value.trim();
+  if (!feeTextPattern.test(text)) return null;
+  const [whole, fraction = ''] = text.replace(/\./g, '').split(',');
+  // Ghép chuỗi thành đơn vị 1/100 trước để tránh kiểm tra precision bằng phép nhân số thực.
+  const hundredths = Number(whole + fraction.padEnd(2, '0'));
+  return Number.isSafeInteger(hundredths) ? hundredths / 100 : null;
 }
 
 /** Accepts ISBN-10 and ISBN-13 with optional spaces or hyphens; the server canonicalizes them. */

@@ -199,6 +199,8 @@ describe('BookListPage', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Tên sách' }), { target: { value: '  Lập trình Java  ' } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Tác giả' }), { target: { value: '  Nguyễn An  ' } });
     const borrowFee = screen.getByRole('textbox', { name: 'Phí mượn (VND)' });
+    expect(borrowFee).toHaveProperty('value', '0');
+    expect(screen.getByRole('textbox', { name: 'Phí trễ mỗi ngày (VND)' })).toHaveProperty('value', '0');
     fireEvent.change(borrowFee, { target: { value: '150000' } });
     expect(borrowFee).toHaveProperty('value', '150.000');
     const submitButtons = screen.getAllByRole('button', { name: 'Thêm sách' });

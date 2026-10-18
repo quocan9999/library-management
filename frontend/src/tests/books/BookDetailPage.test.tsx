@@ -64,6 +64,63 @@ afterEach(() => {
 });
 
 describe('BookDetailPage', () => {
+  it('preserves both fractional fees from the API when editing only the title', async () => {
+    const importedBook = { ...detail(), borrowFee: 1000.50, lateFeePerDay: 1000.01 };
+    let submitted: Record<string, unknown> | undefined;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.method === 'put') {
+        submitted = JSON.parse(String(config.data)) as Record<string, unknown>;
+        return response(config, success('BOOK_UPDATED', { ...importedBook, title: 'Chỉ sửa tên sách', version: 1 }));
+      }
+      return response(config, success('BOOK_DETAIL_SUCCESS', importedBook));
+    }) satisfies AxiosAdapter;
+
+    renderDetail();
+    fireEvent.click(await screen.findByRole('button', { name: 'Chỉnh sửa' }));
+    expect(screen.getByRole('textbox', { name: 'Phí mượn (VND)' })).toHaveProperty('value', '1.000,5');
+    expect(screen.getByRole('textbox', { name: 'Phí trễ mỗi ngày (VND)' })).toHaveProperty('value', '1.000,01');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tên sách' }), { target: { value: 'Chỉ sửa tên sách' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    await waitFor(() => expect(submitted).toMatchObject({ title: 'Chỉ sửa tên sách', borrowFee: 1000.5, lateFeePerDay: 1000.01, version: 0 }));
+    expect(typeof submitted?.borrowFee).toBe('number');
+    expect(typeof submitted?.lateFeePerDay).toBe('number');
+  });
+
+  it('blocks over-precise fees and allows correcting both fields without losing decimal input', async () => {
+    const requests: Record<string, unknown>[] = [];
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.method === 'put') {
+        requests.push(JSON.parse(String(config.data)) as Record<string, unknown>);
+        return response(config, success('BOOK_UPDATED', { ...detail(), borrowFee: 1000.5, lateFeePerDay: 1000.01, version: 1 }));
+      }
+      return response(config, success('BOOK_DETAIL_SUCCESS', detail()));
+    }) satisfies AxiosAdapter;
+
+    renderDetail();
+    fireEvent.click(await screen.findByRole('button', { name: 'Chỉnh sửa' }));
+    const borrow = screen.getByRole('textbox', { name: 'Phí mượn (VND)' });
+    const late = screen.getByRole('textbox', { name: 'Phí trễ mỗi ngày (VND)' });
+    fireEvent.change(borrow, { target: { value: '1.000,001' } });
+    fireEvent.change(late, { target: { value: '1.000,001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() => expect(screen.getAllByText('Nhập số tiền không âm, tối đa 2 chữ số thập phân sau dấu phẩy.')).toHaveLength(2));
+    expect(requests).toHaveLength(0);
+    expect(borrow).toHaveProperty('value', '1.000,001');
+    expect(late).toHaveProperty('value', '1.000,001');
+
+    fireEvent.change(borrow, { target: { value: '1000,' } });
+    expect(borrow).toHaveProperty('value', '1.000,');
+    fireEvent.change(borrow, { target: { value: '1.000,5' } });
+    fireEvent.change(borrow, { target: { value: '1.000,50' } });
+    expect(borrow).toHaveProperty('value', '1.000,50');
+    fireEvent.change(late, { target: { value: '1000,01' } });
+    expect(late).toHaveProperty('value', '1.000,01');
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]).toMatchObject({ borrowFee: 1000.5, lateFeePerDay: 1000.01 });
+  });
+
   it('sends the loaded optimistic version and offers a reload after a stale update', async () => {
     let submitted: Record<string, unknown> | null = null;
     let detailReads = 0;
