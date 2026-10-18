@@ -61,7 +61,7 @@ afterEach(() => {
 });
 
 describe('BookListPage', () => {
-  it('debounces quick search and applies advanced filters only on request', async () => {
+  it('automatically debounces publisher and quick search without an apply button', async () => {
     const requests: Record<string, unknown>[] = [];
     apiClient.defaults.adapter = (async (config) => {
       requests.push(config.params as Record<string, unknown>);
@@ -73,19 +73,28 @@ describe('BookListPage', () => {
     expect(requests[0]).toMatchObject({ page: 0, size: 10, sort: 'createdAt,desc' });
 
     fireEvent.click(screen.getByText('Bộ lọc nâng cao'));
+    expect(screen.queryByRole('button', { name: 'Áp dụng bộ lọc' })).toBeNull();
+    vi.useFakeTimers();
     fireEvent.change(screen.getByRole('textbox', { name: 'Nhà xuất bản' }), { target: { value: 'Trẻ' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(449); });
     expect(requests).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng bộ lọc' }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     await vi.waitFor(() => expect(requests).toHaveLength(2));
     expect(requests[1]).toMatchObject({ publisher: 'Trẻ', page: 0 });
 
-    vi.useFakeTimers();
     fireEvent.change(screen.getByRole('searchbox', { name: 'Tìm sách' }), { target: { value: 'Java' } });
     await act(async () => { await vi.advanceTimersByTimeAsync(449); });
     expect(requests).toHaveLength(2);
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     await vi.waitFor(() => expect(requests).toHaveLength(3));
     expect(requests[2]).toMatchObject({ q: 'Java', publisher: 'Trẻ', page: 0, size: 10 });
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nhà xuất bản' }), { target: { value: 'Pending' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(450); });
+    await vi.waitFor(() => expect(requests).toHaveLength(4));
+    expect(requests[3]).not.toHaveProperty('publisher');
+    expect(requests[3]).not.toHaveProperty('q');
   });
 
   it('does not let an older response overwrite the current search result', async () => {

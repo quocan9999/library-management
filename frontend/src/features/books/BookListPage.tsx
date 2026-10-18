@@ -69,6 +69,7 @@ export function BookListPage() {
   const [requestState, setRequestState] = useState<{ key: string; failed: boolean } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const debounceTimer = useRef<number | undefined>(undefined);
+  const publisherTimer = useRef<number | undefined>(undefined);
 
   const query = useMemo(() => buildQuery(appliedQ, appliedFilters, page, sort), [appliedQ, appliedFilters, page, sort]);
   const requestKey = `${JSON.stringify(query)}:${reloadKey}`;
@@ -78,6 +79,7 @@ export function BookListPage() {
 
   useEffect(() => () => {
     if (debounceTimer.current !== undefined) window.clearTimeout(debounceTimer.current);
+    if (publisherTimer.current !== undefined) window.clearTimeout(publisherTimer.current);
   }, []);
 
   useEffect(() => {
@@ -110,20 +112,34 @@ export function BookListPage() {
     }, 450);
   }, []);
 
-  const applyFilters = () => {
-    if (draftFilters.publishedFrom && draftFilters.publishedTo
-      && draftFilters.publishedFrom > draftFilters.publishedTo) {
+  const changePublisher = (publisher: string) => {
+    setDraftFilters((filters) => ({ ...filters, publisher }));
+    if (publisherTimer.current !== undefined) window.clearTimeout(publisherTimer.current);
+    publisherTimer.current = window.setTimeout(() => {
+      setAppliedFilters((filters) => ({ ...filters, publisher }));
+      setPage(1);
+      publisherTimer.current = undefined;
+    }, 450);
+  };
+
+  const changeFilters = (changes: Partial<Omit<BookFilters, 'publisher'>>) => {
+    const nextFilters = { ...draftFilters, ...changes };
+    setDraftFilters(nextFilters);
+    if (nextFilters.publishedFrom && nextFilters.publishedTo
+      && nextFilters.publishedFrom > nextFilters.publishedTo) {
       setDateError('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
       return;
     }
     setDateError(null);
-    setAppliedFilters(draftFilters);
+    setAppliedFilters((filters) => ({ ...filters, ...changes }));
     setPage(1);
   };
 
   const clearFilters = () => {
     if (debounceTimer.current !== undefined) window.clearTimeout(debounceTimer.current);
     debounceTimer.current = undefined;
+    if (publisherTimer.current !== undefined) window.clearTimeout(publisherTimer.current);
+    publisherTimer.current = undefined;
     setDraftQ('');
     setAppliedQ('');
     setDraftFilters(EMPTY_FILTERS);
@@ -148,6 +164,7 @@ export function BookListPage() {
     { title: 'Mã sách', dataIndex: 'bookCode', key: 'bookCode', sorter: true, sortOrder: sortOrder('bookCode'), width: 120 },
     { title: 'Tên sách', dataIndex: 'title', key: 'title', sorter: true, sortOrder: sortOrder('title'), render: (value: string) => <strong>{value}</strong> },
     { title: 'Tác giả', dataIndex: 'author', key: 'author', sorter: true, sortOrder: sortOrder('author'), width: 180 },
+    { title: 'Nhà xuất bản', dataIndex: 'publisher', key: 'publisher', sorter: true, sortOrder: sortOrder('publisher'), render: (value: string | null) => value || '—', width: 180 },
     { title: 'ISBN', dataIndex: 'isbn', key: 'isbn', sorter: true, sortOrder: sortOrder('isbn'), render: (value: string | null) => value || '—', width: 155 },
     { title: 'Sẵn có / Tổng', key: 'quantity', render: (_value, book) => `${book.availableQuantity} / ${book.totalQuantity}`, width: 130 },
     { title: 'Phí mượn', dataIndex: 'borrowFee', key: 'borrowFee', sorter: true, sortOrder: sortOrder('borrowFee'), align: 'right', render: formatVnd, width: 135 },
@@ -185,7 +202,10 @@ export function BookListPage() {
             key: 'advanced',
             label: 'Bộ lọc nâng cao',
             children: <div className="book-filter-grid">
-              <Input aria-label="Nhà xuất bản" placeholder="Nhà xuất bản" value={draftFilters.publisher} onChange={(event) => setDraftFilters((filters) => ({ ...filters, publisher: event.target.value }))} />
+              <div className="member-filter-field">
+                <label htmlFor="book-publisher-filter">Nhà xuất bản</label>
+                <Input id="book-publisher-filter" aria-label="Nhà xuất bản" placeholder="Nhà xuất bản" value={draftFilters.publisher} onChange={(event) => changePublisher(event.target.value)} />
+              </div>
               <div className="member-filter-field">
                 <label htmlFor="book-published-range">Ngày xuất bản</label>
                 <RangePicker
@@ -195,12 +215,10 @@ export function BookListPage() {
                   placeholder={['Từ ngày', 'Đến ngày']}
                   value={dateRange}
                   onChange={(dates) => {
-                    setDateError(null);
-                    setDraftFilters((filters) => ({
-                      ...filters,
+                    changeFilters({
                       publishedFrom: dates?.[0]?.format('YYYY-MM-DD') ?? '',
                       publishedTo: dates?.[1]?.format('YYYY-MM-DD') ?? '',
-                    }));
+                    });
                   }}
                 />
                 {dateError && <span className="member-field-error" role="alert">{dateError}</span>}
@@ -213,10 +231,9 @@ export function BookListPage() {
                   { value: 'AVAILABLE', label: 'Còn sách' },
                   { value: 'UNAVAILABLE', label: 'Hết sách' },
                 ]}
-                onChange={(availability: BookFilters['availability']) => setDraftFilters((filters) => ({ ...filters, availability }))}
+                onChange={(availability: BookFilters['availability']) => changeFilters({ availability })}
               />
               <div className="book-filter-actions">
-                <Button onClick={applyFilters}>Áp dụng bộ lọc</Button>
                 <Button onClick={clearFilters}>Xóa bộ lọc</Button>
               </div>
             </div>,
