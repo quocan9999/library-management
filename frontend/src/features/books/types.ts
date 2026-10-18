@@ -5,6 +5,7 @@ export interface BookListItem {
   title: string;
   author: string;
   publisher: string | null;
+  coverImageUrl?: string | null;
   publishedDate: string | null;
   totalQuantity: number;
   availableQuantity: number;

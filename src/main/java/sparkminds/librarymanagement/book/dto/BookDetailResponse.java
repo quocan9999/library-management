@@ -18,6 +18,7 @@ public record BookDetailResponse(
         BigDecimal lateFeePerDay,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        Long version
+        Long version,
+        String coverImageUrl
 ) {
 }

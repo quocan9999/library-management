@@ -36,6 +36,12 @@ public class Book {
     @Column(name = "publisher", length = 150)
     private String publisher;
 
+    @Column(name = "cover_image_url", length = 2048)
+    private String coverImageUrl;
+
+    @Column(name = "cover_image_public_id", length = 255)
+    private String coverImagePublicId;
+
     @Column(name = "published_date")
     private LocalDate publishedDate;
 

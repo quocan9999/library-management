@@ -4,11 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.book.dto.BookDetailResponse;
 import sparkminds.librarymanagement.book.dto.CreateBookRequest;
 import sparkminds.librarymanagement.book.dto.UpdateBookRequest;
 import sparkminds.librarymanagement.book.entity.Book;
+import sparkminds.librarymanagement.book.cover.BookCoverObsolete;
+import sparkminds.librarymanagement.book.cover.UploadedBookCover;
 import sparkminds.librarymanagement.book.repository.BookRepository;
 import sparkminds.librarymanagement.book.repository.BookSimilarityRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
@@ -27,6 +30,7 @@ public class BookTransactionService {
     private final BookRepository bookRepository;
     private final BookSimilarityRepository bookSimilarityRepository;
     private final LoanItemRepository loanItemRepository;
+    private final ApplicationEventPublisher events;
 
     /**
      * Tạo một đầu sách sau khi chuẩn hóa thông tin và kiểm tra ISBN/sách tương tự.
@@ -36,6 +40,12 @@ public class BookTransactionService {
      */
     @Transactional
     public BookDetailResponse create(CreateBookRequest request) {
+        return create(request, null);
+    }
+
+    /** Lưu metadata ảnh trong cùng transaction tạo sách; upload đã hoàn tất ngoài transaction. */
+    @Transactional
+    public BookDetailResponse create(CreateBookRequest request, UploadedBookCover cover) {
         String title = BookRules.normalizeRequiredText(request.title());
         String author = BookRules.normalizeRequiredText(request.author());
         String isbn = normalizeIsbn(request.isbn());
@@ -62,6 +72,10 @@ public class BookTransactionService {
         book.setAvailableQuantity(request.totalQuantity());
         book.setBorrowFee(request.borrowFee());
         book.setLateFeePerDay(request.lateFeePerDay());
+        if (cover != null) {
+            book.setCoverImageUrl(cover.url());
+            book.setCoverImagePublicId(cover.publicId());
+        }
 
         bookRepository.saveAndFlush(book);
         book.setBookCode(formatBookCode(book.getId()));
@@ -78,6 +92,12 @@ public class BookTransactionService {
      */
     @Transactional
     public BookDetailResponse update(Integer id, UpdateBookRequest request) {
+        return update(id, request, null);
+    }
+
+    /** Giữ nguyên ảnh khi cover=null; xóa ảnh cũ bằng sự kiện AFTER_COMMIT để rollback không làm mất ảnh. */
+    @Transactional
+    public BookDetailResponse update(Integer id, UpdateBookRequest request, UploadedBookCover cover) {
         Book book = bookRepository.findById(id)
                 .orElseThrow(BookTransactionService::bookNotFound);
         if (!Objects.equals(book.getVersion(), request.version())) {
@@ -109,6 +129,13 @@ public class BookTransactionService {
         book.setBorrowFee(request.borrowFee());
         book.setLateFeePerDay(request.lateFeePerDay());
 
+        if (cover != null) {
+            String oldPublicId = book.getCoverImagePublicId();
+            book.setCoverImageUrl(cover.url());
+            book.setCoverImagePublicId(cover.publicId());
+            if (oldPublicId != null) events.publishEvent(new BookCoverObsolete(oldPublicId));
+        }
+
         try {
             bookRepository.saveAndFlush(book);
         } catch (OptimisticLockingFailureException exception) {
@@ -136,6 +163,9 @@ public class BookTransactionService {
         bookRepository.delete(book);
         // Flush trong transaction để FK RESTRICT chặn lịch sử LoanItem phát sinh sau bước kiểm tra.
         bookRepository.flush();
+        if (book.getCoverImagePublicId() != null) {
+            events.publishEvent(new BookCoverObsolete(book.getCoverImagePublicId()));
+        }
     }
 
     private String normalizeIsbn(String value) {

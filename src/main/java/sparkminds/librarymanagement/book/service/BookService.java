@@ -5,6 +5,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import sparkminds.librarymanagement.book.cover.BookCoverService;
+import sparkminds.librarymanagement.book.cover.UploadedBookCover;
 import sparkminds.librarymanagement.book.dto.BookDetailResponse;
 import sparkminds.librarymanagement.book.dto.CreateBookRequest;
 import sparkminds.librarymanagement.book.dto.UpdateBookRequest;
@@ -20,6 +23,7 @@ public class BookService {
     private final BookTransactionService transactionService;
     private final BookRepository bookRepository;
     private final LoanItemRepository loanItemRepository;
+    private final BookCoverService coverService;
 
     /**
      * Tạo sách và chuyển lỗi UNIQUE ISBN nếu hai request cùng ghi một ISBN.
@@ -33,9 +37,18 @@ public class BookService {
      */
     @BookOperationLog("book.create")
     public BookDetailResponse create(CreateBookRequest request) {
+        return create(request, null);
+    }
+
+    /** Upload trước transaction DB; dọn ảnh mới nếu validation nghiệp vụ hoặc commit thất bại. */
+    @BookOperationLog("book.create")
+    public BookDetailResponse create(CreateBookRequest request, MultipartFile file) {
+        UploadedBookCover cover = coverService.uploadOptional(file);
         try {
-            return transactionService.create(request);
-        } catch (DataIntegrityViolationException exception) {
+            return transactionService.create(request, cover);
+        } catch (RuntimeException exception) {
+            if (cover != null) coverService.discard(cover.publicId());
+            if (!(exception instanceof DataIntegrityViolationException)) throw exception;
             String isbn;
             try {
                 isbn = BookRules.normalizeIsbn(request.isbn());
@@ -60,9 +73,18 @@ public class BookService {
 
     @BookOperationLog("book.update")
     public BookDetailResponse update(Integer id, UpdateBookRequest request) {
+        return update(id, request, null);
+    }
+
+    /** Upload không giữ transaction DB; kiểm tra version trong transaction trước khi thay metadata ảnh. */
+    @BookOperationLog("book.update")
+    public BookDetailResponse update(Integer id, UpdateBookRequest request, MultipartFile file) {
+        UploadedBookCover cover = coverService.uploadOptional(file);
         try {
-            return transactionService.update(id, request);
-        } catch (DataIntegrityViolationException exception) {
+            return transactionService.update(id, request, cover);
+        } catch (RuntimeException exception) {
+            if (cover != null) coverService.discard(cover.publicId());
+            if (!(exception instanceof DataIntegrityViolationException)) throw exception;
             String isbn;
             try {
                 isbn = BookRules.normalizeIsbn(request.isbn());

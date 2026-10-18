@@ -17,6 +17,14 @@ function readRequiredData<T>(envelope: ApiEnvelope<T>, expectedCode: string): T 
   return envelope.data;
 }
 
+function bookBody(input: BookWriteInput, cover?: File | null): BookWriteInput | FormData {
+  if (!cover) return input;
+  const body = new FormData();
+  body.append('book', new Blob([JSON.stringify(input)], { type: 'application/json' }));
+  body.append('cover', cover);
+  return body;
+}
+
 export const bookApi = {
   async getBooks(query: BookListQuery, signal?: AbortSignal): Promise<PageResponse<BookListItem>> {
     const response = await apiClient.get<ApiEnvelope<PageResponse<BookListItem>>>('/api/v1/books', {
@@ -31,13 +39,17 @@ export const bookApi = {
     return readRequiredData(response.data, 'BOOK_DETAIL_SUCCESS');
   },
 
-  async createBook(input: BookWriteInput): Promise<BookDetail> {
-    const response = await apiClient.post<ApiEnvelope<BookDetail>>('/api/v1/books', input);
+  async createBook(input: BookWriteInput, cover?: File | null): Promise<BookDetail> {
+    const response = await apiClient.post<ApiEnvelope<BookDetail>>('/api/v1/books', bookBody(input, cover), {
+      headers: cover ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
     return readRequiredData(response.data, 'BOOK_CREATED');
   },
 
-  async updateBook(id: number, input: BookUpdateInput): Promise<BookDetail> {
-    const response = await apiClient.put<ApiEnvelope<BookDetail>>(`/api/v1/books/${id}`, input);
+  async updateBook(id: number, input: BookUpdateInput, cover?: File | null): Promise<BookDetail> {
+    const response = await apiClient.put<ApiEnvelope<BookDetail>>(`/api/v1/books/${id}`, bookBody(input, cover), {
+      headers: cover ? { 'Content-Type': 'multipart/form-data' } : undefined,
+    });
     return readRequiredData(response.data, 'BOOK_UPDATED');
   },
 

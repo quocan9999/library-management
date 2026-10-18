@@ -47,6 +47,11 @@ class BookOpenApiIntegrationTests {
                         .value("Clean Code"))
                 .andExpect(jsonPath("$.paths['/api/v1/books'].post.responses['409'].content['application/json'].examples['ISBN trùng']")
                         .exists())
+                .andExpect(jsonPath("$.paths['/api/v1/books'].post.requestBody.content['multipart/form-data'].schema.properties.cover.format")
+                        .value("binary"))
+                .andExpect(jsonPath("$.paths['/api/v1/books'].post.requestBody.content['multipart/form-data'].encoding.book.contentType")
+                        .value("application/json"))
+                .andExpect(jsonPath("$.components.schemas.BookDetailResponse.properties.coverImageUrl").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/books/import'].post.requestBody.content['multipart/form-data']")
                         .exists())
                 .andExpect(jsonPath("$.paths['/api/v1/books/import'].post.responses['200']").exists());

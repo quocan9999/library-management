@@ -1,5 +1,7 @@
 package sparkminds.librarymanagement.common.api;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -57,18 +59,24 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException exception) {
-        return error(HttpStatus.PAYLOAD_TOO_LARGE, "BOOK_IMPORT_FILE_TOO_LARGE", "File tải lên vượt quá giới hạn cho phép", null);
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException exception, HttpServletRequest request) {
+        return uploadTooLarge(request);
     }
 
     @ExceptionHandler(MultipartException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMultipart(MultipartException exception) {
+    public ResponseEntity<ApiResponse<Void>> handleMultipart(MultipartException exception, HttpServletRequest request) {
         for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
             if (cause instanceof MaxUploadSizeExceededException) {
-                return error(HttpStatus.PAYLOAD_TOO_LARGE, "BOOK_IMPORT_FILE_TOO_LARGE", "File tải lên vượt quá giới hạn cho phép", null);
+                return uploadTooLarge(request);
             }
         }
         return error(HttpStatus.BAD_REQUEST, "INVALID_MULTIPART_REQUEST", "Yêu cầu tải file không hợp lệ", null);
+    }
+
+    private ResponseEntity<ApiResponse<Void>> uploadTooLarge(HttpServletRequest request) {
+        String code = request.getRequestURI().equals("/api/v1/books/import")
+                ? "BOOK_IMPORT_FILE_TOO_LARGE" : "BOOK_COVER_TOO_LARGE";
+        return error(HttpStatus.PAYLOAD_TOO_LARGE, code, "File tải lên vượt quá giới hạn cho phép", null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

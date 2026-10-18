@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { usePermission } from '../../auth/permissions';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { BookFormModal } from './BookFormModal';
+import { BookCoverImage } from './BookCoverImage';
 import { bookApi } from './api';
 import { formatVnd } from './formatting';
 import type { BookDetail } from './types';
@@ -110,6 +111,7 @@ export function BookDetailPage() {
           action={validBookId ? <Button onClick={() => setReloadKey((key) => key + 1)}>Thử lại</Button> : undefined}
         />}
         {book && <section className="member-detail-card" aria-label="Thông tin sách">
+          <div className="book-detail-cover"><BookCoverImage url={book.coverImageUrl} title={book.title} large /></div>
           <Descriptions bordered column={{ xs: 1, sm: 2, lg: 3 }}>
             <Descriptions.Item label="Mã sách">{book.bookCode}</Descriptions.Item>
             <Descriptions.Item label="Tên sách">{book.title}</Descriptions.Item>

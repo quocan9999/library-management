@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { usePermission } from '../../auth/permissions';
 import { bookApi } from './api';
 import { BookFormModal } from './BookFormModal';
+import { BookCoverImage } from './BookCoverImage';
 import { BookImportModal } from './BookImportModal';
 import { formatVnd } from './formatting';
 import type { BookListItem, BookListQuery, PageResponse } from './types';
@@ -161,6 +162,7 @@ export function BookListPage() {
   const sortOrder = (field: string) => sort === `${field},asc` ? 'ascend' as const : sort === `${field},desc` ? 'descend' as const : null;
 
   const columns: TableColumnsType<BookListItem> = [
+    { title: 'Ảnh bìa', key: 'cover', width: 80, render: (_value, book) => <BookCoverImage url={book.coverImageUrl} title={book.title} /> },
     { title: 'Mã sách', dataIndex: 'bookCode', key: 'bookCode', sorter: true, sortOrder: sortOrder('bookCode'), width: 120 },
     { title: 'Tên sách', dataIndex: 'title', key: 'title', sorter: true, sortOrder: sortOrder('title'), render: (value: string) => <strong>{value}</strong> },
     { title: 'Tác giả', dataIndex: 'author', key: 'author', sorter: true, sortOrder: sortOrder('author'), width: 180 },

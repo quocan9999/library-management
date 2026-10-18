@@ -5,6 +5,7 @@ import { useState, type ChangeEvent } from 'react';
 import type { ApiEnvelope } from '../../auth/types';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { bookApi } from './api';
+import { BookCoverPicker } from './BookCoverPicker';
 import { formatVndInput, isValidIsbn, parseVndInput } from './formatting';
 import type { BookDetail, BookUpdateInput, BookWriteInput } from './types';
 
@@ -42,6 +43,9 @@ function errorMessage(error: unknown): string {
   switch (body?.code) {
     case 'BOOK_ISBN_DUPLICATED': return 'ISBN này đã được sử dụng cho một sách khác.';
     case 'BOOK_NOT_FOUND': return 'Sách không còn tồn tại. Hãy tải lại danh sách.';
+    case 'BOOK_COVER_STORAGE_UNAVAILABLE': return 'Chưa thể tải ảnh bìa lên. Vui lòng kiểm tra cấu hình Cloudinary hoặc thử lại sau.';
+    case 'BOOK_COVER_UPLOAD_FAILED': return 'Tải ảnh bìa thất bại. Sách chưa được lưu; hãy thử lại.';
+    case 'BOOK_COVER_TOO_LARGE': return 'Ảnh bìa không được vượt quá 5 MiB.';
     case 'BOOK_VALIDATION_ERROR':
     case 'VALIDATION_ERROR': return 'Thông tin chưa hợp lệ. Hãy kiểm tra các trường được đánh dấu.';
     default: return 'Không thể lưu thông tin sách lúc này. Hãy thử lại.';
@@ -75,6 +79,8 @@ export function BookFormModal({
   const [form] = Form.useForm<BookFormValues>();
   const { notify } = useAppNotification();
   const [saving, setSaving] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverError, setCoverError] = useState<string | null>(null);
   const [similarConfirmation, setSimilarConfirmation] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [reloadError, setReloadError] = useState<string | null>(null);
@@ -94,14 +100,15 @@ export function BookFormModal({
   };
 
   const submit = async (values: BookFormValues) => {
+    if (coverError || saving) return;
     setSaving(true);
     setConflict(false);
     setReloadError(null);
     const input = buildInput(values);
     try {
       const saved = book
-        ? await bookApi.updateBook(book.id, { ...input, version: book.version } satisfies BookUpdateInput)
-        : await bookApi.createBook({ ...input, confirmSimilar: similarConfirmation });
+        ? await bookApi.updateBook(book.id, { ...input, version: book.version } satisfies BookUpdateInput, coverFile)
+        : await bookApi.createBook({ ...input, confirmSimilar: similarConfirmation }, coverFile);
       notify('success', {
         title: book ? 'Cập nhật sách thành công' : 'Tạo sách thành công',
         description: `${saved.bookCode} · ${saved.title}`,
@@ -119,6 +126,10 @@ export function BookFormModal({
         return;
       }
       const fieldErrors = body?.errors ?? {};
+      if (fieldErrors.cover) {
+        setCoverError(fieldErrors.cover);
+        return;
+      }
       const mapped = (['title', 'author', 'isbn', 'publisher', 'publishedDate', 'totalQuantity', 'borrowFee', 'lateFeePerDay'] as const)
         .flatMap((field) => fieldErrors[field] ? [{ name: field, errors: [fieldErrors[field]] }] : []);
       if (mapped.length > 0) {
@@ -180,6 +191,9 @@ export function BookFormModal({
         {book && <Form.Item label="Mã sách">
           <Input value={book.bookCode} readOnly aria-label="Mã sách" />
         </Form.Item>}
+        <Form.Item label="Ảnh bìa" htmlFor="book-cover-file" validateStatus={coverError ? 'error' : undefined} help={coverError}>
+          <BookCoverPicker value={coverFile} existingUrl={book?.coverImageUrl} disabled={saving} error={coverError} onChange={(file, error) => { setCoverFile(file); setCoverError(error); }} />
+        </Form.Item>
         <Form.Item
           label="Tên sách"
           name="title"

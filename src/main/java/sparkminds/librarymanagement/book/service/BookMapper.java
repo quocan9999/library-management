@@ -25,7 +25,8 @@ final class BookMapper {
                 book.getLateFeePerDay(),
                 book.getCreatedAt(),
                 book.getUpdatedAt(),
-                book.getVersion()
+                book.getVersion(),
+                book.getCoverImageUrl()
         );
     }
 
@@ -43,7 +44,8 @@ final class BookMapper {
                 book.getBorrowFee(),
                 book.getLateFeePerDay(),
                 book.getCreatedAt(),
-                book.getUpdatedAt()
+                book.getUpdatedAt(),
+                book.getCoverImageUrl()
         );
     }
 }

@@ -31,8 +31,14 @@
 		<jjwt.version>0.13.0</jjwt.version>
 		<commons-csv.version>1.14.1</commons-csv.version>
 		<springdoc.version>3.1.0</springdoc.version>
+		<cloudinary.version>2.5.0</cloudinary.version>
 	</properties>
 	<dependencies>
+		<dependency>
+			<groupId>com.cloudinary</groupId>
+			<artifactId>cloudinary-http5</artifactId>
+			<version>${cloudinary.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>

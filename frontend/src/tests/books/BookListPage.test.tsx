@@ -61,6 +61,66 @@ afterEach(() => {
 });
 
 describe('BookListPage', () => {
+  it('submits a selected cover and book JSON together as multipart', async () => {
+    authState.permissions = ['book:read', 'book:create'];
+    let submitted: FormData | undefined;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.method === 'post') {
+        submitted = config.data as FormData;
+        return response(config, success('BOOK_CREATED', { ...book(25), coverImageUrl: 'https://res.cloudinary.com/demo/cover.png' }));
+      }
+      return response(config, success('BOOK_LIST_SUCCESS', page()));
+    }) satisfies AxiosAdapter;
+    render(<MemoryRouter><BookListPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Thêm sách' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tên sách' }), { target: { value: 'Sách có ảnh' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tác giả' }), { target: { value: 'Tác giả' } });
+    fireEvent.change(screen.getByLabelText('Chọn ảnh bìa'), {
+      target: { files: [new File(['image'], 'cover.png', { type: 'image/png' })] },
+    });
+    const buttons = screen.getAllByRole('button', { name: 'Thêm sách' });
+    fireEvent.click(buttons[buttons.length - 1]);
+    await vi.waitFor(() => expect(submitted).toBeInstanceOf(FormData));
+    expect(submitted?.get('cover')).toHaveProperty('name', 'cover.png');
+    expect(submitted?.get('book')).toHaveProperty('type', 'application/json');
+    const metadata = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsText(submitted!.get('book') as Blob);
+    });
+    expect(JSON.parse(metadata)).toMatchObject({ title: 'Sách có ảnh', author: 'Tác giả', totalQuantity: 0 });
+  });
+
+  it('rejects unsupported cover files and lets the user remove them before saving without an image', async () => {
+    authState.permissions = ['book:read', 'book:create'];
+    let submitted: unknown;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.method === 'post') {
+        submitted = config.data;
+        return response(config, success('BOOK_CREATED', book(26)));
+      }
+      return response(config, success('BOOK_LIST_SUCCESS', page()));
+    }) satisfies AxiosAdapter;
+    render(<MemoryRouter><BookListPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Thêm sách' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tên sách' }), { target: { value: 'Sách không ảnh' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tác giả' }), { target: { value: 'Tác giả' } });
+    fireEvent.change(screen.getByLabelText('Chọn ảnh bìa'), {
+      target: { files: [new File(['<svg/>'], 'cover.svg', { type: 'image/svg+xml' })] },
+    });
+    expect(await screen.findByText('Chỉ chấp nhận ảnh JPEG hoặc PNG.')).toBeTruthy();
+    let buttons = screen.getAllByRole('button', { name: 'Thêm sách' });
+    fireEvent.click(buttons[buttons.length - 1]);
+    await act(async () => { await Promise.resolve(); });
+    expect(submitted).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Bỏ ảnh đã chọn' }));
+    buttons = screen.getAllByRole('button', { name: 'Thêm sách' });
+    fireEvent.click(buttons[buttons.length - 1]);
+    await vi.waitFor(() => expect(typeof submitted).toBe('string'));
+    expect(JSON.parse(submitted as string)).toMatchObject({ title: 'Sách không ảnh' });
+  });
+
   it('automatically debounces publisher and quick search without an apply button', async () => {
     const requests: Record<string, unknown>[] = [];
     apiClient.defaults.adapter = (async (config) => {

@@ -2436,6 +2436,53 @@ input:focus-visible,
   vertical-align: middle;
 }
 
+.book-cover-image {
+  display: block;
+  width: 40px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+.book-cover-image-large,
+.book-cover-preview {
+  width: 140px;
+  height: 196px;
+  object-fit: contain;
+}
+
+.book-cover-empty {
+  display: grid;
+  place-items: center;
+  background: #f4f5f7;
+  color: #667085;
+}
+
+.book-detail-cover {
+  padding: 20px;
+}
+
+.book-cover-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.book-cover-picker > div {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.book-cover-picker input {
+  max-width: 100%;
+}
+
+.book-cover-hint {
+  color: #667085;
+  font-size: 12px;
+}
+
 @media (max-width: 760px) {
   .book-toolbar-actions {
     width: 100%;

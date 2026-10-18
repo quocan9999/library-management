@@ -14,6 +14,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.http.HttpMethod;
+import sparkminds.librarymanagement.book.cover.BookCoverStorage;
+import sparkminds.librarymanagement.book.cover.UploadedBookCover;
+import sparkminds.librarymanagement.common.api.BusinessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import sparkminds.librarymanagement.book.entity.Book;
@@ -33,6 +40,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -60,6 +71,9 @@ class BookAdminApiIntegrationTests {
 
     @MockitoSpyBean
     private LoanItemRepository loanItemRepository;
+
+    @MockitoBean
+    private BookCoverStorage coverStorage;
 
     @Value("${spring.datasource.url}")
     private String datasourceUrl;
@@ -104,6 +118,192 @@ class BookAdminApiIntegrationTests {
         if (removeUserBookCreatePermission) {
             setUserBookCreatePermission(false);
         }
+    }
+
+    @Test
+    void multipartCreateStoresCoverMetadataAndReturnsImageInDetailAndSearch() throws Exception {
+        String token = loginAsSuperAdmin();
+        stubCover("cover-created");
+        MvcResult result = mockMvc.perform(coverRequest(HttpMethod.POST, "/api/v1/books",
+                        createBookBody("Covered book", null, false)).header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.coverImageUrl").value("https://res.cloudinary.com/test/cover-created.png"))
+                .andReturn();
+        Integer id = JsonPath.read(result.getResponse().getContentAsString(), "$.data.id");
+        assertThat(jdbcTemplate.queryForObject("SELECT cover_image_public_id FROM books WHERE id = ?", String.class, id))
+                .isEqualTo("cover-created");
+        mockMvc.perform(get("/api/v1/books/{id}", id).header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.data.coverImageUrl").value("https://res.cloudinary.com/test/cover-created.png"))
+                .andExpect(jsonPath("$.data.coverImagePublicId").doesNotExist());
+        mockMvc.perform(get("/api/v1/books").param("q", authorFixture).header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.data.content[0].coverImageUrl").value("https://res.cloudinary.com/test/cover-created.png"));
+    }
+
+    @Test
+    void replacementDeletesOldCoverAfterCommitAndJsonUpdateKeepsCurrentImage() throws Exception {
+        String token = loginAsSuperAdmin();
+        Integer id = createCoveredBook(token, "old-cover");
+        Long version = jdbcTemplate.queryForObject("SELECT version FROM books WHERE id = ?", Long.class, id);
+        stubCover("new-cover");
+        doAnswer(invocation -> {
+            assertThat(jdbcTemplate.queryForObject("SELECT cover_image_public_id FROM books WHERE id = ?", String.class, id))
+                    .isEqualTo("new-cover");
+            return null;
+        }).when(coverStorage).delete("old-cover");
+        mockMvc.perform(coverRequest(HttpMethod.PUT, "/api/v1/books/" + id, updateBookBody("Changed cover", 2, version))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.coverImageUrl").value("https://res.cloudinary.com/test/new-cover.png"));
+        verify(coverStorage).delete("old-cover");
+        Long latest = jdbcTemplate.queryForObject("SELECT version FROM books WHERE id = ?", Long.class, id);
+        mockMvc.perform(put("/api/v1/books/{id}", id).header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON).content(updateBookBody("Only metadata", 2, latest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.coverImageUrl").value("https://res.cloudinary.com/test/new-cover.png"));
+        verify(coverStorage, never()).delete("new-cover");
+    }
+
+    @Test
+    void staleCoverUpdateDiscardsNewUploadButPreservesExistingImageAndConflict() throws Exception {
+        String token = loginAsSuperAdmin();
+        Integer id = createCoveredBook(token, "existing-cover");
+        Long version = jdbcTemplate.queryForObject("SELECT version FROM books WHERE id = ?", Long.class, id);
+        mockMvc.perform(put("/api/v1/books/{id}", id).header("Authorization", "Bearer " + token)
+                        .contentType(APPLICATION_JSON).content(updateBookBody("Concurrent edit", 2, version)))
+                .andExpect(status().isOk());
+        stubCover("discarded-cover");
+        mockMvc.perform(coverRequest(HttpMethod.PUT, "/api/v1/books/" + id, updateBookBody("Stale edit", 2, version))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("BOOK_VERSION_CONFLICT"));
+        verify(coverStorage).delete("discarded-cover");
+        verify(coverStorage, never()).delete("existing-cover");
+        assertThat(jdbcTemplate.queryForObject("SELECT cover_image_public_id FROM books WHERE id = ?", String.class, id))
+                .isEqualTo("existing-cover");
+    }
+
+    @Test
+    void duplicateBookWithCoverRollsBackAndDiscardsUploadedImage() throws Exception {
+        String token = loginAsSuperAdmin();
+        createCoveredBook(token, "first-cover");
+        stubCover("duplicate-cover");
+        mockMvc.perform(coverRequest(HttpMethod.POST, "/api/v1/books", createBookBody("Cover fixture", null, false))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+        verify(coverStorage).delete("duplicate-cover");
+        verify(coverStorage, never()).delete("first-cover");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM books WHERE author = ?", Integer.class, authorFixture)).isEqualTo(1);
+    }
+
+    @Test
+    void cloudinaryFailureDoesNotCreateBook() throws Exception {
+        String token = loginAsSuperAdmin();
+        when(coverStorage.upload(any())).thenThrow(new BusinessException(HttpStatus.BAD_GATEWAY,
+                "BOOK_COVER_UPLOAD_FAILED", "Không thể tải ảnh bìa lên, vui lòng thử lại"));
+        mockMvc.perform(coverRequest(HttpMethod.POST, "/api/v1/books", createBookBody("Failed upload", null, false))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadGateway()).andExpect(jsonPath("$.code").value("BOOK_COVER_UPLOAD_FAILED"));
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM books WHERE author = ?", Integer.class, authorFixture)).isZero();
+    }
+
+    @Test
+    void deletingCoveredBookRemovesImageOnlyAfterDatabaseCommit() throws Exception {
+        String token = loginAsSuperAdmin();
+        Integer id = createCoveredBook(token, "delete-cover");
+        doAnswer(invocation -> {
+            assertThat(bookRepository.existsById(id)).isFalse();
+            return null;
+        }).when(coverStorage).delete("delete-cover");
+        mockMvc.perform(delete("/api/v1/books/{id}", id).header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+        verify(coverStorage).delete("delete-cover");
+    }
+
+    @Test
+    void databaseFailureAfterReplacingMetadataKeepsOldImageAndDiscardsNewUpload() throws Exception {
+        String token = loginAsSuperAdmin();
+        Integer id = createCoveredBook(token, "rollback-old");
+        Long version = jdbcTemplate.queryForObject("SELECT version FROM books WHERE id = ?", Long.class, id);
+        stubCover("rollback-new");
+        doAnswer(invocation -> {
+            Book changed = invocation.getArgument(0);
+            if ("rollback-new".equals(changed.getCoverImagePublicId())) {
+                throw new DataIntegrityViolationException("Simulated database failure");
+            }
+            return invocation.callRealMethod();
+        }).when(bookRepository).saveAndFlush(any(Book.class));
+        mockMvc.perform(coverRequest(HttpMethod.PUT, "/api/v1/books/" + id, updateBookBody("Rolled back", 2, version))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+        verify(coverStorage).delete("rollback-new");
+        verify(coverStorage, never()).delete("rollback-old");
+        assertThat(jdbcTemplate.queryForObject("SELECT cover_image_public_id FROM books WHERE id = ?", String.class, id))
+                .isEqualTo("rollback-old");
+    }
+
+    @Test
+    void historyConflictPreservesBookCover() throws Exception {
+        String token = loginAsSuperAdmin();
+        Integer id = createCoveredBook(token, "history-cover");
+        int loanId = createMemberAndLoanFixture();
+        jdbcTemplate.update("""
+                INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee)
+                VALUES (?, ?, 'BORROWED', 0, 0, 0)
+                """, loanId, id);
+        mockMvc.perform(delete("/api/v1/books/{id}", id).header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict());
+        verify(coverStorage, never()).delete("history-cover");
+        assertThat(jdbcTemplate.queryForObject("SELECT cover_image_public_id FROM books WHERE id = ?", String.class, id))
+                .isEqualTo("history-cover");
+    }
+
+    @Test
+    void multipartChecksAuthenticationRoleAndBeanValidationBeforeUploading() throws Exception {
+        mockMvc.perform(coverRequest(HttpMethod.POST, "/api/v1/books", createBookBody("Anonymous", null, false)))
+                .andExpect(status().isUnauthorized());
+        String userToken = loginAsUser(true);
+        mockMvc.perform(coverRequest(HttpMethod.POST, "/api/v1/books", createBookBody("User cover", null, false))
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+        String adminToken = loginAsSuperAdmin();
+        mockMvc.perform(coverRequest(HttpMethod.POST, "/api/v1/books", createBookBody("", null, false))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isUnprocessableEntity());
+        verifyNoInteractions(coverStorage);
+    }
+
+    private void stubCover(String publicId) {
+        when(coverStorage.upload(any())).thenReturn(new UploadedBookCover("https://res.cloudinary.com/test/" + publicId + ".png", publicId));
+    }
+
+    private Integer createCoveredBook(String token, String publicId) throws Exception {
+        stubCover(publicId);
+        MvcResult result = mockMvc.perform(coverRequest(HttpMethod.POST, "/api/v1/books", createBookBody("Cover fixture", null, false))
+                        .header("Authorization", "Bearer " + token)).andExpect(status().isCreated()).andReturn();
+        return JsonPath.read(result.getResponse().getContentAsString(), "$.data.id");
+    }
+
+    private org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder coverRequest(
+            HttpMethod method, String path, String body) throws Exception {
+        java.io.ByteArrayOutputStream image = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 3, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", image);
+        return org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(method, path)
+                .file(new MockMultipartFile("book", "", "application/json", body.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .file(new MockMultipartFile("cover", "cover.png", "image/png", image.toByteArray()));
+    }
+
+    @Test
+    void multipartCreateRejectsFakeCoverWithoutSavingBook() throws Exception {
+        String token = loginAsSuperAdmin();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/books")
+                        .file(new org.springframework.mock.web.MockMultipartFile("book", "", "application/json",
+                                createBookBody("Fake cover", null, false).getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .file(new org.springframework.mock.web.MockMultipartFile("cover", "cover.png", "image/png",
+                                "not an image".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errors.cover").exists());
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM books WHERE author = ?", Integer.class, authorFixture))
+                .isZero();
     }
 
     @Test

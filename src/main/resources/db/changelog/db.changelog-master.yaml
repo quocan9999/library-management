@@ -130,3 +130,7 @@ databaseChangeLog:
   - include:
       file: changes/033-book-similarity-lock.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/034-book-cover-image.yaml
+      relativeToChangelogFile: true

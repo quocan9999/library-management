@@ -17,6 +17,7 @@ public record BookListItemResponse(
         BigDecimal borrowFee,
         BigDecimal lateFeePerDay,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String coverImageUrl
 ) {
 }

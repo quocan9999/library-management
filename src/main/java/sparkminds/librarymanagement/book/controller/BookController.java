@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +21,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import sparkminds.librarymanagement.book.dto.BookDetailResponse;
 import sparkminds.librarymanagement.book.dto.BookListItemResponse;
 import sparkminds.librarymanagement.book.dto.CreateBookRequest;
@@ -71,16 +74,13 @@ public class BookController {
         ));
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
             summary = "Tạo đầu sách",
             description = "Chuẩn hóa ISBN, khởi tạo tồn kho khả dụng và yêu cầu xác nhận nếu trùng tên/tác giả không ISBN.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = CreateBookRequest.class),
-                            examples = @ExampleObject(name = "Tạo sách", value = """
-                                    {"title":"Clean Code","author":"Robert C. Martin","isbn":"9780132350884","publisher":"Prentice Hall","publishedDate":"2008-08-01","totalQuantity":5,"borrowFee":10000.00,"lateFeePerDay":2000.00,"confirmSimilar":false}
-                                    """))
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = CreateBookRequest.class))
             )
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
@@ -135,16 +135,13 @@ public class BookController {
         ));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
             summary = "Cập nhật sách",
             description = "Gửi version đã đọc cùng dữ liệu mới; version cũ trả BOOK_VERSION_CONFLICT (409).",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = UpdateBookRequest.class),
-                            examples = @ExampleObject(name = "Cập nhật sách", value = """
-                                    {"title":"Clean Code, 2nd printing","author":"Robert C. Martin","isbn":"9780132350884","publisher":"Prentice Hall","publishedDate":"2008-08-01","totalQuantity":7,"borrowFee":10000.00,"lateFeePerDay":2000.00,"version":0}
-                                    """))
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = UpdateBookRequest.class))
             )
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
@@ -169,6 +166,31 @@ public class BookController {
                 "Cập nhật thông tin sách thành công",
                 bookService.update(id, request)
         ));
+    }
+
+    /** JSON part book được Bean Validation kiểm tra trước khi xử lý file, dùng cùng quyền tạo sách. */
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Tạo sách kèm ảnh bìa", description = "Multipart gồm part book dạng application/json và part cover tùy chọn. Ảnh JPEG/PNG tối đa 5 MiB, 20 triệu pixel. Lỗi ảnh trả 422/413; Cloudinary chưa cấu hình trả 503, upload thất bại trả 502. Các lỗi CRUD giống API JSON.")
+    @PreAuthorize("hasAuthority('book:create') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<BookDetailResponse>> createWithCover(
+            @Valid @RequestPart("book") CreateBookRequest request,
+            @RequestPart(value = "cover", required = false) MultipartFile cover) {
+        BookDetailResponse book = bookService.create(request, cover);
+        return ResponseEntity.created(URI.create("/api/v1/books/" + book.id()))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.success(201, "BOOK_CREATED", "Tạo sách thành công", book));
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Cập nhật sách và thay ảnh bìa", description = "Part book dạng application/json phải có version hiện tại; cover là ảnh JPEG/PNG tùy chọn, tối đa 5 MiB và 20 triệu pixel. Không gửi cover sẽ giữ ảnh hiện tại. Version cũ trả 409; ảnh không hợp lệ 422/413; Cloudinary lỗi 502/503.")
+    @PreAuthorize("hasAuthority('book:update') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<BookDetailResponse>> updateWithCover(
+            @PathVariable Integer id,
+            @Valid @RequestPart("book") UpdateBookRequest request,
+            @RequestPart(value = "cover", required = false) MultipartFile cover) {
+        return ResponseEntity.ok(ApiResponse.success(200, "BOOK_UPDATED", "Cập nhật thông tin sách thành công",
+                bookService.update(id, request, cover)));
     }
 
     @DeleteMapping("/{id}")
