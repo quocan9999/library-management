@@ -40,7 +40,7 @@ export function isValidIsbn(value: string): boolean {
     const checksum = [...compact].reduce((sum, char, index) => sum + (char === 'X' ? 10 : Number(char)) * (10 - index), 0);
     return checksum % 11 === 0;
   }
-  if (/^\d{13}$/.test(compact)) {
+  if (/^(?:978|979)\d{10}$/.test(compact)) {
     const checksum = [...compact.slice(0, 12)].reduce((sum, char, index) => sum + Number(char) * (index % 2 === 0 ? 1 : 3), 0);
     return (10 - (checksum % 10)) % 10 === Number(compact[12]);
   }

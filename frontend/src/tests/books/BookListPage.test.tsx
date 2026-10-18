@@ -61,6 +61,33 @@ afterEach(() => {
 });
 
 describe('BookListPage', () => {
+  it('blocks an ISBN-13 with a valid checksum but invalid prefix before calling the API', async () => {
+    authState.permissions = ['book:read', 'book:create'];
+    const bodies: Array<Record<string, unknown>> = [];
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.method === 'post') {
+        bodies.push(JSON.parse(String(config.data)) as Record<string, unknown>);
+        return response(config, success('BOOK_CREATED', book(27)));
+      }
+      return response(config, success('BOOK_LIST_SUCCESS', page()));
+    }) satisfies AxiosAdapter;
+    render(<MemoryRouter><BookListPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Thêm sách' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tên sách' }), { target: { value: 'Clean Code' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tác giả' }), { target: { value: 'Robert C. Martin' } });
+    const isbn = screen.getByRole('textbox', { name: 'ISBN' });
+    fireEvent.change(isbn, { target: { value: '1234567890128' } });
+    let buttons = screen.getAllByRole('button', { name: 'Thêm sách' });
+    fireEvent.click(buttons[buttons.length - 1]);
+    expect(await screen.findByText('ISBN-10 hoặc ISBN-13 không hợp lệ.')).toBeTruthy();
+    expect(bodies).toHaveLength(0);
+    fireEvent.change(isbn, { target: { value: '9780132350884' } });
+    buttons = screen.getAllByRole('button', { name: 'Thêm sách' });
+    fireEvent.click(buttons[buttons.length - 1]);
+    await vi.waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ isbn: '9780132350884', borrowFee: 0, lateFeePerDay: 0 });
+  });
+
   it('submits a selected cover and book JSON together as multipart', async () => {
     authState.permissions = ['book:read', 'book:create'];
     let submitted: FormData | undefined;

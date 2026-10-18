@@ -46,6 +46,21 @@ describe('book input and display formatting', () => {
     },
   );
 
+  it.each([
+    ['9780132350884', true],
+    ['1234567890128', false],
+    ['9791234567896', true],
+    [' 979-1-2345-6789-6 ', true],
+    ['9791234567897', false],
+    ['9780132350885', false],
+    ['0306406152', true],
+    ['0-306-40615-2', true],
+    ['080442957X', true],
+    ['0-8044-2957-X', true],
+  ] as const)('validates ISBN %s with the same prefix and checksum rules as the server', (isbn, expected) => {
+    expect(isValidIsbn(isbn)).toBe(expected);
+  });
+
   it('accepts valid ISBN-10 and ISBN-13 and leaves normalization to the server', () => {
     expect(isValidIsbn('0-306-40615-2')).toBe(true);
     expect(isValidIsbn('978-0-306-40615-7')).toBe(true);
