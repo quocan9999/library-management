@@ -16,6 +16,9 @@ import sparkminds.librarymanagement.common.api.PagedResponse;
 import sparkminds.librarymanagement.loan.service.BorrowQueryService;
 import sparkminds.librarymanagement.loan.service.BorrowReservationService;
 import sparkminds.librarymanagement.loan.service.BorrowCancellationService;
+import sparkminds.librarymanagement.loan.service.BorrowRenewalService;
+import sparkminds.librarymanagement.loan.dto.BorrowRenewalResponse;
+import sparkminds.librarymanagement.loan.dto.RenewBorrowRequest;
 
 import java.net.URI;
 
@@ -27,6 +30,16 @@ public class BorrowRequestController {
     private final BorrowReservationService reservationService;
     private final BorrowQueryService queryService;
     private final BorrowCancellationService cancellationService;
+    private final BorrowRenewalService renewalService;
+
+    @PostMapping("/mine/{loanCode}/items/{itemId}/renew")
+    @PreAuthorize("hasAuthority('borrow:renew') and principal.roleCode == 'USER'")
+    public ResponseEntity<ApiResponse<BorrowRenewalResponse>> renew(@AuthenticationPrincipal CustomUserPrincipal principal,
+            @PathVariable String loanCode, @PathVariable Integer itemId, @Valid @RequestBody RenewBorrowRequest request) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(ApiResponse.success(200,
+                "BORROW_ITEM_RENEWED", "Đã gia hạn sách miễn phí thêm 7 ngày",
+                renewalService.renew(principal.getAccountId(), loanCode, itemId, request)));
+    }
 
     @GetMapping("/mine")
     @PreAuthorize("hasAuthority('borrow:read-own') and principal.roleCode == 'USER'")

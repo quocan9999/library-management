@@ -12,4 +12,6 @@ public interface LoanItemStatusHistoryRepository extends Repository<LoanItemStat
     Page<LoanItemStatusHistory> findByLoanItemId(Integer loanItemId, Pageable page);
 
     Page<LoanItemStatusHistory> findByLoanItemLoanId(Integer loanId, Pageable page);
+
+    boolean existsByNotificationKey(String notificationKey);
 }

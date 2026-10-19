@@ -48,7 +48,11 @@ public class StaffBorrowQueryService {
         var content = events.getContent().stream().map(event -> new StaffBorrowHistoryResponse(event.getId(),
                 event.getLoanItem().getId(), event.getFromStatus(), event.getToStatus(), event.getReasonCode(),
                 event.getActorAccount() == null ? null : event.getActorAccount().getId(), event.getActorRoleCode(),
-                event.getOccurredAt().toInstant(ZoneOffset.UTC), event.getNote())).toList();
+                event.getOccurredAt().toInstant(ZoneOffset.UTC), event.getNote(), event.getNotificationKind(),
+                event.getNotificationState(), event.getNotificationAttempts(),
+                event.getNotificationNextAttemptAt() == null ? null : event.getNotificationNextAttemptAt().toInstant(ZoneOffset.UTC),
+                event.getNotificationSentAt() == null ? null : event.getNotificationSentAt().toInstant(ZoneOffset.UTC),
+                event.getNotificationLastErrorCode())).toList();
         return PagedResponse.of(content, events.getNumber(), events.getSize(), events.getTotalElements());
     }
 

@@ -17,6 +17,17 @@ public class BorrowReadRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /** Loại intent đã tồn tại ngay trong DB để batch đầu không làm đói các item phía sau khi job chạy lặp. */
+    public List<Integer> reminderCandidateIds(java.time.LocalDate dueDate,
+                                               sparkminds.librarymanagement.loan.entity.NotificationKind kind) {
+        return jdbcTemplate.queryForList("""
+                SELECT li.id FROM loan_items li WHERE li.status = ? AND li.due_date = ?
+                  AND NOT EXISTS (SELECT 1 FROM loan_item_status_history h
+                    WHERE h.notification_key = CONCAT('item:', li.id, ':due:', ?, ':', ?))
+                ORDER BY li.id LIMIT 100
+                """, Integer.class, LoanItemStatus.BORROWED.name(), dueDate, dueDate.toString(), kind.name());
+    }
+
     /** Tính n/N trong một query có index FIFO, không cache vị trí hoặc truy vấn riêng mỗi item trong trang. */
     public Map<Integer, QueuePosition> queuePositions(List<Integer> ids) {
         if (ids.isEmpty()) return Map.of();
