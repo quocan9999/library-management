@@ -1,0 +1,146 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-create-roles.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/002-create-permissions.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/003-create-role-permissions.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/004-create-accounts.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/005-seed-roles.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/006-seed-permissions.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/007-seed-role-permissions.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/008-seed-admin-account.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/009-create-refresh-tokens.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/010-create-revoked-access-tokens.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/011-create-email-verification-tokens.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/012-create-password-reset-tokens.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/013-create-email-change-verifications.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/014-create-members.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/015-create-books.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/016-create-loans.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/017-create-loan-items.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/018-create-system-configs.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/019-seed-system-config.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/020-seed-demo-user.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/021-update-accounts-username-length.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/022-add-role-version.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/023-seed-role-management-permissions.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/024-seed-super-admin-account.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/025-disable-public-super-admin-seed.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/026-member-phone-unique.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/027-member-version.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/028-seed-member-status-permission.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/029-account-session-version.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/030-dynamic-role-account-foundation.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/031-account-session-change-reason.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/032-add-books-version.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/033-book-similarity-lock.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/changelog/changes/034-book-cover-image.yaml
+      relativeToChangelogFile: false
+
+  - include:
+      file: db/borrow-legacy-fixture.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/035-borrow-foundation.yaml
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/036-borrow-permissions.yaml
+      relativeToChangelogFile: false

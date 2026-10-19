@@ -148,6 +148,12 @@ public class PermissionDependencyRegistry {
         dependencies.put("book:delete", Set.of("book:read"));
         dependencies.put("book:import", Set.of("book:read"));
         dependencies.put("role:update", Set.of("role:read"));
+        dependencies.put("borrow:cancel-own", Set.of("borrow:read-own"));
+        dependencies.put("borrow:renew", Set.of("borrow:read-own"));
+        dependencies.put("borrow:prepare", Set.of("borrow:read"));
+        dependencies.put("borrow:cancel", Set.of("borrow:read"));
+        dependencies.put("borrow:fee-confirm", Set.of("borrow:read"));
+        dependencies.put("borrow:handover", Set.of("borrow:read", "borrow:fee-confirm"));
         return dependencies;
     }
 }

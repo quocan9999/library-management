@@ -64,7 +64,9 @@ class RoleReadServicePermissionCatalogTests {
         return List.of(
                 "member:read", "member:create", "member:update", "member:delete", "member:status:update",
                 "book:read", "book:create", "book:update", "book:delete", "book:import",
-                "role:read", "role:update", "borrow:create", "account:change-email"
+                "role:read", "role:update", "borrow:create", "account:change-email",
+                "borrow:read-own", "borrow:cancel-own", "borrow:renew", "borrow:read", "borrow:prepare",
+                "borrow:cancel", "borrow:fee-confirm", "borrow:handover"
         ).stream().map(code -> {
             Permission permission = new Permission();
             permission.setCode(code);

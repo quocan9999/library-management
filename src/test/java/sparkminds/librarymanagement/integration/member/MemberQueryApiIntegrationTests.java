@@ -1404,9 +1404,9 @@ class MemberQueryApiIntegrationTests {
 
     private int createLoan(Integer memberId, String code, LocalDateTime borrowedAt, String status) {
         jdbcTemplate.update("""
-                INSERT INTO loans (loan_code, member_id, borrowed_at, due_date, status)
+                INSERT INTO loans (loan_code, member_id, borrowed_at, pickup_reference, status)
                 VALUES (?, ?, ?, ?, ?)
-                """, code, memberId, borrowedAt, borrowedAt.toLocalDate().plusDays(14), status);
+                """, code, memberId, borrowedAt, UUID.randomUUID().toString(), status);
         return jdbcTemplate.queryForObject("SELECT id FROM loans WHERE loan_code = ?", Integer.class, code);
     }
 
@@ -1420,9 +1420,11 @@ class MemberQueryApiIntegrationTests {
             LocalDateTime returnedAt
     ) {
         jdbcTemplate.update("""
-                INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, returned_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, loanId, bookId, status, borrowFee, lateFeePerDay, lateFee, returnedAt);
+                INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, returned_at,
+                                        borrowed_at, due_date)
+                SELECT ?, ?, ?, ?, ?, ?, ?, borrowed_at, DATE_ADD(DATE(borrowed_at), INTERVAL 14 DAY)
+                FROM loans WHERE id = ?
+                """, loanId, bookId, status, borrowFee, lateFeePerDay, lateFee, returnedAt, loanId);
     }
 
     private void setPermission(String roleCode, String permissionCode, boolean assigned) {

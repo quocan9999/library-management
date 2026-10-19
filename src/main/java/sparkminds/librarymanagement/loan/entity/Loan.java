@@ -8,8 +8,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import sparkminds.librarymanagement.member.entity.Member;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -28,11 +28,23 @@ public class Loan {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    @Column(name = "borrowed_at", nullable = false)
+    @Column(name = "borrowed_at")
     private LocalDateTime borrowedAt;
 
-    @Column(name = "due_date", nullable = false)
-    private LocalDate dueDate;
+    @Column(name = "pickup_reference", nullable = false, unique = true, length = 36, updatable = false)
+    private String pickupReference;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
+    @PrePersist
+    void initializePickupReference() {
+        // Mã giữ nguyên suốt yêu cầu; không dùng loanCode tuần tự làm bí mật trong QR.
+        if (pickupReference == null) {
+            pickupReference = UUID.randomUUID().toString();
+        }
+    }
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)

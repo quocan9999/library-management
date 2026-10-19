@@ -246,8 +246,8 @@ class BookAdminApiIntegrationTests {
         Integer id = createCoveredBook(token, "history-cover");
         int loanId = createMemberAndLoanFixture();
         jdbcTemplate.update("""
-                INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee)
-                VALUES (?, ?, 'BORROWED', 0, 0, 0)
+                INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, borrowed_at, due_date)
+                VALUES (?, ?, 'BORROWED', 0, 0, 0, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY))
                 """, loanId, id);
         mockMvc.perform(delete("/api/v1/books/{id}", id).header("Authorization", "Bearer " + token))
                 .andExpect(status().isConflict());
@@ -615,8 +615,8 @@ class BookAdminApiIntegrationTests {
         Integer bookId = JsonPath.read(created.getResponse().getContentAsString(), "$.data.id");
         int loanId = createMemberAndLoanFixture();
         jdbcTemplate.update("""
-                        INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee)
-                        VALUES (?, ?, 'BORROWED', 0, 0, 0)
+                        INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, borrowed_at, due_date)
+                        VALUES (?, ?, 'BORROWED', 0, 0, 0, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY))
                         """,
                 loanId, bookId);
 
@@ -675,8 +675,8 @@ class BookAdminApiIntegrationTests {
                         .isTrue();
             }
             jdbcTemplate.update("""
-                            INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee)
-                            VALUES (?, ?, 'BORROWED', 0, 0, 0)
+                            INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, borrowed_at, due_date)
+                            VALUES (?, ?, 'BORROWED', 0, 0, 0, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY))
                             """,
                     loanId, bookId);
             allowDelete.countDown();
@@ -881,8 +881,8 @@ class BookAdminApiIntegrationTests {
         Integer memberId = jdbcTemplate.queryForObject(
                 "SELECT id FROM members WHERE member_code = ?", Integer.class, memberCodeFixture);
         jdbcTemplate.update("""
-                        INSERT INTO loans (loan_code, member_id, borrowed_at, due_date, status)
-                        VALUES (?, ?, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY), 'ACTIVE')
+                        INSERT INTO loans (loan_code, member_id, borrowed_at, pickup_reference, status)
+                        VALUES (?, ?, CURRENT_TIMESTAMP, UUID(), 'ACTIVE')
                         """,
                 loanCodeFixture, memberId);
         return jdbcTemplate.queryForObject("SELECT id FROM loans WHERE loan_code = ?", Integer.class, loanCodeFixture);

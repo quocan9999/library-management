@@ -20,7 +20,8 @@ public class RoleAccessPolicy {
     private static final List<String> USER_ASSIGNABLE_PERMISSION_CODES = List.of(
             "book:read", "book:create", "book:update", "book:delete", "book:import",
             "member:read", "member:create", "member:update", "member:delete",
-            "borrow:create", "borrow:return", "account:change-password", "account:change-email"
+            "borrow:create", "borrow:return", "borrow:read-own", "borrow:cancel-own", "borrow:renew",
+            "account:change-password", "account:change-email"
     );
 
     public boolean canReadRoleManagement(String actorRoleCode) {

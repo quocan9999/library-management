@@ -1,0 +1,118 @@
+databaseChangeLog:
+  - changeSet:
+      id: 035-borrow-foundation
+      author: quocan9999
+      comment: "Chuyển ngày mượn xuống từng item, giữ snapshot legacy và bổ sung lịch sử bền vững. Không rollback tự động sau khi phát sinh dữ liệu Borrow mới."
+      preConditions:
+        - onFail: HALT
+        - onError: HALT
+        - onFailMessage: "BORROW_LEGACY_DATA_INVALID: phiếu mượn cũ cần được đối soát trước migration Borrow."
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >
+              SELECT COUNT(*) FROM loans l
+              WHERE NOT EXISTS (SELECT 1 FROM loan_items li WHERE li.loan_id = l.id)
+        - sqlCheck:
+            expectedResult: "0"
+            sql: >
+              SELECT COUNT(*) FROM loan_items li JOIN loans l ON l.id = li.loan_id
+              WHERE li.status NOT IN ('BORROWED', 'RETURNED')
+                OR l.borrowed_at IS NULL OR l.due_date IS NULL OR l.due_date <= DATE(l.borrowed_at)
+                OR (li.status = 'RETURNED' AND li.returned_at IS NULL)
+                OR (li.status <> 'RETURNED' AND li.returned_at IS NOT NULL)
+      changes:
+        - sql:
+            dbms: mysql
+            sql: |
+              ALTER TABLE loans
+                ADD COLUMN pickup_reference VARCHAR(36) NULL,
+                ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+              ALTER TABLE loan_items
+                ADD COLUMN waitlisted_at DATETIME(6) NULL,
+                ADD COLUMN ready_at DATETIME(6) NULL,
+                ADD COLUMN pickup_expires_at DATETIME(6) NULL,
+                ADD COLUMN borrowed_at DATETIME(6) NULL,
+                ADD COLUMN due_date DATE NULL,
+                ADD COLUMN renewal_count TINYINT NOT NULL DEFAULT 0,
+                ADD COLUMN paid_borrow_fee DECIMAL(12,2) NULL,
+                ADD COLUMN borrow_fee_paid_at DATETIME(6) NULL,
+                ADD COLUMN borrow_fee_confirmed_by_account_id INT NULL,
+                ADD COLUMN late_fee_paid_at DATETIME(6) NULL,
+                ADD COLUMN late_fee_paid_by_account_id INT NULL,
+                ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+              UPDATE loan_items li JOIN loans l ON l.id = li.loan_id
+              SET li.borrowed_at = l.borrowed_at, li.due_date = l.due_date
+              WHERE li.status IN ('BORROWED', 'RETURNED');
+              -- RANDOM_BYTES tạo mã không đoán được; UUID() của MySQL là UUID thời gian, không dùng cho QR.
+              UPDATE loans SET pickup_reference = LOWER(CONCAT(
+                HEX(RANDOM_BYTES(4)), '-', HEX(RANDOM_BYTES(2)), '-4', SUBSTRING(HEX(RANDOM_BYTES(2)), 2), '-',
+                HEX((ORD(RANDOM_BYTES(1)) & 3) | 8), SUBSTRING(HEX(RANDOM_BYTES(2)), 2), '-', HEX(RANDOM_BYTES(6))));
+              ALTER TABLE loans
+                DROP CHECK chk_loans_due_date,
+                DROP CHECK chk_loans_status,
+                DROP INDEX idx_loans_due_date,
+                DROP COLUMN due_date,
+                MODIFY borrowed_at DATETIME NULL,
+                MODIFY pickup_reference VARCHAR(36) NOT NULL,
+                ADD CONSTRAINT uk_loans_pickup_reference UNIQUE (pickup_reference),
+                ADD CONSTRAINT chk_loans_status CHECK (status IN ('OPEN', 'ACTIVE', 'PARTIALLY_RETURNED', 'RETURNED', 'CLOSED'));
+              ALTER TABLE loan_items
+                DROP CHECK chk_loan_items_status,
+                DROP CHECK chk_loan_items_return_status,
+                ADD CONSTRAINT chk_loan_items_status CHECK (status IN (
+                  'WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP', 'BORROWED', 'RETURNED', 'CANCELLED', 'EXPIRED', 'REJECTED')),
+                ADD CONSTRAINT chk_loan_items_return_status CHECK (
+                  (status = 'RETURNED' AND returned_at IS NOT NULL) OR (status <> 'RETURNED' AND returned_at IS NULL)),
+                ADD CONSTRAINT chk_loan_items_borrow_dates CHECK (
+                  status NOT IN ('BORROWED', 'RETURNED') OR (borrowed_at IS NOT NULL AND due_date IS NOT NULL)),
+                ADD CONSTRAINT chk_loan_items_due_date CHECK (due_date > DATE(borrowed_at)),
+                ADD CONSTRAINT chk_loan_items_ready_dates CHECK (
+                  status <> 'READY_FOR_PICKUP' OR (ready_at IS NOT NULL AND pickup_expires_at IS NOT NULL)),
+                ADD CONSTRAINT chk_loan_items_waitlisted_at CHECK (status <> 'WAITLISTED' OR waitlisted_at IS NOT NULL),
+                ADD CONSTRAINT chk_loan_items_renewal_count CHECK (renewal_count IN (0, 1)),
+                ADD CONSTRAINT chk_loan_items_fee_confirmation CHECK (
+                  (paid_borrow_fee IS NULL AND borrow_fee_paid_at IS NULL AND borrow_fee_confirmed_by_account_id IS NULL)
+                  OR (paid_borrow_fee IS NOT NULL AND borrow_fee_paid_at IS NOT NULL
+                    AND borrow_fee_confirmed_by_account_id IS NOT NULL AND paid_borrow_fee >= 0 AND paid_borrow_fee = borrow_fee)),
+                ADD CONSTRAINT fk_loan_items_fee_actor FOREIGN KEY (borrow_fee_confirmed_by_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+                ADD CONSTRAINT fk_loan_items_late_fee_actor FOREIGN KEY (late_fee_paid_by_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+                ADD INDEX idx_loan_items_fifo (book_id, status, waitlisted_at, id),
+                ADD INDEX idx_loan_items_pickup_expiry (status, pickup_expires_at),
+                ADD INDEX idx_loan_items_due_date (status, due_date),
+                ADD INDEX idx_loan_items_loan_status (loan_id, status);
+              CREATE TABLE loan_item_status_history (
+                id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                loan_item_id INT NOT NULL,
+                from_status VARCHAR(20) NULL,
+                to_status VARCHAR(20) NOT NULL,
+                actor_account_id INT NULL,
+                actor_role_code VARCHAR(50) NULL,
+                reason_code VARCHAR(50) NOT NULL,
+                note VARCHAR(500) NULL,
+                occurred_at DATETIME(6) NOT NULL,
+                notification_key VARCHAR(160) NULL,
+                notification_kind VARCHAR(40) NULL,
+                notification_state VARCHAR(16) NULL,
+                notification_attempts INT NOT NULL DEFAULT 0,
+                notification_next_attempt_at DATETIME(6) NULL,
+                notification_sent_at DATETIME(6) NULL,
+                notification_last_error_code VARCHAR(80) NULL,
+                CONSTRAINT fk_loan_item_history_item FOREIGN KEY (loan_item_id) REFERENCES loan_items(id) ON DELETE RESTRICT,
+                CONSTRAINT fk_loan_item_history_actor FOREIGN KEY (actor_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+                CONSTRAINT uk_loan_item_history_notification UNIQUE (notification_key),
+                CONSTRAINT chk_loan_item_history_from CHECK (from_status IN (
+                  'WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP', 'BORROWED', 'RETURNED', 'CANCELLED', 'EXPIRED', 'REJECTED')),
+                CONSTRAINT chk_loan_item_history_to CHECK (to_status IN (
+                  'WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP', 'BORROWED', 'RETURNED', 'CANCELLED', 'EXPIRED', 'REJECTED')),
+                CONSTRAINT chk_loan_item_history_reason CHECK (reason_code IN (
+                  'REQUEST_CREATED', 'QUEUE_PROMOTED', 'PREPARATION_STARTED', 'READY_CONFIRMED', 'USER_CANCELLED',
+                  'COUNTER_CANCELLED', 'PICKUP_EXPIRED', 'PHYSICAL_COPY_UNAVAILABLE', 'HANDOVER_COMPLETED',
+                  'RENEWAL_COMPLETED', 'RETURN_COMPLETED', 'LEGACY_IMPORTED', 'DUE_REMINDER_THREE_DAYS',
+                  'DUE_REMINDER_TODAY', 'OVERDUE_REMINDER_FIRST_DAY')),
+                CONSTRAINT chk_loan_item_history_notification_state CHECK (notification_state IN ('PENDING', 'SENT', 'FAILED')),
+                CONSTRAINT chk_loan_item_history_attempts CHECK (notification_attempts >= 0),
+                INDEX idx_loan_item_history_item_time (loan_item_id, occurred_at, id)
+              );
+              -- Chỉ ghi nhận lúc nhập lịch sử; không giả lập các bước chuẩn bị hay bằng chứng đã thu tiền.
+              INSERT INTO loan_item_status_history (loan_item_id, to_status, reason_code, occurred_at)
+              SELECT id, status, 'LEGACY_IMPORTED', UTC_TIMESTAMP(6) FROM loan_items;

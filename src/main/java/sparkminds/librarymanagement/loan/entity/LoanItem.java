@@ -7,8 +7,10 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import sparkminds.librarymanagement.book.entity.Book;
+import sparkminds.librarymanagement.auth.entity.Account;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -49,6 +51,45 @@ public class LoanItem {
 
     @Column(name = "late_fee", nullable = false, precision = 12, scale = 2)
     private BigDecimal lateFee = BigDecimal.ZERO;
+
+    @Column(name = "waitlisted_at")
+    private LocalDateTime waitlistedAt;
+
+    @Column(name = "ready_at")
+    private LocalDateTime readyAt;
+
+    @Column(name = "pickup_expires_at")
+    private LocalDateTime pickupExpiresAt;
+
+    @Column(name = "borrowed_at")
+    private LocalDateTime borrowedAt;
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
+    @Column(name = "renewal_count", nullable = false)
+    private byte renewalCount;
+
+    @Column(name = "paid_borrow_fee", precision = 12, scale = 2)
+    private BigDecimal paidBorrowFee;
+
+    @Column(name = "borrow_fee_paid_at")
+    private LocalDateTime borrowFeePaidAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "borrow_fee_confirmed_by_account_id")
+    private Account borrowFeeConfirmedByAccount;
+
+    @Column(name = "late_fee_paid_at")
+    private LocalDateTime lateFeePaidAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "late_fee_paid_by_account_id")
+    private Account lateFeePaidByAccount;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 
     @Column(name = "returned_at")
     private LocalDateTime returnedAt;

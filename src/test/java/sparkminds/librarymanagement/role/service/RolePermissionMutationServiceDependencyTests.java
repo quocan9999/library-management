@@ -103,7 +103,8 @@ class RolePermissionMutationServiceDependencyTests {
                 .thenReturn(List.of(
                         "role:read", "role:update", "member:read", "member:create", "member:update",
                         "member:delete", "member:status:update", "book:read", "book:create", "book:update",
-                        "book:delete", "book:import"));
+                        "book:delete", "book:import", "borrow:read-own", "borrow:cancel-own", "borrow:renew",
+                        "borrow:read", "borrow:prepare", "borrow:cancel", "borrow:fee-confirm", "borrow:handover"));
         when(roleAccessPolicy.editablePermissions(eq("ADMIN"), eq("USER"), any(), any()))
                 .thenReturn(List.of("member:read", "member:create", "member:delete", "borrow:return"));
         when(permissionRepository.findAllByCodeIn(any()))
