@@ -15,6 +15,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface LoanRepository extends JpaRepository<Loan, Integer> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "member")
+    Optional<Loan> findByPickupReference(String pickupReference);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "member")
+    @Query("""
+            select loan from Loan loan where :allStatuses = true or exists (
+              select item.id from LoanItem item where item.loan.id = loan.id and item.status in :statuses)
+            """)
+    Page<Loan> findStaffRequests(@Param("allStatuses") boolean allStatuses,
+                                 @Param("statuses") Collection<LoanItemStatus> statuses, Pageable page);
+
     // Tìm phiếu mượn theo mã phiếu mượn duy nhất.
     Optional<Loan> findByLoanCode(String loanCode);
 

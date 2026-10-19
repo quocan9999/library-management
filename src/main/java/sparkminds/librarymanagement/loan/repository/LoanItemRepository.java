@@ -33,6 +33,9 @@ public interface LoanItemRepository extends JpaRepository<LoanItem, Integer> {
 
     boolean existsByLoanMemberIdAndStatusAndDueDateBefore(Integer memberId, LoanItemStatus status, LocalDate date);
 
+    @Query("select count(item) > 0 from LoanItem item where item.loan.member.id = :memberId and item.lateFee > 0 and item.lateFeePaidAt is null")
+    boolean hasUnpaidLateFee(@Param("memberId") Integer memberId);
+
     @Query("select item from LoanItem item join fetch item.book where item.loan.id = :loanId order by item.id")
     List<LoanItem> findWithBookByLoanId(@Param("loanId") Integer loanId);
 

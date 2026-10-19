@@ -10,4 +10,6 @@ public interface LoanItemStatusHistoryRepository extends Repository<LoanItemStat
     LoanItemStatusHistory save(LoanItemStatusHistory history);
 
     Page<LoanItemStatusHistory> findByLoanItemId(Integer loanItemId, Pageable page);
+
+    Page<LoanItemStatusHistory> findByLoanItemLoanId(Integer loanId, Pageable page);
 }
