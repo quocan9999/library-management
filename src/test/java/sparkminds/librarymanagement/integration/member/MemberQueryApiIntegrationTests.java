@@ -430,7 +430,7 @@ class MemberQueryApiIntegrationTests {
     }
 
     @Test
-    void disableCountsBorrowedItemsAcrossLoansWithoutChangingLoanHistory() throws Exception {
+    void disableRejectsBorrowedItemsAcrossLoansWithoutChangingAccountOrLoanHistory() throws Exception {
         String token = login("admin", "admin");
         MemberFixture fixture = createMember("MMV8-P04-COUNT-" + UUID.randomUUID().toString().substring(0, 8),
                 "Borrow Count Fixture", "0370000093", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
@@ -453,8 +453,14 @@ class MemberQueryApiIntegrationTests {
                 BigDecimal.ZERO, null);
 
         patchAccountStatus(token, fixture.memberId(), true, false)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER_HAS_ACTIVE_BORROW_ACTIVITY"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT a.enabled FROM accounts a JOIN members m ON m.account_id = a.id WHERE m.id = ?",
+                Boolean.class, fixture.memberId())).isTrue();
+        mockMvc.perform(get("/api/v1/members/{id}", fixture.memberId())
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.enabled").value(false))
                 .andExpect(jsonPath("$.data.borrowedItemCount").value(3));
         history(token, fixture.memberId(), "status", "BORROWED")
                 .andExpect(status().isOk())

@@ -1,6 +1,10 @@
 package sparkminds.librarymanagement.member.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import sparkminds.librarymanagement.member.entity.Member;
 
 import java.util.Optional;
@@ -19,4 +23,12 @@ public interface MemberRepository extends JpaRepository<Member, Integer> {
     boolean existsByPhoneAndIdNot(String phone, Integer id);
 
     boolean existsByPhone(String phone);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select member from Member member where member.account.id = :accountId")
+    Optional<Member> findByAccountIdForUpdate(@Param("accountId") Integer accountId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select member from Member member where member.id = :memberId")
+    Optional<Member> findByIdForUpdate(@Param("memberId") Integer memberId);
 }

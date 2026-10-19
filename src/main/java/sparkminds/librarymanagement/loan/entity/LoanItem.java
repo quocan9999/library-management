@@ -4,8 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import sparkminds.librarymanagement.loan.service.LoanTimestampListener;
 import sparkminds.librarymanagement.book.entity.Book;
 import sparkminds.librarymanagement.auth.entity.Account;
 
@@ -17,6 +16,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @Entity
+@EntityListeners(LoanTimestampListener.class)
 @Table(
         name = "loan_items",
         uniqueConstraints = {
@@ -94,11 +94,9 @@ public class LoanItem {
     @Column(name = "returned_at")
     private LocalDateTime returnedAt;
 
-    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 }
