@@ -1,5 +1,5 @@
 import { Alert, Button, Input } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
@@ -20,7 +20,6 @@ export function ForgotPasswordPage() {
   const [requested, setRequested] = useState(false);
   const [serverError, setServerError] = useState<ForgotPasswordErrorCopy | null>(null);
   const [requestedEmail, setRequestedEmail] = useState('');
-  const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [isSending, setIsSending] = useState(false);
   const sendingRef = useRef(false);
@@ -36,16 +35,17 @@ export function ForgotPasswordPage() {
     reValidateMode: 'onChange',
   });
 
+  const isCoolingDown = cooldownSeconds > 0;
   useEffect(() => {
-    if (!cooldownUntil) return undefined;
-    const update = () => setCooldownSeconds(Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000)));
-    update();
-    const timer = window.setInterval(update, 1000);
+    if (!isCoolingDown) return undefined;
+    const timer = window.setInterval(() => {
+      setCooldownSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
     return () => window.clearInterval(timer);
-  }, [cooldownUntil]);
+  }, [isCoolingDown]);
 
   const sendRequest = async (email: string) => {
-    if (sendingRef.current || Date.now() < cooldownUntil) return;
+    if (sendingRef.current || cooldownSeconds > 0) return;
     sendingRef.current = true;
     setIsSending(true);
     setServerError(null);
@@ -53,7 +53,6 @@ export function ForgotPasswordPage() {
       await authApi.forgotPassword(email);
       setRequestedEmail(email);
       setRequested(true);
-      setCooldownUntil(Date.now() + 60_000);
       setCooldownSeconds(60);
     } catch (error) {
       const fieldErrors = mapForgotPasswordValidationErrors(error);
@@ -61,7 +60,6 @@ export function ForgotPasswordPage() {
       const copy = getForgotPasswordError(error);
       setServerError(copy);
       if (copy.retryAfterSeconds) {
-        setCooldownUntil(Date.now() + copy.retryAfterSeconds * 1000);
         setCooldownSeconds(copy.retryAfterSeconds);
       }
     } finally {
@@ -71,6 +69,9 @@ export function ForgotPasswordPage() {
   };
 
   const onSubmit = ({ email }: ForgotPasswordFormValues) => sendRequest(email);
+  const submitForm = (event: FormEvent<HTMLFormElement>) => {
+    void handleSubmit(onSubmit)(event);
+  };
 
   return (
     <AuthLayout ariaLabel="Yêu cầu đặt lại mật khẩu tài khoản thư viện" centered>
@@ -107,7 +108,7 @@ export function ForgotPasswordPage() {
           </>
         ) : (
           <>
-            <form className="login-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+            <form className="login-form" onSubmit={submitForm} noValidate>
               {serverError && (
                 <Alert
                   className="login-alert"

@@ -1,5 +1,9 @@
 package sparkminds.librarymanagement.book.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,11 +21,21 @@ import sparkminds.librarymanagement.common.api.PagedResponse;
 @RequestMapping("/api/v1/catalog/books")
 @RequiredArgsConstructor
 @PreAuthorize("hasAuthority('book:read')")
+@Tag(name = "Book Catalog", description = "Danh mục sách dành cho tài khoản đã xác thực có permission book:read")
+@SecurityRequirement(name = "bearerAuth")
 public class BookCatalogController {
 
     private final BookCatalogService catalogService;
 
     @GetMapping
+    @Operation(summary = "Tìm kiếm danh mục sách", description = "Trả danh sách sách tối thiểu cho catalog, hỗ trợ q, availability, phân trang và sort whitelist.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Trang sách trong catalog", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Tham số lọc, phân trang hoặc sort không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có permission book:read", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     public ResponseEntity<ApiResponse<PagedResponse<BookCatalogResponse>>> list(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String availability,
@@ -34,6 +48,14 @@ public class BookCatalogController {
     }
 
     @GetMapping("/{bookId}")
+    @Operation(summary = "Xem chi tiết sách trong catalog", description = "Chỉ trả trường catalog dành cho người mượn; không dùng DTO quản trị sách.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Chi tiết sách catalog", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có permission book:read", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sách", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     public ResponseEntity<ApiResponse<BookCatalogResponse>> get(@PathVariable Integer bookId) {
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(ApiResponse.success(200,
                 "BOOK_CATALOG_DETAIL_SUCCESS", "Lấy thông tin sách thành công", catalogService.get(bookId)));

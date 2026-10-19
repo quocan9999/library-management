@@ -1,5 +1,5 @@
 import { Alert, Button, Input } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -40,7 +40,6 @@ export function ResendVerificationForm({
   const [serverError, setServerError] = useState<ReturnType<typeof getResendError> | null>(null);
   const [requested, setRequested] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(Math.max(0, initialCooldownSeconds));
-  const cooldownUntil = useRef(initialCooldownSeconds > 0 ? Date.now() + initialCooldownSeconds * 1000 : 0);
   const sending = useRef(false);
   const {
     control,
@@ -60,13 +59,13 @@ export function ResendVerificationForm({
   useEffect(() => {
     if (!isCoolingDown) return undefined;
     const interval = window.setInterval(() => {
-      setCooldownSeconds(Math.max(0, Math.ceil((cooldownUntil.current - Date.now()) / 1000)));
+      setCooldownSeconds((seconds) => Math.max(0, seconds - 1));
     }, 1000);
     return () => window.clearInterval(interval);
   }, [isCoolingDown]);
 
   const onSubmit = async ({ email }: ResendFormValues) => {
-    if (sending.current || Date.now() < cooldownUntil.current) return;
+    if (sending.current || cooldownSeconds > 0) return;
     sending.current = true;
     setServerError(null);
     if (!inlineResend) setRequested(false);
@@ -74,7 +73,6 @@ export function ResendVerificationForm({
     try {
       await authApi.resendVerification(email);
       setRequested(true);
-      cooldownUntil.current = Date.now() + 60_000;
       setCooldownSeconds(60);
       onRequested?.(email);
     } catch (error) {
@@ -85,13 +83,16 @@ export function ResendVerificationForm({
         const copy = getResendError(error);
         setServerError(copy);
         if (copy.retryAfterSeconds) {
-          cooldownUntil.current = Date.now() + copy.retryAfterSeconds * 1000;
           setCooldownSeconds(copy.retryAfterSeconds);
         }
       }
     } finally {
       sending.current = false;
     }
+  };
+
+  const submitForm = (event: FormEvent<HTMLFormElement>) => {
+    void handleSubmit(onSubmit)(event);
   };
 
   return (
@@ -117,7 +118,7 @@ export function ResendVerificationForm({
         />
       )}
 
-      <form className="resend-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form className="resend-form" onSubmit={submitForm} noValidate>
         {(hideEmailField || (inlineResend && requested)) && <input type="hidden" {...register('email')} />}
         {!hideEmailField && !(inlineResend && requested) && <div className="form-field">
           <label htmlFor="resend-email">Email</label>

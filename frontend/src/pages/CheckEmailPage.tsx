@@ -5,10 +5,13 @@ import { ResendVerificationForm } from './ResendVerificationForm';
 
 export function CheckEmailPage() {
   const email = readRegistrationEmail();
-  const state = useLocation().state as { registrationCooldownUntil?: number } | null;
-  const deadline = state?.registrationCooldownUntil;
-  const initialCooldownSeconds = Math.max(readRegistrationCooldownSeconds(),
-    typeof deadline === 'number' && Number.isFinite(deadline) ? Math.max(0, Math.ceil((deadline - Date.now()) / 1000)) : 0);
+  const state = useLocation().state as { registrationCooldownSeconds?: number } | null;
+  const stateCooldownSeconds = state?.registrationCooldownSeconds;
+  const initialCooldownSeconds = email
+    ? readRegistrationCooldownSeconds()
+    : typeof stateCooldownSeconds === 'number' && Number.isFinite(stateCooldownSeconds)
+      ? Math.max(0, stateCooldownSeconds)
+      : 0;
 
   return (
     <AuthLayout ariaLabel="Kiểm tra email xác thực" centered>

@@ -2,8 +2,12 @@ package sparkminds.librarymanagement.integration.loan;
 
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,11 +24,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import sparkminds.librarymanagement.auth.security.jwt.JwtTokenService;
 import sparkminds.librarymanagement.auth.security.jwt.JwtTokenType;
+import sparkminds.librarymanagement.loan.service.BorrowNotificationDispatcher;
+import sparkminds.librarymanagement.loan.service.BorrowReminderService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,15 +54,18 @@ class BorrowHandoverIntegrationTests {
     @Autowired private MockMvc mvc;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JwtTokenService jwt;
+    @Autowired private BorrowReminderService reminderService;
+    @Autowired private BorrowNotificationDispatcher notificationDispatcher;
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     private java.time.Clock clock;
+    @MockitoBean
+    private JavaMailSender mailSender;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
     private sparkminds.librarymanagement.loan.service.BorrowAuditService auditService;
 
     @org.junit.jupiter.api.BeforeEach
     void useFixedUtcClock() {
-        org.mockito.Mockito.when(clock.instant()).thenReturn(Instant.parse("2026-10-19T09:00:00Z"));
-        org.mockito.Mockito.when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+        setClock(Instant.parse("2026-10-19T09:00:00Z"));
     }
 
     private final List<Integer> accountIds = new ArrayList<>();
@@ -74,6 +86,8 @@ class BorrowHandoverIntegrationTests {
                     JOIN members m ON m.id = l.member_id WHERE m.account_id = ?
                     """, accountId);
             jdbc.update("DELETE l FROM loans l JOIN members m ON m.id = l.member_id WHERE m.account_id = ?", accountId);
+            jdbc.update("DELETE FROM email_verification_tokens WHERE account_id = ?", accountId);
+            jdbc.update("DELETE FROM refresh_tokens WHERE account_id = ?", accountId);
             jdbc.update("DELETE FROM members WHERE account_id = ?", accountId);
             jdbc.update("DELETE FROM accounts WHERE id = ?", accountId);
         }
@@ -112,6 +126,99 @@ class BorrowHandoverIntegrationTests {
                 Integer.class, id)).isEqualTo(1);
         transition(staff, code, id, "ready", 409);
         assertThat(available(book)).isZero();
+    }
+
+    @Test
+    void registeredUserCompletesCatalogFifoCounterHandoverRenewalAndReminderJourney() throws Exception {
+        String email = "borrow-e2e-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test";
+        mvc.perform(post("/api/v1/auth/register").contentType(APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"Strong1!\"}"))
+                .andExpect(status().isCreated());
+
+        var mailCaptor = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
+        org.mockito.Mockito.verify(mailSender).send(mailCaptor.capture());
+        String verificationLink = java.util.Arrays.stream(mailCaptor.getValue().getText().split("\\R"))
+                .filter(line -> line.contains("/verify-email?token=")).findFirst().orElseThrow();
+        String encodedToken = URI.create(verificationLink).getRawQuery().substring("token=".length());
+        String verificationToken = URLDecoder.decode(encodedToken, StandardCharsets.UTF_8);
+        mvc.perform(post("/api/v1/auth/verify-email").contentType(APPLICATION_JSON)
+                        .content("{\"token\":\"" + verificationToken + "\"}"))
+                .andExpect(status().isOk());
+
+        String userBearer = login(email);
+        Integer accountId = jdbc.queryForObject("SELECT id FROM accounts WHERE email = ?", Integer.class, email);
+        Integer memberId = jdbc.queryForObject("SELECT id FROM members WHERE account_id = ?", Integer.class, accountId);
+        accountIds.add(accountId);
+        UserFixture user = new UserFixture(accountId, memberId, userBearer.substring("Bearer ".length()));
+
+        int firstBook = createBook(1, 1);
+        int fifoBook = createBook(2, 0);
+        int zeroFeeBook = createBook(1, 1);
+        jdbc.update("UPDATE books SET borrow_fee = 0 WHERE id = ?", zeroFeeBook);
+        UserFixture earlierWaiter = createUser();
+        createRequest(earlierWaiter, List.of(fifoBook), 201);
+
+        String firstTitle = title(firstBook);
+        mvc.perform(get("/api/v1/catalog/books").param("q", firstTitle).header("Authorization", userBearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].id").value(firstBook));
+        mvc.perform(get("/api/v1/catalog/books/{bookId}", firstBook).header("Authorization", userBearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(firstBook));
+
+        MvcResult created = createRequest(user, List.of(firstBook, fifoBook, zeroFeeBook), 201);
+        String code = loanCode(created);
+        assertThat(itemStatus(user, firstBook)).isEqualTo("RESERVED");
+        assertThat(itemStatus(user, fifoBook)).isEqualTo("WAITLISTED");
+        assertThat(itemStatus(user, zeroFeeBook)).isEqualTo("RESERVED");
+
+        int earlierWaiterItemId = itemId(earlierWaiter, fifoBook);
+        int userWaitlistItemId = itemId(user, fifoBook);
+        assertThat(earlierWaiterItemId).isLessThan(userWaitlistItemId);
+        updateStock(fifoBook, 4);
+        assertThat(itemStatus(earlierWaiter, fifoBook)).isEqualTo("RESERVED");
+        assertThat(itemStatus(user, fifoBook)).isEqualTo("RESERVED");
+        assertThat(available(fifoBook)).isZero();
+
+        String counter = staffBearer("borrow:read", "borrow:prepare", "borrow:cancel", "borrow:fee-confirm", "borrow:handover");
+        String pickupReference = JsonPath.read(created.getResponse().getContentAsString(), "$.data.pickupReference");
+        mvc.perform(get("/api/v1/librarian/pickups/{reference}", pickupReference).header("Authorization", counter))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.member.id").value(memberId));
+        for (int bookId : List.of(firstBook, fifoBook, zeroFeeBook)) {
+            makeReady(counter, user, code, bookId);
+            assertThat(itemStatus(user, bookId)).isEqualTo("READY_FOR_PICKUP");
+        }
+
+        int cancelledItemId = itemId(user, firstBook);
+        int fifoItemId = itemId(user, fifoBook);
+        int zeroFeeItemId = itemId(user, zeroFeeBook);
+        transition(counter, code, cancelledItemId, "cancel", 200);
+        assertThat(itemStatus(user, firstBook)).isEqualTo("CANCELLED");
+        assertThat(available(firstBook)).isEqualTo(1);
+        handoverWithFees(counter, code, List.of(fifoItemId, zeroFeeItemId), List.of("25.00", "0"), 200);
+        assertThat(itemStatus(user, fifoBook)).isEqualTo("BORROWED");
+        assertThat(itemStatus(user, zeroFeeBook)).isEqualTo("BORROWED");
+        assertThat(jdbc.queryForObject("SELECT paid_borrow_fee FROM loan_items WHERE id = ?", BigDecimal.class, zeroFeeItemId))
+                .isEqualByComparingTo(BigDecimal.ZERO);
+
+        LocalDate initialDueDate = jdbc.queryForObject("SELECT due_date FROM loan_items WHERE id = ?", LocalDate.class, fifoItemId);
+        assertThat(initialDueDate).isEqualTo(LocalDate.of(2026, 11, 2));
+        setClock(initialDueDate.minusDays(3).atTime(9, 0).toInstant(ZoneOffset.UTC));
+        String renewalBearer = login(email);
+        long itemVersion = jdbc.queryForObject("SELECT version FROM loan_items WHERE id = ?", Long.class, fifoItemId);
+        mvc.perform(post("/api/v1/borrow-requests/mine/{code}/items/{id}/renew", code, fifoItemId)
+                        .header("Authorization", renewalBearer).contentType(APPLICATION_JSON)
+                        .content("{\"expectedItemVersion\":" + itemVersion + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.renewalCount").value(1));
+        LocalDate renewedDueDate = jdbc.queryForObject("SELECT due_date FROM loan_items WHERE id = ?", LocalDate.class, fifoItemId);
+        assertThat(renewedDueDate).isEqualTo(initialDueDate.plusDays(7));
+
+        setClock(renewedDueDate.minusDays(3).atTime(9, 0).toInstant(ZoneOffset.UTC));
+        assertThat(reminderService.createDueReminders()).isEqualTo(1);
+        assertThat(reminderService.createDueReminders()).isZero();
+        assertThat(notificationDispatcher.dispatchPending()).isGreaterThanOrEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM loan_item_status_history
+                WHERE loan_item_id = ? AND notification_kind = 'DUE_REMINDER_THREE_DAYS' AND notification_state = 'SENT'
+                """, Integer.class, fifoItemId)).isEqualTo(1);
     }
 
     @Test
@@ -449,6 +556,45 @@ class BorrowHandoverIntegrationTests {
                         .contentType(APPLICATION_JSON).content("{\"identityVerified\":" + identity
                                 + ",\"expectedLoanVersion\":" + version + ",\"items\":[" + payments + "]}"))
                 .andExpect(status().is(expected));
+    }
+
+    private void handoverWithFees(String staff, String code, List<Integer> items, List<String> amounts, int expected)
+            throws Exception {
+        long version = jdbc.queryForObject("SELECT version FROM loans WHERE loan_code = ?", Long.class, code);
+        String payments = java.util.stream.IntStream.range(0, items.size())
+                .mapToObj(index -> "{\"loanItemId\":" + items.get(index) + ",\"collectedBorrowFee\":"
+                        + amounts.get(index) + "}")
+                .collect(java.util.stream.Collectors.joining(","));
+        mvc.perform(post("/api/v1/librarian/borrow-requests/{code}/handover", code).header("Authorization", staff)
+                        .contentType(APPLICATION_JSON).content("{\"identityVerified\":true,\"expectedLoanVersion\":"
+                                + version + ",\"items\":[" + payments + "]}"))
+                .andExpect(status().is(expected));
+    }
+
+    private String login(String email) throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/auth/login").contentType(APPLICATION_JSON)
+                        .content("{\"identifier\":\"" + email + "\",\"password\":\"Strong1!\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("AUTH_LOGIN_SUCCESS")).andReturn();
+        return "Bearer " + JsonPath.read(result.getResponse().getContentAsString(), "$.data.accessToken");
+    }
+
+    private void updateStock(int bookId, int totalQuantity) throws Exception {
+        String request = "{\"title\":\"" + title(bookId) + "\",\"author\":\"Borrow fixture\",\"totalQuantity\":"
+                + totalQuantity + ",\"borrowFee\":25.00,\"lateFeePerDay\":1.50,\"version\":"
+                + jdbc.queryForObject("SELECT version FROM books WHERE id = ?", Long.class, bookId) + "}";
+        mvc.perform(put("/api/v1/books/{id}", bookId).header("Authorization", adminBearer())
+                        .contentType(APPLICATION_JSON).content(request))
+                .andExpect(status().isOk());
+    }
+
+    private String title(int bookId) {
+        return jdbc.queryForObject("SELECT title FROM books WHERE id = ?", String.class, bookId);
+    }
+
+    private void setClock(Instant instant) {
+        org.mockito.Mockito.reset(clock);
+        org.mockito.Mockito.when(clock.instant()).thenReturn(instant);
+        org.mockito.Mockito.when(clock.getZone()).thenReturn(ZoneOffset.UTC);
     }
 
     private String staffBearer(String... permissions) {

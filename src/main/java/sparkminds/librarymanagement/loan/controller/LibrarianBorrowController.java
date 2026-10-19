@@ -1,5 +1,9 @@
 package sparkminds.librarymanagement.loan.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,12 +29,22 @@ import sparkminds.librarymanagement.loan.service.StaffBorrowQueryService;
 @RestController
 @RequestMapping("/api/v1/librarian")
 @RequiredArgsConstructor
+@Tag(name = "Librarian Borrow", description = "Quầy nhận sách cho role động khác USER có permission Borrow tương ứng")
+@SecurityRequirement(name = "bearerAuth")
 public class LibrarianBorrowController {
     private final StaffBorrowQueryService queryService;
     private final StaffBorrowItemService itemService;
     private final BorrowHandoverService handoverService;
 
     @GetMapping("/borrow-requests")
+    @Operation(summary = "Liệt kê yêu cầu cần xử lý tại quầy", description = "Lọc và phân trang yêu cầu; PREPARING quá 24 giờ được đánh dấu cảnh báo, không tự hủy.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Trang yêu cầu tại quầy", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bộ lọc, phân trang hoặc sort không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải role staff hoặc thiếu borrow:read", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     @PreAuthorize("hasAuthority('borrow:read') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<PagedResponse<StaffBorrowResponse>>> list(
             @RequestParam(required = false) String status, @RequestParam(required = false) String page,
@@ -39,12 +53,29 @@ public class LibrarianBorrowController {
     }
 
     @GetMapping("/pickups/{pickupReference}")
+    @Operation(summary = "Tra cứu mã nhận sách tại quầy", description = "QR chỉ tra cứu; cần staff đăng nhập với borrow:read và xác minh danh tính riêng trước handover.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Chi tiết nhận sách tại quầy", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải role staff hoặc thiếu borrow:read", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy mã nhận sách", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     @PreAuthorize("hasAuthority('borrow:read') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<StaffBorrowResponse>> pickup(@PathVariable String pickupReference) {
         return success("BORROW_REQUEST_DETAIL_SUCCESS", "Lấy yêu cầu nhận sách thành công", queryService.pickup(pickupReference));
     }
 
     @GetMapping("/borrow-requests/{loanCode}/history")
+    @Operation(summary = "Xem lịch sử yêu cầu tại quầy", description = "Trả timeline trạng thái theo item có phân trang cho staff được cấp borrow:read.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lịch sử yêu cầu tại quầy", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bộ lọc, phân trang hoặc sort không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải role staff hoặc thiếu borrow:read", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy yêu cầu", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     @PreAuthorize("hasAuthority('borrow:read') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<PagedResponse<StaffBorrowHistoryResponse>>> history(@PathVariable String loanCode,
             @RequestParam(required = false) String page, @RequestParam(required = false) String size,
@@ -53,6 +84,15 @@ public class LibrarianBorrowController {
     }
 
     @PostMapping("/borrow-requests/{loanCode}/items/{itemId}/prepare")
+    @Operation(summary = "Bắt đầu chuẩn bị sách", description = "Chuyển RESERVED sang PREPARING; actor được lấy từ JWT và cần borrow:prepare.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sách đang được chuẩn bị", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải role staff hoặc thiếu borrow:prepare", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy request/item", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Item không ở trạng thái RESERVED", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     @PreAuthorize("hasAuthority('borrow:prepare') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<StaffBorrowResponse>> prepare(@AuthenticationPrincipal CustomUserPrincipal principal,
             @PathVariable String loanCode, @PathVariable Integer itemId) {
@@ -60,6 +100,15 @@ public class LibrarianBorrowController {
     }
 
     @PostMapping("/borrow-requests/{loanCode}/items/{itemId}/ready")
+    @Operation(summary = "Xác nhận sách sẵn sàng nhận", description = "Chuyển PREPARING sang READY_FOR_PICKUP và đặt deadline chính xác 72 giờ từ readyAt.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sách đã sẵn sàng nhận", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải role staff hoặc thiếu borrow:prepare", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy request/item", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Item không ở trạng thái PREPARING", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     @PreAuthorize("hasAuthority('borrow:prepare') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<StaffBorrowResponse>> ready(@AuthenticationPrincipal CustomUserPrincipal principal,
             @PathVariable String loanCode, @PathVariable Integer itemId) {
@@ -67,6 +116,15 @@ public class LibrarianBorrowController {
     }
 
     @PostMapping("/borrow-requests/{loanCode}/items/{itemId}/cancel")
+    @Operation(summary = "Hủy item chưa bàn giao tại quầy", description = "Hủy item theo yêu cầu thành viên trước khi xác nhận thu phí; giải phóng tồn và promote FIFO trong cùng transaction.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Item đã được hủy tại quầy", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải role staff hoặc thiếu borrow:cancel", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy request/item", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Item đã bàn giao hoặc không thể hủy", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     @PreAuthorize("hasAuthority('borrow:cancel') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<StaffBorrowResponse>> cancel(@AuthenticationPrincipal CustomUserPrincipal principal,
             @PathVariable String loanCode, @PathVariable Integer itemId) {
@@ -74,6 +132,15 @@ public class LibrarianBorrowController {
     }
 
     @PostMapping("/borrow-requests/{loanCode}/items/{itemId}/reject")
+    @Operation(summary = "Ghi nhận không tìm thấy bản sách", description = "Chuyển item chưa giao sang REJECTED khi bản vật lý không có; không cộng tồn kho giả.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Item đã được reject", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải role staff hoặc thiếu borrow:prepare", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy request/item", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Item không thể reject từ trạng thái hiện tại", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     @PreAuthorize("hasAuthority('borrow:prepare') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<StaffBorrowResponse>> reject(@AuthenticationPrincipal CustomUserPrincipal principal,
             @PathVariable String loanCode, @PathVariable Integer itemId) {
@@ -81,6 +148,17 @@ public class LibrarianBorrowController {
     }
 
     @PostMapping("/borrow-requests/{loanCode}/handover")
+    @Operation(summary = "Xác nhận phí và bàn giao toàn bộ sách READY", description = "Yêu cầu borrow:handover và borrow:fee-confirm. identityVerified phải đúng; items phải trùng chính xác toàn bộ READY còn hạn. Phí, actor, borrowedAt, dueDate và lịch sử commit atomic; ADMIN không bypass overdue, nợ hoặc deadline.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Phí đã xác nhận và toàn bộ sách READY đã bàn giao", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Request body không đúng định dạng", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thiếu hoặc access token không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không phải role staff hoặc thiếu một trong hai permission", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy yêu cầu/item", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Set READY sai, hết hạn, mất điều kiện, version cũ hoặc đã bàn giao", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "Chưa xác minh danh tính, phí sai, item trùng hoặc amount âm", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi nội bộ; response không chứa SQL hoặc stack trace", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class)))
+    })
     @PreAuthorize("hasAuthority('borrow:handover') and hasAuthority('borrow:fee-confirm') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<StaffBorrowResponse>> handover(@AuthenticationPrincipal CustomUserPrincipal principal,
             @PathVariable String loanCode, @Valid @RequestBody HandoverRequest request) {

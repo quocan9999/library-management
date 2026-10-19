@@ -55,10 +55,10 @@ function RedirectSignedInUser({ children }: { children: React.ReactNode }) {
 function RequireAuthFlow({ children, registration = false }: { children: React.ReactNode; registration?: boolean }) {
   const { accessToken, isBootstrapping } = useAuth();
   const location = useLocation();
-  const state = location.state as { verificationRequestKey?: string; registrationCooldownUntil?: number } | null;
+  const state = location.state as { verificationRequestKey?: string; registrationCooldownSeconds?: number } | null;
   const hasFlow = registration
-    ? (Boolean(readRegistrationEmail()) || (typeof state?.registrationCooldownUntil === 'number'
-      && Number.isFinite(state.registrationCooldownUntil))) && !accessToken
+    ? (Boolean(readRegistrationEmail()) || (typeof state?.registrationCooldownSeconds === 'number'
+      && Number.isFinite(state.registrationCooldownSeconds) && state.registrationCooldownSeconds > 0)) && !accessToken
     : Boolean(new URLSearchParams(location.search).get('token'))
       || (location.pathname === '/verify-email' && typeof state?.verificationRequestKey === 'string');
   if (isBootstrapping) return <SessionBootstrap />;
