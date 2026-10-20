@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { usePermission } from '../../auth/permissions';
 import { useAppNotification } from '../../components/AppNotificationProvider';
-import { borrowApi } from './api';
+import { MAX_BORROW_BOOKS, borrowApi } from './api';
 import { borrowErrorMessage, borrowErrorNotificationType } from './errors';
 import type { CatalogBook } from './types';
 
@@ -51,14 +51,27 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
 
   if (!canCreate) return null;
 
-  if (onToggleSelection) return <div className="borrow-action">
-    <Button
-      type={selected ? 'default' : 'primary'}
-      disabled={!canRequest || (!selected && selectionDisabled)}
-      aria-pressed={selected}
-      onClick={() => onToggleSelection(book)}
-    >{selected ? `Bỏ ${book.title} khỏi giỏ` : `Chọn sách ${book.title}`}</Button>
-  </div>;
+  if (onToggleSelection) {
+    const selectionLabel = selected
+      ? 'Đã chọn ✓'
+      : !canRequest
+        ? 'Hết sách'
+        : selectionDisabled
+          ? `Đã đủ ${MAX_BORROW_BOOKS} sách`
+          : book.availableQuantity === 0
+            ? 'Vào hàng chờ'
+            : 'Chọn mượn';
+    return <div className="borrow-action borrow-action--catalog">
+      <Button
+        type={selected ? 'default' : 'primary'}
+        disabled={!selected && (!canRequest || selectionDisabled)}
+        aria-pressed={selected}
+        aria-label={`${selectionLabel} ${book.title}`}
+        block
+        onClick={() => onToggleSelection(book)}
+      >{selectionLabel}</Button>
+    </div>;
+  }
 
   return <div className="borrow-action">
     <Button type="primary" disabled={!canRequest || pending} onClick={() => { setConfirmOpen(true); }}>

@@ -1,12 +1,19 @@
-import { Alert, Button, Card, Input, Modal, Pagination, Select, Skeleton } from 'antd';
+import { Alert, Button, Card, Input, Modal, Pagination, Select, Skeleton, Tag } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BORROW_PAGE_SIZE, borrowApi } from './api';
+import { BORROW_PAGE_SIZE, MAX_BORROW_BOOKS, borrowApi } from './api';
 import { BorrowBookAction } from './BorrowBookAction';
+import { BorrowCart } from './BorrowCart';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { borrowErrorMessage, borrowErrorNotificationType } from './errors';
 import { formatVnd } from '../books/formatting';
 import type { BorrowListQuery, CatalogBook, PageResponse } from './types';
+
+function stockLabel(book: CatalogBook): { label: string; tone: 'available' | 'low' | 'unavailable' } {
+  if (book.availableQuantity === 0) return { label: 'Hết sách', tone: 'unavailable' };
+  if (book.availableQuantity === 1) return { label: 'Sắp hết · còn 1', tone: 'low' };
+  return { label: `Còn ${book.availableQuantity}/${book.totalQuantity}`, tone: 'available' };
+}
 
 export function CatalogPage() {
   const { notify } = useAppNotification();
@@ -19,8 +26,10 @@ export function CatalogPage() {
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
   const [selectedBooks, setSelectedBooks] = useState<CatalogBook[]>([]);
   const [confirmRequestOpen, setConfirmRequestOpen] = useState(false);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [requestPending, setRequestPending] = useState(false);
   const requestLock = useRef(false);
+  const totalBorrowFee = useMemo(() => selectedBooks.reduce((total, book) => total + book.borrowFee, 0), [selectedBooks]);
 
   const query = useMemo<BorrowListQuery>(() => ({
     ...(queryText ? { q: queryText } : {}),
@@ -58,20 +67,22 @@ export function CatalogPage() {
   };
 
   const toggleBookSelection = (book: CatalogBook) => {
+    if (selectedBooks.length === 1 && selectedBooks[0].id === book.id) setCartDrawerOpen(false);
     setSelectedBooks((current) => {
       if (current.some((selected) => selected.id === book.id)) return current.filter((selected) => selected.id !== book.id);
-      if (current.length >= 3) return current;
+      if (current.length >= MAX_BORROW_BOOKS) return current;
       return [...current, book];
     });
   };
 
   const submitBorrowRequest = async () => {
-    if (requestLock.current || selectedBooks.length < 1 || selectedBooks.length > 3) return;
+    if (requestLock.current || selectedBooks.length < 1 || selectedBooks.length > MAX_BORROW_BOOKS) return;
     requestLock.current = true;
     setRequestPending(true);
     try {
       await borrowApi.createRequest(selectedBooks.map((book) => book.id));
       setConfirmRequestOpen(false);
+      setCartDrawerOpen(false);
       setSelectedBooks([]);
       notify('success', {
         title: 'Đã tạo yêu cầu mượn',
@@ -89,7 +100,7 @@ export function CatalogPage() {
     }
   };
 
-  return <main className="borrow-stage" aria-labelledby="catalog-heading">
+  return <main className={`borrow-stage${selectedBooks.length > 0 ? ' borrow-stage--with-cart' : ''}`} aria-labelledby="catalog-heading">
     <header className="borrow-heading">
       <div>
         <p className="role-eyebrow">DANH MỤC THƯ VIỆN</p>
@@ -123,24 +134,6 @@ export function CatalogPage() {
       />
     </section>
 
-    {selectedBooks.length > 0 && <section className="borrow-selection" aria-label="Giỏ đặt mượn">
-      <div className="borrow-selection__heading">
-        <div>
-          <h2>Giỏ đặt mượn</h2>
-          <p>{selectedBooks.length} / 3 đầu sách đã chọn. Các sách sẽ được gộp vào cùng một yêu cầu và mã QR.</p>
-        </div>
-        <Button type="primary" disabled={requestPending} onClick={() => setConfirmRequestOpen(true)}>
-          Đặt mượn ({selectedBooks.length})
-        </Button>
-      </div>
-      <ul className="borrow-selection__items">
-        {selectedBooks.map((book) => <li key={book.id}>
-          <span>{book.title} · {formatVnd(book.borrowFee)}</span>
-          <Button type="link" disabled={requestPending || confirmRequestOpen} onClick={() => toggleBookSelection(book)}>Bỏ chọn {book.title}</Button>
-        </li>)}
-      </ul>
-    </section>}
-
     {loadState === 'loading' && <div className="borrow-loading" role="status"><Skeleton active paragraph={{ rows: 3 }} /><Skeleton active paragraph={{ rows: 3 }} /></div>}
     {loadState === 'error' && <Alert
       className="borrow-page-alert"
@@ -156,31 +149,46 @@ export function CatalogPage() {
     </section>}
     {loadState === 'ready' && result && result.content.length > 0 && <>
       <section className="catalog-grid" aria-label="Sách trong danh mục">
-        {result.content.map((book) => <Card key={book.id} className="catalog-card" data-catalog-book={book.id}>
-          <Link className="catalog-card__cover" to={`/books/${book.id}`} aria-label={`Xem chi tiết ${book.title}`}>
-            {book.coverImageUrl
-              ? <img src={book.coverImageUrl} alt={`Bìa sách ${book.title}`} loading="lazy" />
-              : <span aria-hidden="true">SÁCH</span>}
-          </Link>
-          <div className="catalog-card__body">
-            <Link className="catalog-card__title" to={`/books/${book.id}`}>{book.title}</Link>
-            <p className="catalog-card__author">{book.author}</p>
-            <dl className="catalog-card__facts">
-              <div><dt>Mã sách</dt><dd>{book.bookCode}</dd></div>
-              <div><dt>Còn bản</dt><dd>{book.availableQuantity} / {book.totalQuantity}</dd></div>
-              <div><dt>Phí mượn</dt><dd>{formatVnd(book.borrowFee)}</dd></div>
-              <div><dt>Phí trễ mỗi ngày</dt><dd>{formatVnd(book.lateFeePerDay)}</dd></div>
-            </dl>
-            {book.availableQuantity === 0 && <p className="catalog-card__queue">Hàng chờ: {book.waitlistCount} / {book.waitlistCap}</p>}
-            <BorrowBookAction
-              key={`${book.id}-${book.availableQuantity}-${book.waitlistCount}`}
-              book={book}
-              selected={selectedBooks.some((selected) => selected.id === book.id)}
-              selectionDisabled={selectedBooks.length >= 3}
-              onToggleSelection={toggleBookSelection}
-            />
-          </div>
-        </Card>)}
+        {result.content.map((book) => {
+          const selected = selectedBooks.some((selection) => selection.id === book.id);
+          const stock = stockLabel(book);
+          return <Card
+            key={book.id}
+            className={`catalog-card${selected ? ' catalog-card--selected' : ''}`}
+            data-catalog-book={book.id}
+          >
+            <Link className="catalog-card__cover" to={`/books/${book.id}`} aria-label={`Xem chi tiết ${book.title}`}>
+              {book.coverImageUrl
+                ? <img src={book.coverImageUrl} alt={`Bìa sách ${book.title}`} loading="lazy" />
+                : <span className="catalog-card__cover-placeholder">{book.title}</span>}
+              {selected && <span className="catalog-card__selected-mark" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" focusable="false">
+                  <path d="m3.5 8.2 2.8 2.7 6.2-6" />
+                </svg>
+              </span>}
+            </Link>
+            <div className="catalog-card__body">
+              <Link className="catalog-card__title" to={`/books/${book.id}`}>{book.title}</Link>
+              <p className="catalog-card__author">{book.author}</p>
+              <div className="catalog-card__price-row">
+                <p className="catalog-card__price"><strong>{formatVnd(book.borrowFee)}</strong><span>/lượt</span></p>
+                <Tag className={`catalog-stock-tag catalog-stock-tag--${stock.tone}`}>{stock.label}</Tag>
+              </div>
+              <div className="catalog-card__meta-row">
+                <span>{book.bookCode}</span>
+                <span>Trễ {formatVnd(book.lateFeePerDay)}/ngày</span>
+              </div>
+              {book.availableQuantity === 0 && <p className="catalog-card__queue">Hàng chờ: {book.waitlistCount} / {book.waitlistCap}</p>}
+              <BorrowBookAction
+                key={`${book.id}-${book.availableQuantity}-${book.waitlistCount}`}
+                book={book}
+                selected={selected}
+                selectionDisabled={selectedBooks.length >= MAX_BORROW_BOOKS}
+                onToggleSelection={toggleBookSelection}
+              />
+            </div>
+          </Card>;
+        })}
       </section>
       {result.totalPages > 1 && <Pagination
         className="borrow-pagination"
@@ -192,8 +200,20 @@ export function CatalogPage() {
         aria-label="Trang danh mục sách"
       />}
     </>}
+    <BorrowCart
+      books={selectedBooks}
+      maximumBooks={MAX_BORROW_BOOKS}
+      totalFee={totalBorrowFee}
+      locked={requestPending || confirmRequestOpen}
+      drawerOpen={cartDrawerOpen}
+      onOpenDrawer={() => setCartDrawerOpen(true)}
+      onCloseDrawer={() => setCartDrawerOpen(false)}
+      onRemove={toggleBookSelection}
+      onSubmit={() => setConfirmRequestOpen(true)}
+    />
     <Modal
       open={confirmRequestOpen}
+      centered
       title="Xác nhận yêu cầu mượn"
       okText={requestPending ? 'Đang gửi…' : 'Xác nhận đặt mượn'}
       cancelText="Xem lại"

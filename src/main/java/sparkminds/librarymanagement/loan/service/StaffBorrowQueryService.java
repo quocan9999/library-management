@@ -20,6 +20,11 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import sparkminds.librarymanagement.common.api.BusinessException;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,10 +62,41 @@ public class StaffBorrowQueryService {
     }
 
     public PagedResponse<StaffBorrowResponse> list(String status, String page, String size, String sort) {
+        return list(status, page, size, sort, null);
+    }
+
+    public PagedResponse<StaffBorrowResponse> list(String status, String page, String size, String sort, String q) {
         var filter = BorrowRequestFilter.parse(status);
-        var pagination = BorrowPagination.parse(page, size, sort, "createdAt", Sort.Direction.DESC);
-        var loans = loanRepository.findStaffRequests(filter == BorrowRequestFilter.ALL, filter.statuses(), pagination);
-        return PagedResponse.of(responses(loans.getContent()), loans.getNumber(), loans.getSize(), loans.getTotalElements());
+        var pagination = staffPagination(page, size, sort);
+        String search = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
+        if (search.length() > 200) throw invalidSearch();
+        String pattern = "%" + search.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        var results = loanRepository.searchStaffRequests(filter == BorrowRequestFilter.ALL,
+                filter.statuses(), search, pattern, pagination);
+        var loans = results.getContent().stream().map(row -> (Loan) row[0]).toList();
+        return PagedResponse.of(responses(loans), results.getNumber(), results.getSize(), results.getTotalElements());
+    }
+
+    private PageRequest staffPagination(String page, String size, String sort) {
+        var pagination = BorrowPagination.parse(page, size, null, "createdAt", Sort.Direction.DESC);
+        if (sort == null || sort.isBlank()) return pagination;
+        var fields = Map.of("loanCode", "loanCode", "memberName", "member.fullName",
+                "itemCount", "itemCount", "createdAt", "createdAt");
+        String[] parts = sort.split(",", -1);
+        if (parts.length != 2 || !fields.containsKey(parts[0].trim())) throw invalidSearch();
+        try {
+            var direction = Sort.Direction.fromString(parts[1].trim());
+            // Chỉ dùng field trong whitelist; id cố định thứ tự khi nhiều yêu cầu có cùng giá trị.
+            var ordering = Sort.by(direction, fields.get(parts[0].trim())).and(Sort.by(direction, "id"));
+            return PageRequest.of(pagination.getPageNumber(), pagination.getPageSize(), ordering);
+        } catch (IllegalArgumentException exception) {
+            throw invalidSearch();
+        }
+    }
+
+    private BusinessException invalidSearch() {
+        return new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_PARAMETER",
+                "Tham số tìm kiếm hoặc sắp xếp không hợp lệ");
     }
 
     /** Đọc cả trang bằng batch; Member chỉ có mã/tên để đối chiếu, không trả email, điện thoại hay tài khoản. */

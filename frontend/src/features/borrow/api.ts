@@ -12,6 +12,7 @@ import type {
 } from './types';
 
 export const BORROW_PAGE_SIZE = 10;
+export const MAX_BORROW_BOOKS = 3;
 
 function readRequiredData<T>(envelope: ApiEnvelope<T>, expectedCode: string): T {
   if (!envelope.success || envelope.code !== expectedCode || envelope.data === null) {
@@ -32,8 +33,8 @@ export const borrowApi = {
   },
 
   async createRequest(bookIds: number[]): Promise<BorrowRequest> {
-    if (bookIds.length < 1 || bookIds.length > 3 || new Set(bookIds).size !== bookIds.length) {
-      throw new Error('Chọn từ 1 đến 3 đầu sách khác nhau.');
+    if (bookIds.length < 1 || bookIds.length > MAX_BORROW_BOOKS || new Set(bookIds).size !== bookIds.length) {
+      throw new Error(`Chọn từ 1 đến ${MAX_BORROW_BOOKS} đầu sách khác nhau.`);
     }
     const response = await apiClient.post<ApiEnvelope<BorrowRequest>>('/api/v1/borrow-requests', { bookIds });
     return readRequiredData(response.data, 'BORROW_REQUEST_CREATED');
@@ -60,9 +61,9 @@ export const borrowApi = {
     return readRequiredData(response.data, 'BORROW_ITEM_RENEWED');
   },
 
-  async listStaff(page = 0, status: BorrowRequestFilter = 'PENDING'): Promise<PageResponse<StaffBorrowRequest>> {
+  async listStaff(page = 0, status: BorrowRequestFilter = 'PENDING', size = BORROW_PAGE_SIZE, q = '', sort = 'createdAt,desc'): Promise<PageResponse<StaffBorrowRequest>> {
     const response = await apiClient.get<ApiEnvelope<PageResponse<StaffBorrowRequest>>>('/api/v1/librarian/borrow-requests', {
-      params: { page, size: BORROW_PAGE_SIZE, sort: 'createdAt,desc', status },
+      params: { page, size, sort, status, ...(q ? { q } : {}) },
     });
     return readRequiredData(response.data, 'BORROW_REQUEST_LIST_SUCCESS');
   },

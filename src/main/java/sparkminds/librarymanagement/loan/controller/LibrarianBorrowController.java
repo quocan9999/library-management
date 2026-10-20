@@ -37,7 +37,7 @@ public class LibrarianBorrowController {
     private final BorrowHandoverService handoverService;
 
     @GetMapping("/borrow-requests")
-    @Operation(summary = "Liệt kê yêu cầu cần xử lý tại quầy", description = "Lọc và phân trang yêu cầu; PREPARING quá 24 giờ được đánh dấu cảnh báo, không tự hủy.")
+    @Operation(summary = "Liệt kê yêu cầu cần xử lý tại quầy", description = "Tìm theo q: QR, mã yêu cầu, mã hoặc họ tên thành viên; lọc trạng thái và phân trang. Sort hỗ trợ loanCode, memberName, itemCount, createdAt với asc/desc; mặc định createdAt,desc. PREPARING quá 24 giờ được đánh dấu cảnh báo, không tự hủy.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Trang yêu cầu tại quầy", useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bộ lọc, phân trang hoặc sort không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
@@ -48,8 +48,9 @@ public class LibrarianBorrowController {
     @PreAuthorize("hasAuthority('borrow:read') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<PagedResponse<StaffBorrowResponse>>> list(
             @RequestParam(required = false) String status, @RequestParam(required = false) String page,
-            @RequestParam(required = false) String size, @RequestParam(required = false) String sort) {
-        return success("BORROW_REQUEST_LIST_SUCCESS", "Lấy danh sách yêu cầu thành công", queryService.list(status, page, size, sort));
+            @RequestParam(required = false) String size, @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String q) {
+        return success("BORROW_REQUEST_LIST_SUCCESS", "Lấy danh sách yêu cầu thành công", queryService.list(status, page, size, sort, q));
     }
 
     @GetMapping("/pickups/{pickupReference}")

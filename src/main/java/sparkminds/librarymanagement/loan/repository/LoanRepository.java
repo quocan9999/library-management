@@ -15,6 +15,25 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface LoanRepository extends JpaRepository<Loan, Integer> {
+    String STAFF_SEARCH_WHERE = """
+             where (:allStatuses = true or exists (
+               select item.id from LoanItem item where item.loan.id = loan.id and item.status in :statuses))
+             and (:search = '' or loan.pickupReference = :search
+               or lower(loan.loanCode) like :pattern escape '!'
+               or lower(member.memberCode) like :pattern escape '!'
+               or lower(member.fullName) like :pattern escape '!')
+            """;
+
+    /** Lọc trước phân trang; đếm toàn bộ sách của yêu cầu, không chỉ sách khớp trạng thái. */
+    @Query(value = """
+            select loan, (select count(bookItem.id) from LoanItem bookItem where bookItem.loan.id = loan.id) as itemCount
+            from Loan loan join fetch loan.member member
+            """ + STAFF_SEARCH_WHERE,
+            countQuery = "select count(loan.id) from Loan loan join loan.member member " + STAFF_SEARCH_WHERE)
+    Page<Object[]> searchStaffRequests(@Param("allStatuses") boolean allStatuses,
+            @Param("statuses") Collection<LoanItemStatus> statuses, @Param("search") String search,
+            @Param("pattern") String pattern, Pageable page);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "member")
     Optional<Loan> findByPickupReference(String pickupReference);
 

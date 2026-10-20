@@ -92,10 +92,12 @@ export interface BorrowRequest {
   items: BorrowItem[];
 }
 
+export type LoanAggregateStatus = 'OPEN' | 'ACTIVE' | 'PARTIALLY_RETURNED' | 'RETURNED' | 'CLOSED';
+
 export interface StaffBorrowRequest {
   loanCode: string;
   pickupReference: string;
-  status: string;
+  status: LoanAggregateStatus;
   createdAt: string;
   version: number;
   member: { id: number; memberCode: string; fullName: string };
