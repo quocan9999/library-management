@@ -182,7 +182,6 @@ export function BookListPage() {
       <section className="role-workspace member-workspace book-workspace" aria-labelledby="book-list-title">
         <div className="role-heading">
           <div>
-            <p className="role-eyebrow">QUẢN TRỊ KHO SÁCH</p>
             <h1 id="book-list-title">Quản lý sách</h1>
             <p className="role-intro">Tra cứu thông tin xuất bản, số lượng và mức phí mượn.</p>
           </div>

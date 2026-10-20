@@ -184,7 +184,6 @@ export function MemberListPage() {
       <section className="role-workspace member-workspace" aria-labelledby="member-list-title">
         <div className="role-heading">
           <div>
-            <p className="role-eyebrow">QUẢN TRỊ HỘI VIÊN</p>
             <h1 id="member-list-title">Quản lý thành viên</h1>
             <p className="role-intro">Tra cứu hồ sơ và lược sử mượn/trả sách.</p>
           </div>

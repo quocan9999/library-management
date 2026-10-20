@@ -265,7 +265,6 @@ export function LibrarianBorrowRequestsPage() {
     <section className="role-workspace member-workspace" aria-labelledby="staff-borrow-heading">
     <header className="role-heading">
       <div>
-        <p className="role-eyebrow">QUẦY DỊCH VỤ THƯ VIỆN</p>
         <h1 id="staff-borrow-heading">Xử lý yêu cầu mượn tại quầy</h1>
         <p className="role-intro">Tra cứu yêu cầu và mở chi tiết để chuẩn bị sách, xác nhận phí và bàn giao tại quầy.</p>
       </div>
