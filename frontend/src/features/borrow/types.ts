@@ -78,6 +78,9 @@ export interface BorrowRequestSummary {
   aggregateStatus: string;
   createdAt: string;
   version: number;
+  paymentStatus?: 'PENDING' | 'PAID' | 'NOT_REQUIRED' | 'EXPIRED';
+  paymentAmount?: number;
+  paymentExpiresAt?: string | null;
   itemCount: number;
   statuses: LoanItemStatus[];
   items: BorrowItem[];
@@ -89,6 +92,11 @@ export interface BorrowRequest {
   status: string;
   createdAt: string;
   version: number;
+  paymentStatus?: 'PENDING' | 'PAID' | 'NOT_REQUIRED' | 'EXPIRED';
+  paymentMethod?: 'MOCK_VIETQR' | 'COUNTER' | 'NO_CHARGE' | null;
+  paymentAmount?: number;
+  paymentExpiresAt?: string | null;
+  paidAt?: string | null;
   items: BorrowItem[];
 }
 
@@ -100,9 +108,24 @@ export interface StaffBorrowRequest {
   status: LoanAggregateStatus;
   createdAt: string;
   version: number;
+  origin?: 'ONLINE' | 'COUNTER';
+  paymentStatus?: 'PENDING' | 'PAID' | 'NOT_REQUIRED' | 'EXPIRED';
+  paymentAmount?: number;
+  paymentExpiresAt?: string | null;
   member: { id: number; memberCode: string; fullName: string };
   items: BorrowItem[];
   preparingOverdueItemIds: number[];
+}
+
+export interface CounterMemberOption {
+  id: number;
+  memberCode: string;
+  fullName: string;
+}
+
+export interface ConfirmMockPayment {
+  expectedLoanVersion: number;
+  confirmedAmount: number;
 }
 
 export interface HandoverRequest {

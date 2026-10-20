@@ -8,7 +8,10 @@ export const STAFF_DESK_FILTERS: Array<{ key: StaffDeskFilter; label: string }> 
   { key: 'READY_FOR_PICKUP', label: 'Sẵn sàng nhận' },
   { key: 'WAITLISTED', label: 'Hàng chờ' },
   { key: 'BORROWED', label: 'Đang mượn' },
-  { key: 'HISTORY', label: 'Lịch sử' },
+  { key: 'RETURNED', label: 'Đã trả' },
+  { key: 'CANCELLED', label: 'Đã hủy' },
+  { key: 'EXPIRED', label: 'Đã hết hạn nhận' },
+  { key: 'REJECTED', label: 'Không tìm thấy sách' },
 ];
 
 export const ITEM_STATUS_LABELS: Record<LoanItemStatus, string> = {
@@ -39,6 +42,12 @@ const ITEM_STATUS_PRIORITY: LoanItemStatus[] = [
 export function getPrimaryItemStatus(items: BorrowItem[]): LoanItemStatus | null {
   const statuses = new Set(items.map((item) => item.status));
   return ITEM_STATUS_PRIORITY.find((status) => statuses.has(status)) ?? null;
+}
+
+/** Hiển thị các trạng thái thực tế; PREPARING cũ vẫn thuộc bước cần chuẩn bị ở quầy. */
+export function getRequestDisplayStatuses(request: StaffBorrowRequest): LoanItemStatus[] {
+  const statuses = new Set<LoanItemStatus>(request.items.map((item) => item.status === 'PREPARING' ? 'RESERVED' : item.status));
+  return ITEM_STATUS_PRIORITY.filter((status) => statuses.has(status));
 }
 
 export function getRequestFeeTotal(request: StaffBorrowRequest): number {

@@ -13,6 +13,7 @@ import sparkminds.librarymanagement.book.repository.BookRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.loan.entity.Loan;
 import sparkminds.librarymanagement.loan.entity.LoanItem;
+import sparkminds.librarymanagement.loan.entity.LoanPaymentStatus;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
 import sparkminds.librarymanagement.loan.repository.LoanRepository;
 import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
@@ -51,6 +52,10 @@ public class StaffBorrowLockService {
                 .map(id -> bookRepository.findByIdForUpdate(id).orElseThrow(BorrowQueryService::notFound)).toList();
         for (Book book : books) entityManager.refresh(book, LockModeType.PESSIMISTIC_WRITE);
         entityManager.refresh(loan);
+        if (loan.getPaymentStatus() == LoanPaymentStatus.PENDING) {
+            throw new BusinessException(HttpStatus.CONFLICT, "BORROW_PAYMENT_REQUIRED",
+                    "Yêu cầu phải được thanh toán trực tuyến trước khi xử lý tại quầy");
+        }
         for (LoanItem item : items) entityManager.refresh(item);
         return new Context(loan, items);
     }

@@ -23,6 +23,8 @@ import sparkminds.librarymanagement.loan.service.BorrowCancellationService;
 import sparkminds.librarymanagement.loan.service.BorrowRenewalService;
 import sparkminds.librarymanagement.loan.dto.BorrowRenewalResponse;
 import sparkminds.librarymanagement.loan.dto.RenewBorrowRequest;
+import sparkminds.librarymanagement.loan.dto.ConfirmMockPaymentRequest;
+import sparkminds.librarymanagement.loan.service.BorrowMockPaymentService;
 
 import java.net.URI;
 
@@ -37,6 +39,7 @@ public class BorrowRequestController {
     private final BorrowQueryService queryService;
     private final BorrowCancellationService cancellationService;
     private final BorrowRenewalService renewalService;
+    private final BorrowMockPaymentService paymentService;
 
     @PostMapping("/mine/{loanCode}/items/{itemId}/renew")
     @Operation(summary = "Gia hạn một sách đang mượn", description = "Gia hạn miễn phí thêm 7 ngày đúng cửa sổ từ due date−3 ngày đến hết due date; tối đa một lần và không có Waitlist cho sách.")
@@ -115,6 +118,17 @@ public class BorrowRequestController {
         return ResponseEntity.created(URI.create("/api/v1/borrow-requests/mine/" + result.loanCode()))
                 .header("Cache-Control", "no-store").body(ApiResponse.success(201, "BORROW_REQUEST_CREATED",
                         "Đã tạo yêu cầu đặt mượn", result));
+    }
+
+    @PostMapping("/mine/{loanCode}/mock-payment")
+    @Operation(summary = "Xác nhận VietQR mô phỏng", description = "Chỉ chủ yêu cầu được xác nhận mock payment; server khóa dữ liệu, kiểm tra số tiền và hạn giữ đơn trước khi ghi nhận phí từng sách.")
+    @PreAuthorize("hasAuthority('borrow:read-own') and principal.roleCode == 'USER'")
+    public ResponseEntity<ApiResponse<BorrowRequestResponse>> confirmMockPayment(
+            @AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable String loanCode,
+            @Valid @RequestBody ConfirmMockPaymentRequest request) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(ApiResponse.success(200, "BORROW_MOCK_PAYMENT_CONFIRMED",
+                        "Đã ghi nhận thanh toán mô phỏng", paymentService.confirm(principal.getAccountId(), loanCode, request)));
     }
 
     @GetMapping("/mine/{loanCode}")

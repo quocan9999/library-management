@@ -20,8 +20,13 @@ import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
 import sparkminds.librarymanagement.common.api.ApiResponse;
 import sparkminds.librarymanagement.common.api.PagedResponse;
 import sparkminds.librarymanagement.loan.dto.HandoverRequest;
+import sparkminds.librarymanagement.loan.dto.PrepareBorrowItemsRequest;
 import sparkminds.librarymanagement.loan.dto.StaffBorrowHistoryResponse;
 import sparkminds.librarymanagement.loan.dto.StaffBorrowResponse;
+import sparkminds.librarymanagement.loan.dto.CreateCounterBorrowRequest;
+import sparkminds.librarymanagement.loan.dto.CounterMemberOptionResponse;
+import sparkminds.librarymanagement.loan.service.BorrowReservationService;
+import sparkminds.librarymanagement.loan.service.StaffCounterBorrowService;
 import sparkminds.librarymanagement.loan.service.BorrowHandoverService;
 import sparkminds.librarymanagement.loan.service.StaffBorrowItemService;
 import sparkminds.librarymanagement.loan.service.StaffBorrowQueryService;
@@ -35,6 +40,8 @@ public class LibrarianBorrowController {
     private final StaffBorrowQueryService queryService;
     private final StaffBorrowItemService itemService;
     private final BorrowHandoverService handoverService;
+    private final BorrowReservationService reservationService;
+    private final StaffCounterBorrowService counterBorrowService;
 
     @GetMapping("/borrow-requests")
     @Operation(summary = "Liệt kê yêu cầu cần xử lý tại quầy", description = "Tìm theo q: QR, mã yêu cầu, mã hoặc họ tên thành viên; lọc trạng thái và phân trang. Sort hỗ trợ loanCode, memberName, itemCount, createdAt với asc/desc; mặc định createdAt,desc. PREPARING quá 24 giờ được đánh dấu cảnh báo, không tự hủy.")
@@ -51,6 +58,28 @@ public class LibrarianBorrowController {
             @RequestParam(required = false) String size, @RequestParam(required = false) String sort,
             @RequestParam(required = false) String q) {
         return success("BORROW_REQUEST_LIST_SUCCESS", "Lấy danh sách yêu cầu thành công", queryService.list(status, page, size, sort, q));
+    }
+
+    @GetMapping("/counter-members")
+    @Operation(summary = "Tìm thành viên để tạo yêu cầu tại quầy", description = "Chỉ trả mã thành viên và họ tên của tài khoản USER đang bật, đã xác minh email.")
+    @PreAuthorize("hasAuthority('borrow:prepare') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<java.util.List<CounterMemberOptionResponse>>> counterMembers(
+            @AuthenticationPrincipal CustomUserPrincipal principal, @RequestParam(required = false) String q) {
+        return success("BORROW_COUNTER_MEMBER_SEARCH_SUCCESS", "Tìm thành viên thành công",
+                counterBorrowService.searchMembers(principal.getAccountId(), q));
+    }
+
+    @PostMapping("/borrow-requests/counter")
+    @Operation(summary = "Tạo yêu cầu mượn trực tiếp tại quầy", description = "Thủ thư chọn thành viên và tối đa ba đầu sách còn bản sẵn; yêu cầu được lưu bền vững để có thể đóng chi tiết và tra cứu lại.")
+    @PreAuthorize("hasAuthority('borrow:prepare') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<StaffBorrowResponse>> createCounter(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @Valid @RequestBody CreateCounterBorrowRequest request) {
+        var created = reservationService.createForMember(principal.getAccountId(), request.memberId(),
+                new sparkminds.librarymanagement.loan.dto.CreateBorrowRequest(request.bookIds()));
+        return ResponseEntity.status(201).header("Cache-Control", "no-store")
+                .body(ApiResponse.success(201, "BORROW_COUNTER_REQUEST_CREATED",
+                        "Đã tạo yêu cầu mượn tại quầy", created));
     }
 
     @GetMapping("/pickups/{pickupReference}")
@@ -82,6 +111,16 @@ public class LibrarianBorrowController {
             @RequestParam(required = false) String page, @RequestParam(required = false) String size,
             @RequestParam(required = false) String sort) {
         return success("BORROW_ITEM_HISTORY_SUCCESS", "Lấy lịch sử yêu cầu thành công", queryService.history(loanCode, page, size, sort));
+    }
+
+    @PostMapping("/borrow-requests/{loanCode}/ready")
+    @Operation(summary = "Xác nhận đã chuẩn bị các sách được chọn", description = "Cập nhật đồng thời và gửi một email nhận sách cho cả lần chuẩn bị.")
+    @PreAuthorize("hasAuthority('borrow:prepare') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<StaffBorrowResponse>> readyBatch(
+            @AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable String loanCode,
+            @Valid @RequestBody PrepareBorrowItemsRequest request) {
+        return success("BORROW_ITEMS_READY", "Các sách đã sẵn sàng nhận",
+                itemService.readyBatch(principal.getAccountId(), loanCode, request.itemIds()));
     }
 
     @PostMapping("/borrow-requests/{loanCode}/items/{itemId}/prepare")

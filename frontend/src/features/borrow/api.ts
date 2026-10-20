@@ -6,6 +6,8 @@ import type {
   BorrowRequest,
   BorrowRequestSummary,
   CatalogBook,
+  ConfirmMockPayment,
+  CounterMemberOption,
   HandoverRequest,
   PageResponse,
   StaffBorrowRequest,
@@ -40,12 +42,26 @@ export const borrowApi = {
     return readRequiredData(response.data, 'BORROW_REQUEST_CREATED');
   },
 
+  async confirmMockPayment(loanCode: string, body: ConfirmMockPayment): Promise<BorrowRequest> {
+    const response = await apiClient.post<ApiEnvelope<BorrowRequest>>(
+      `/api/v1/borrow-requests/mine/${encodeURIComponent(loanCode)}/mock-payment`, body,
+    );
+    return readRequiredData(response.data, 'BORROW_MOCK_PAYMENT_CONFIRMED');
+  },
+
   async listMine(page = 0, status: BorrowRequestFilter = 'ALL', signal?: AbortSignal): Promise<PageResponse<BorrowRequestSummary>> {
     const response = await apiClient.get<ApiEnvelope<PageResponse<BorrowRequestSummary>>>('/api/v1/borrow-requests/mine', {
       params: { page, size: BORROW_PAGE_SIZE, sort: 'createdAt,desc', status },
       signal,
     });
     return readRequiredData(response.data, 'BORROW_REQUEST_LIST_SUCCESS');
+  },
+
+  async getMine(loanCode: string, signal?: AbortSignal): Promise<BorrowRequest> {
+    const response = await apiClient.get<ApiEnvelope<BorrowRequest>>(
+      `/api/v1/borrow-requests/mine/${encodeURIComponent(loanCode)}`, { signal },
+    );
+    return readRequiredData(response.data, 'BORROW_REQUEST_DETAIL_SUCCESS');
   },
 
   async cancelMine(loanCode: string, itemId: number): Promise<BorrowRequest> {
@@ -73,6 +89,31 @@ export const borrowApi = {
       `/api/v1/librarian/pickups/${encodeURIComponent(pickupReference)}`,
     );
     return readRequiredData(response.data, 'BORROW_REQUEST_DETAIL_SUCCESS');
+  },
+
+  async searchCounterMembers(query: string): Promise<CounterMemberOption[]> {
+    const response = await apiClient.get<ApiEnvelope<CounterMemberOption[]>>('/api/v1/librarian/counter-members', {
+      params: { q: query },
+    });
+    return readRequiredData(response.data, 'BORROW_COUNTER_MEMBER_SEARCH_SUCCESS');
+  },
+
+  async createCounterRequest(memberId: number, bookIds: number[]): Promise<StaffBorrowRequest> {
+    if (!Number.isSafeInteger(memberId) || memberId <= 0 || bookIds.length < 1
+      || bookIds.length > MAX_BORROW_BOOKS || new Set(bookIds).size !== bookIds.length) {
+      throw new Error(`Chọn một thành viên và từ 1 đến ${MAX_BORROW_BOOKS} đầu sách khác nhau.`);
+    }
+    const response = await apiClient.post<ApiEnvelope<StaffBorrowRequest>>(
+      '/api/v1/librarian/borrow-requests/counter', { memberId, bookIds },
+    );
+    return readRequiredData(response.data, 'BORROW_COUNTER_REQUEST_CREATED');
+  },
+
+  async markPrepared(loanCode: string, itemIds: number[]): Promise<StaffBorrowRequest> {
+    const response = await apiClient.post<ApiEnvelope<StaffBorrowRequest>>(
+      `/api/v1/librarian/borrow-requests/${encodeURIComponent(loanCode)}/ready`, { itemIds },
+    );
+    return readRequiredData(response.data, 'BORROW_ITEMS_READY');
   },
 
   async prepare(loanCode: string, itemId: number): Promise<StaffBorrowRequest> {

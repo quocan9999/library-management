@@ -1,5 +1,5 @@
 import { Button, Select } from 'antd';
-import { ITEM_STATUS_LABELS, type StaffDeskFilter } from './staffBorrowPresentation';
+import { STAFF_DESK_FILTERS, type StaffDeskFilter } from './staffBorrowPresentation';
 import { LibrarianBorrowLookup } from './LibrarianBorrowLookup';
 
 interface LibrarianBorrowRequestFiltersProps {
@@ -29,12 +29,7 @@ export function LibrarianBorrowRequestFilters({
           id="borrow-request-status"
           value={value}
           onChange={onChange}
-          options={[
-            { value: 'ALL', label: 'Tất cả trạng thái' },
-            { value: 'PENDING', label: 'Cần xử lý tại quầy' },
-            ...Object.entries(ITEM_STATUS_LABELS).map(([status, label]) => ({ value: status, label })),
-            { value: 'HISTORY', label: 'Lịch sử đã kết thúc' },
-          ]}
+          options={STAFF_DESK_FILTERS.map(({ key, label }) => ({ value: key, label }))}
         />
         <span className="librarian-borrow-filter-hint">Lọc yêu cầu có sách thuộc trạng thái đã chọn.</span>
       </div>

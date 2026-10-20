@@ -9,9 +9,12 @@ import sparkminds.librarymanagement.loan.dto.StaffBorrowResponse;
 import sparkminds.librarymanagement.loan.entity.LoanItemEventReason;
 import sparkminds.librarymanagement.loan.entity.LoanItem;
 import sparkminds.librarymanagement.loan.entity.LoanItemStatus;
+import sparkminds.librarymanagement.loan.entity.LoanOrigin;
+import sparkminds.librarymanagement.loan.entity.LoanPaymentStatus;
 import sparkminds.librarymanagement.loan.entity.NotificationKind;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -19,7 +22,6 @@ import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.math.BigDecimal;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -64,13 +66,31 @@ public class BorrowHandoverService {
                 || itemRepository.hasUnpaidLateFee(memberId)) {
             throw error(HttpStatus.CONFLICT, "BORROW_OUTSTANDING_OBLIGATION", "Thành viên còn sách quá hạn hoặc phí trễ chưa giải quyết");
         }
-        var payments = validatedPayments(ready, request);
+        Map<Integer, BigDecimal> payments;
+        if (loan.getOrigin() == LoanOrigin.COUNTER) {
+            payments = validatedCounterPayments(ready, request);
+        } else {
+            validateOnlinePayment(loan.getPaymentStatus(), ready, request);
+            payments = Map.of();
+        }
         if (loan.getBorrowedAt() == null) loan.setBorrowedAt(now);
+        if (loan.getOrigin() == LoanOrigin.COUNTER) {
+            BigDecimal collectedAmount = payments.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (collectedAmount.signum() > 0) {
+                loan.setPaymentAmount(loan.getPaymentAmount().add(collectedAmount));
+                loan.setPaymentStatus(LoanPaymentStatus.PAID);
+                loan.setPaymentMethod(sparkminds.librarymanagement.loan.entity.LoanPaymentMethod.COUNTER);
+                loan.setPaidAt(now);
+                loan.setPaymentExpiresAt(null);
+            }
+        }
         for (int index = 0; index < ready.size(); index++) {
             var item = ready.get(index);
-            item.setPaidBorrowFee(payments.get(item.getId()));
-            item.setBorrowFeePaidAt(now);
-            item.setBorrowFeeConfirmedByAccount(actor);
+            if (loan.getOrigin() == LoanOrigin.COUNTER) {
+                item.setPaidBorrowFee(payments.get(item.getId()));
+                item.setBorrowFeePaidAt(now);
+                item.setBorrowFeeConfirmedByAccount(actor);
+            }
             item.setBorrowedAt(now);
             item.setDueDate(now.toLocalDate().plusDays(14));
             item.setStatus(LoanItemStatus.BORROWED);
@@ -83,7 +103,7 @@ public class BorrowHandoverService {
         return queryService.detail(code);
     }
 
-    private Map<Integer, BigDecimal> validatedPayments(List<LoanItem> ready, HandoverRequest request) {
+    private Map<Integer, BigDecimal> validatedCounterPayments(List<LoanItem> ready, HandoverRequest request) {
         var submittedIds = request.items().stream().map(HandoverRequest.PaymentItem::loanItemId).toList();
         if (new HashSet<>(submittedIds).size() != submittedIds.size()) {
             throw error(HttpStatus.UNPROCESSABLE_ENTITY, "BORROW_INVALID_HANDOVER_SET", "Danh sách thu phí không được lặp sách");
@@ -100,6 +120,17 @@ public class BorrowHandoverService {
             }
         }
         return payments;
+    }
+
+    private void validateOnlinePayment(LoanPaymentStatus paymentStatus, List<LoanItem> ready,
+                                       HandoverRequest request) {
+        if (paymentStatus != LoanPaymentStatus.PAID) {
+            throw error(HttpStatus.CONFLICT, "BORROW_PAYMENT_REQUIRED", "Yêu cầu phải thanh toán trực tuyến trước khi bàn giao");
+        }
+        if (!request.items().isEmpty() || ready.stream().anyMatch(item -> item.getPaidBorrowFee() == null
+                || item.getPaidBorrowFee().compareTo(item.getBorrowFee()) != 0 || item.getBorrowFeePaidAt() == null)) {
+            throw error(HttpStatus.CONFLICT, "BORROW_PAYMENT_RECORD_MISSING", "Không tìm thấy xác nhận thanh toán trực tuyến cho toàn bộ sách READY");
+        }
     }
 
     private BusinessException error(HttpStatus status, String code, String message) {

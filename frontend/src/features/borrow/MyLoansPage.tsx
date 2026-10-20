@@ -1,7 +1,7 @@
 import { Alert, Button, Modal, Pagination, Skeleton, Tag } from 'antd';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { usePermission } from '../../auth/permissions';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { borrowApi } from './api';
@@ -58,7 +58,8 @@ function readyCountdown(expiresAt: string | null, now: number | null): string | 
 
 function getVisibleItems(requests: BorrowRequestSummary[], filter: LoanFilter) {
   // Trạng thái tổng hợp của Loan có thể khác nhau giữa các sách, vì vậy lọc từng LoanItem trước khi nhóm lại.
-  return requests.map((request) => ({ ...request, items: request.items.filter((item) => filterItem(item, filter)) }))
+  return requests.map((request) => ({ ...request, items: request.items.filter((item) =>
+    filterItem(item, filter) || (filter === 'PENDING' && request.paymentStatus === 'PENDING' && item.status === 'WAITLISTED')) }))
     .filter((request) => request.items.length > 0);
 }
 
@@ -68,6 +69,7 @@ function requestStatus(filter: LoanFilter): BorrowRequestFilter {
 }
 
 export function MyLoansPage() {
+  const navigate = useNavigate();
   const { notify } = useAppNotification();
   const canCancel = usePermission('borrow:cancel-own');
   const canRenew = usePermission('borrow:renew');
@@ -178,6 +180,13 @@ export function MyLoansPage() {
             <p className="role-eyebrow">YÊU CẦU {request.loanCode}</p>
             <h2>{request.items.length} {request.items.length === 1 ? 'cuốn' : 'cuốn'} trong nhóm này</h2>
             <p>Ngày tạo {formatDate(request.createdAt)} · {request.itemCount} sách trong yêu cầu</p>
+            {request.paymentStatus === 'PENDING' && <div className="borrow-payment-reminder">
+              <Tag color="warning">Chờ thanh toán</Tag>
+              <span>Cần thanh toán {formatVnd(request.paymentAmount ?? 0)} để thư viện bắt đầu xử lý.</span>
+              <Button type="primary" onClick={() => navigate(`/borrow-payment/${encodeURIComponent(request.loanCode)}`)}>
+                Tiếp tục thanh toán
+              </Button>
+            </div>}
           </div>
           {request.pickupReference && <div className="borrow-qr" aria-label={`Mã QR nhận sách cho ${request.loanCode}`}>
             <QRCodeSVG value={request.pickupReference} size={112} level="M" marginSize={4} title={`Mã QR nhận sách cho ${request.loanCode}`} />
@@ -204,7 +213,8 @@ export function MyLoansPage() {
               {loanItem.status === 'BORROWED' && <div><dt>Phí trễ / ngày</dt><dd>{formatVnd(loanItem.lateFeePerDay)}</dd></div>}
             </dl>
             <div className="borrow-item__actions">
-              {canCancel && ['WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP'].includes(loanItem.status)
+              {canCancel && !(request.paymentStatus === 'PAID' && loanItem.paidBorrowFee > 0)
+                && ['WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP'].includes(loanItem.status)
                 && <Button disabled={pending} onClick={() => setAction({ type: 'cancel', loanCode: request.loanCode, item: loanItem })}>Hủy sách này</Button>}
               {canRenew && loanItem.status === 'BORROWED' && loanItem.renewalCount === 0
                 && <Button type="primary" disabled={pending} onClick={() => setAction({ type: 'renew', loanCode: request.loanCode, item: loanItem })}>Gia hạn miễn phí 7 ngày</Button>}
@@ -232,7 +242,7 @@ export function MyLoansPage() {
       onCancel={() => { if (!pending) setAction(null); }}
       onOk={() => { void confirmAction(); }}
     >
-      {action?.type === 'cancel' && <p>Bạn muốn hủy “{action.item.title}” khỏi yêu cầu này? Sách READY được phép hủy tại quầy trước khi xác nhận phí.</p>}
+      {action?.type === 'cancel' && <p>Bạn muốn hủy “{action.item.title}” khỏi yêu cầu này? Nếu khoản phí đã được thanh toán trực tuyến, hãy liên hệ thủ thư để được hỗ trợ hoàn tiền trực tiếp tại quầy.</p>}
       {action?.type === 'renew' && <p>Gia hạn “{action.item.title}” thêm 7 ngày miễn phí từ hạn trả hiện tại. Mỗi sách chỉ được gia hạn một lần trong thời gian máy chủ cho phép.</p>}
     </Modal>
   </main>;

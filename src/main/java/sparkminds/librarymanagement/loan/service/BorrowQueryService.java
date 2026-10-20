@@ -48,6 +48,8 @@ public class BorrowQueryService {
             var responses = itemResponses(ownedItems, positions);
             return new BorrowRequestSummaryResponse(loan.getLoanCode(), loan.getPickupReference(), loan.getStatus(),
                     loan.getCreatedAt().toInstant(ZoneOffset.UTC), loan.getVersion(), responses.size(),
+                    loan.getPaymentStatus(), loan.getPaymentAmount(),
+                    loan.getPaymentExpiresAt() == null ? null : loan.getPaymentExpiresAt().toInstant(ZoneOffset.UTC),
                     ownedItems.stream().map(LoanItem::getStatus).distinct().toList(), responses);
         }).toList();
         return PagedResponse.of(content, loans.getNumber(), loans.getSize(), loans.getTotalElements());
@@ -73,7 +75,10 @@ public class BorrowQueryService {
         var positions = queuePositions(items);
         var responses = itemResponses(items, positions);
         return new BorrowRequestResponse(loan.getLoanCode(), loan.getPickupReference(), loan.getStatus(),
-                loan.getCreatedAt().toInstant(ZoneOffset.UTC), loan.getVersion(), responses);
+                loan.getCreatedAt().toInstant(ZoneOffset.UTC), loan.getVersion(), loan.getPaymentStatus(),
+                loan.getPaymentMethod(), loan.getPaymentAmount(),
+                loan.getPaymentExpiresAt() == null ? null : loan.getPaymentExpiresAt().toInstant(ZoneOffset.UTC),
+                loan.getPaidAt() == null ? null : loan.getPaidAt().toInstant(ZoneOffset.UTC), responses);
     }
 
     private List<BorrowItemResponse> itemResponses(List<LoanItem> items, Map<Integer, QueuePosition> positions) {

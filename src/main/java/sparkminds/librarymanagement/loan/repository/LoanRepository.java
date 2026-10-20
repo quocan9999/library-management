@@ -18,6 +18,7 @@ public interface LoanRepository extends JpaRepository<Loan, Integer> {
     String STAFF_SEARCH_WHERE = """
              where (:allStatuses = true or exists (
                select item.id from LoanItem item where item.loan.id = loan.id and item.status in :statuses))
+             and loan.paymentStatus <> sparkminds.librarymanagement.loan.entity.LoanPaymentStatus.PENDING
              and (:search = '' or loan.pickupReference = :search
                or lower(loan.loanCode) like :pattern escape '!'
                or lower(member.memberCode) like :pattern escape '!'
@@ -37,10 +38,20 @@ public interface LoanRepository extends JpaRepository<Loan, Integer> {
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "member")
     Optional<Loan> findByPickupReference(String pickupReference);
 
+    @Query("select loan.id from Loan loan where loan.paymentStatus = :status and loan.paymentExpiresAt <= :now order by loan.paymentExpiresAt, loan.id")
+    java.util.List<Integer> findExpiredPaymentIds(
+            @Param("status") sparkminds.librarymanagement.loan.entity.LoanPaymentStatus status,
+            @Param("now") LocalDateTime now, Pageable page);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select loan from Loan loan where loan.id = :loanId")
+    Optional<Loan> findByIdForUpdate(@Param("loanId") Integer loanId);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "member")
     @Query("""
-            select loan from Loan loan where :allStatuses = true or exists (
-              select item.id from LoanItem item where item.loan.id = loan.id and item.status in :statuses)
+            select loan from Loan loan where loan.paymentStatus <> sparkminds.librarymanagement.loan.entity.LoanPaymentStatus.PENDING
+              and (:allStatuses = true or exists (
+                select item.id from LoanItem item where item.loan.id = loan.id and item.status in :statuses))
             """)
     Page<Loan> findStaffRequests(@Param("allStatuses") boolean allStatuses,
                                  @Param("statuses") Collection<LoanItemStatus> statuses, Pageable page);

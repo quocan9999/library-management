@@ -11,6 +11,7 @@ import sparkminds.librarymanagement.loan.dto.StaffBorrowHistoryResponse;
 import sparkminds.librarymanagement.loan.entity.Loan;
 import sparkminds.librarymanagement.loan.entity.LoanItem;
 import sparkminds.librarymanagement.loan.entity.LoanItemStatus;
+import sparkminds.librarymanagement.loan.entity.LoanPaymentStatus;
 import sparkminds.librarymanagement.loan.repository.BorrowReadRepository;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
 import sparkminds.librarymanagement.loan.repository.LoanRepository;
@@ -38,8 +39,9 @@ public class StaffBorrowQueryService {
     private final Clock clock;
 
     public StaffBorrowResponse pickup(String reference) {
-        return responses(List.of(loanRepository.findByPickupReference(reference)
-                .orElseThrow(BorrowQueryService::notFound))).get(0);
+        var loan = loanRepository.findByPickupReference(reference).orElseThrow(BorrowQueryService::notFound);
+        if (loan.getPaymentStatus() == LoanPaymentStatus.PENDING) throw BorrowQueryService.notFound();
+        return responses(List.of(loan)).get(0);
     }
 
     public StaffBorrowResponse detail(String code) {
@@ -120,6 +122,8 @@ public class StaffBorrowQueryService {
             var member = loan.getMember();
             return new StaffBorrowResponse(loan.getLoanCode(), loan.getPickupReference(), loan.getStatus(),
                     loan.getCreatedAt().toInstant(ZoneOffset.UTC), loan.getVersion(),
+                    loan.getOrigin(), loan.getPaymentStatus(), loan.getPaymentAmount(),
+                    loan.getPaymentExpiresAt() == null ? null : loan.getPaymentExpiresAt().toInstant(ZoneOffset.UTC),
                     new StaffBorrowResponse.MemberIdentity(member.getId(), member.getMemberCode(), member.getFullName()),
                     responses, warnings);
         }).toList();

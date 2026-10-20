@@ -108,6 +108,15 @@ public class BorrowNotificationRepository {
                 NotificationStatus.SENT.name(), itemId, currentDueDate.toString());
     }
 
+    /** Key chỉ chứa ID nội bộ; giới hạn theo cùng Loan để nội dung không lẫn yêu cầu khác. */
+    public List<String> readyBatchTitles(Delivery delivery) {
+        return jdbc.queryForList("""
+                SELECT b.title FROM loan_items li JOIN books b ON b.id = li.book_id
+                JOIN loans l ON l.id = li.loan_id
+                WHERE l.loan_code = ? AND FIND_IN_SET(CAST(li.id AS CHAR), ?) > 0 ORDER BY li.id
+                """, String.class, delivery.loanCode(), delivery.key().substring("ready-batch:".length()));
+    }
+
     /** DTO nội bộ cho SMTP; không serialize recipient hoặc nội dung này lên API/log. */
     public record Delivery(Long id, int attempt, NotificationKind kind, String key, Integer itemId, Integer bookId,
                             LoanItemStatus itemStatus, LocalDate dueDate, LocalDateTime pickupExpiresAt,

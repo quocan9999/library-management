@@ -142,3 +142,7 @@ databaseChangeLog:
   - include:
       file: changes/036-borrow-permissions.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/037-borrow-counter-and-mock-payment.yaml
+      relativeToChangelogFile: true

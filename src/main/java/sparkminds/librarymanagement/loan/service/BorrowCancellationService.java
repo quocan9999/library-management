@@ -10,12 +10,15 @@ import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.loan.dto.BorrowRequestResponse;
 import sparkminds.librarymanagement.loan.entity.LoanItemEventReason;
 import sparkminds.librarymanagement.loan.entity.LoanItemStatus;
+import sparkminds.librarymanagement.loan.entity.LoanPaymentMethod;
+import sparkminds.librarymanagement.loan.entity.LoanPaymentStatus;
 import sparkminds.librarymanagement.loan.entity.NotificationKind;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
 import sparkminds.librarymanagement.loan.repository.LoanRepository;
 
 import java.time.Clock;
 import java.time.ZoneOffset;
+import java.math.BigDecimal;
 import java.util.TreeSet;
 
 @Service
@@ -49,7 +52,8 @@ public class BorrowCancellationService {
         // Promotion không khóa Member; sau khi chờ Book phải đọc lại status để không hủy theo snapshot WAITLISTED cũ.
         entityManager.refresh(item);
         LoanItemStatus previous = item.getStatus();
-        if (!previous.isPending() || item.getPaidBorrowFee() != null || item.getBorrowedAt() != null) {
+        boolean feeWasCollected = item.getPaidBorrowFee() != null && item.getPaidBorrowFee().signum() > 0;
+        if (!previous.isPending() || feeWasCollected || item.getBorrowedAt() != null) {
             throw new BusinessException(HttpStatus.CONFLICT, "BORROW_ITEM_NOT_CANCELLABLE", "Sách không còn ở trạng thái được hủy");
         }
         if (previous == LoanItemStatus.READY_FOR_PICKUP
@@ -58,6 +62,7 @@ public class BorrowCancellationService {
         }
         item.setStatus(LoanItemStatus.CANCELLED);
         if (previous != LoanItemStatus.WAITLISTED) book.setAvailableQuantity(book.getAvailableQuantity() + 1);
+        refreshUnpaidPaymentAmount(loan, now());
         auditService.append(item, previous, LoanItemEventReason.USER_CANCELLED, member.getAccount(),
                 NotificationKind.CANCELLED, "item:" + item.getId() + ":cancelled");
         var affected = new TreeSet<Integer>();
@@ -65,5 +70,25 @@ public class BorrowCancellationService {
         inventoryService.allocateWaiting(book, affected);
         aggregateService.refresh(affected);
         return queryService.getMine(accountId, loanCode);
+    }
+
+    private void refreshUnpaidPaymentAmount(sparkminds.librarymanagement.loan.entity.Loan loan,
+                                            java.time.LocalDateTime now) {
+        if (loan.getPaymentStatus() != LoanPaymentStatus.PENDING) return;
+        BigDecimal amount = loanItemRepository.findByLoanId(loan.getId()).stream()
+                .filter(candidate -> candidate.getStatus().isPending() && candidate.getPaidBorrowFee() == null)
+                .map(candidate -> candidate.getBorrowFee())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        loan.setPaymentAmount(amount);
+        if (amount.signum() == 0) {
+            loan.setPaymentStatus(LoanPaymentStatus.PAID);
+            loan.setPaymentMethod(LoanPaymentMethod.NO_CHARGE);
+            loan.setPaymentExpiresAt(null);
+            loan.setPaidAt(now);
+        }
+    }
+
+    private java.time.LocalDateTime now() {
+        return java.time.LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
     }
 }

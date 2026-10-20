@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Input, Modal, Pagination, Select, Skeleton, Tag } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { BORROW_PAGE_SIZE, MAX_BORROW_BOOKS, borrowApi } from './api';
 import { BorrowBookAction } from './BorrowBookAction';
 import { BorrowCart } from './BorrowCart';
@@ -16,6 +16,7 @@ function stockLabel(book: CatalogBook): { label: string; tone: 'available' | 'lo
 }
 
 export function CatalogPage() {
+  const navigate = useNavigate();
   const { notify } = useAppNotification();
   const [searchDraft, setSearchDraft] = useState('');
   const [queryText, setQueryText] = useState('');
@@ -80,15 +81,11 @@ export function CatalogPage() {
     requestLock.current = true;
     setRequestPending(true);
     try {
-      await borrowApi.createRequest(selectedBooks.map((book) => book.id));
+      const created = await borrowApi.createRequest(selectedBooks.map((book) => book.id));
       setConfirmRequestOpen(false);
       setCartDrawerOpen(false);
       setSelectedBooks([]);
-      notify('success', {
-        title: 'Đã tạo yêu cầu mượn',
-        description: 'Trạng thái được xác nhận từ máy chủ.',
-      });
-      setReloadKey((key) => key + 1);
+      navigate(`/borrow-payment/${encodeURIComponent(created.loanCode)}`);
     } catch (error: unknown) {
       notify(borrowErrorNotificationType(error), {
         title: 'Không thể tạo yêu cầu mượn',

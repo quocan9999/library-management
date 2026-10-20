@@ -2547,6 +2547,13 @@ input:focus-visible,
   gap: 12px;
 }
 
+.librarian-borrow-page__heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .borrow-toolbar .ant-input-search,
 .borrow-toolbar .ant-select,
 .borrow-lookup .ant-input-search {
@@ -3292,7 +3299,102 @@ input:focus-visible,
 .handover-fee-list li {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 18px;
+}
+
+.borrow-payment {
+  max-width: 1120px;
+}
+
+.borrow-payment__layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.85fr) minmax(0, 1.15fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.borrow-payment__qr-card .ant-card-body {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.borrow-payment__qr {
+  display: grid;
+  place-items: center;
+  width: min(100%, 260px);
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.borrow-payment__mock-label {
+  display: inline-flex;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.borrow-payment__details .ant-descriptions-item-content {
+  overflow-wrap: anywhere;
+}
+
+.borrow-payment__details .ant-descriptions-item-content h4 {
+  margin: 0;
+}
+
+.borrow-payment__details .ant-btn {
+  margin-top: 16px;
+}
+
+.borrow-payment__books {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.borrow-payment__books > h4 {
+  margin-top: 0;
+}
+
+.borrow-payment__book-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.borrow-payment__book-row > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.borrow-payment-reminder {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.borrow-payment-reminder .ant-tag {
+  margin: 0;
+}
+
+.borrow-payment-reminder > span {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .borrow-lookup {
@@ -3503,6 +3605,10 @@ input:focus-visible,
   min-width: 0;
 }
 
+.librarian-borrow-table-wrap .ant-table-cell {
+  vertical-align: middle;
+}
+
 .librarian-borrow-table .ant-table-tbody > tr.librarian-borrow-table__row--action > td:first-child {
   box-shadow: inset 3px 0 var(--gold);
 }
@@ -3522,8 +3628,9 @@ input:focus-visible,
 
 .librarian-borrow-table__member,
 .librarian-borrow-table__status {
-  display: grid;
-  justify-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 2px;
 }
 
@@ -3559,48 +3666,67 @@ input:focus-visible,
   align-items: start;
 }
 
-.librarian-borrow-drawer .ant-drawer-content {
+.librarian-borrow-modal .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
   background: var(--paper);
 }
 
-.librarian-borrow-drawer .ant-drawer-header {
-  border-bottom-color: var(--line);
+.librarian-borrow-modal .ant-modal {
+  width: min(880px, calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px);
 }
 
-.librarian-borrow-drawer__title,
-.librarian-borrow-drawer__title > div:first-child {
+.librarian-borrow-modal .ant-modal-header {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.librarian-borrow-modal .ant-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.librarian-borrow-modal__title,
+.librarian-borrow-modal__title > div:first-child {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.librarian-borrow-drawer__title {
+.librarian-borrow-modal__title > div:first-child {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.librarian-borrow-modal__title {
   justify-content: space-between;
 }
 
-.librarian-borrow-drawer__title h4 {
+.librarian-borrow-modal__title h4 {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
 
-.librarian-borrow-drawer__body {
+.librarian-borrow-modal__body {
   display: grid;
   align-content: start;
   gap: 16px;
-  min-height: 100%;
   padding: 20px;
 }
 
-.librarian-borrow-drawer__warning,
-.librarian-borrow-drawer__error {
+.librarian-borrow-modal__warning,
+.librarian-borrow-modal__error {
   margin: 0;
 }
 
-.librarian-borrow-drawer__loading {
+.librarian-borrow-modal__loading {
   padding: 8px;
 }
 
-.librarian-borrow-drawer__section {
+.librarian-borrow-modal__section {
   display: grid;
   gap: 10px;
   padding: 16px;
@@ -3609,16 +3735,16 @@ input:focus-visible,
   background: var(--paper);
 }
 
-.librarian-borrow-drawer__section > h5,
-.librarian-borrow-drawer__section-heading h5 {
+.librarian-borrow-modal__section > h5,
+.librarian-borrow-modal__section-heading h5 {
   margin: 0;
 }
 
-.librarian-borrow-drawer__member {
+.librarian-borrow-modal__member {
   display: grid;
 }
 
-.librarian-borrow-drawer__qr {
+.librarian-borrow-modal__qr {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -3626,63 +3752,63 @@ input:focus-visible,
   border-top: 1px solid var(--line);
 }
 
-.librarian-borrow-drawer__qr > div {
+.librarian-borrow-modal__qr > div {
   display: grid;
   justify-items: start;
   gap: 6px;
   min-width: 0;
 }
 
-.librarian-borrow-drawer__reference {
+.librarian-borrow-modal__reference {
   max-width: 100%;
   overflow-wrap: anywhere;
   white-space: normal;
 }
 
-.librarian-borrow-drawer__section-heading {
+.librarian-borrow-modal__section-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.librarian-borrow-drawer__items {
+.librarian-borrow-modal__items {
   display: grid;
 }
 
-.librarian-borrow-item {
+.librarian-borrow-modal-item {
   display: grid;
   gap: 8px;
   padding: 12px 0;
   border-top: 1px solid var(--line);
 }
 
-.librarian-borrow-item:first-child {
+.librarian-borrow-modal-item:first-child {
   border-top: 0;
 }
 
-.librarian-borrow-item__heading {
+.librarian-borrow-modal-item__heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.librarian-borrow-item__book {
+.librarian-borrow-modal-item__book {
   display: grid;
   min-width: 0;
   gap: 2px;
 }
 
-.librarian-borrow-item__book .ant-typography:first-child {
+.librarian-borrow-modal-item__book .ant-typography:first-child {
   max-width: 420px;
 }
 
-.librarian-borrow-item__heading .ant-tag {
+.librarian-borrow-modal-item__heading .ant-tag {
   flex: 0 0 auto;
   margin: 0;
 }
 
-.librarian-borrow-item__fee {
+.librarian-borrow-modal-item__fee {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -3690,23 +3816,23 @@ input:focus-visible,
   font-variant-numeric: tabular-nums;
 }
 
-.librarian-borrow-item__fee--inactive {
+.librarian-borrow-modal-item__fee--inactive {
   color: var(--muted);
   opacity: 0.72;
 }
 
-.librarian-borrow-item__deadline,
-.librarian-borrow-item__waitlist {
+.librarian-borrow-modal-item__deadline,
+.librarian-borrow-modal-item__waitlist {
   font-size: 12px;
 }
 
-.librarian-borrow-item__actions {
+.librarian-borrow-modal-item__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.librarian-borrow-drawer__footer {
+.librarian-borrow-modal__footer {
   display: grid;
   gap: 12px;
   padding: 16px 20px;
@@ -3714,21 +3840,98 @@ input:focus-visible,
   background: var(--paper);
 }
 
-.librarian-borrow-drawer__total,
-.librarian-borrow-drawer__footer-actions {
+.librarian-borrow-modal__total,
+.librarian-borrow-modal__footer-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.librarian-borrow-drawer__footer-actions {
+.librarian-borrow-modal__footer-actions {
   justify-content: flex-end;
   flex-wrap: wrap;
 }
 
-.librarian-borrow-drawer__footer-actions .ant-checkbox-wrapper {
+.librarian-borrow-modal__footer-actions .ant-checkbox-wrapper {
   margin-inline-end: auto;
+}
+
+.librarian-counter-create {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.librarian-counter-create__book-heading,
+.librarian-counter-create__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.librarian-counter-create__book-heading label,
+.librarian-counter-create > label {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.librarian-counter-create__book-list,
+.librarian-counter-create__search-results {
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+}
+
+.librarian-counter-create__search-results {
+  max-height: 220px;
+}
+
+.librarian-counter-create__selected-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.librarian-counter-create__book-list .ant-list-item {
+  align-items: center;
+  gap: 12px;
+}
+
+.librarian-counter-create__search-results .ant-list-item {
+  align-items: center;
+  gap: 12px;
+}
+
+.librarian-counter-create__book,
+.librarian-counter-create__book-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.librarian-counter-create__book {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.librarian-counter-create__book .ant-typography {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.librarian-counter-create__book-meta {
+  justify-items: end;
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.librarian-counter-create__summary {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 @media (max-width: 768px) {
@@ -3748,24 +3951,44 @@ input:focus-visible,
     max-width: 100%;
   }
 
-  .librarian-borrow-drawer .ant-drawer-content-wrapper {
-    width: 100vw !important;
+  .librarian-borrow-modal .ant-modal-content {
+    max-height: calc(100dvh - 16px);
   }
 
-  .librarian-borrow-drawer__body {
+  .librarian-borrow-modal__body {
     padding: 14px;
   }
 
-  .librarian-borrow-drawer__footer {
+  .librarian-borrow-modal__footer {
     padding: 14px;
   }
 
-  .librarian-borrow-drawer__footer-actions {
+  .librarian-borrow-modal__footer-actions {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .librarian-borrow-drawer__footer-actions .ant-btn {
+  .librarian-borrow-modal__footer-actions .ant-btn {
     width: 100%;
+  }
+
+  .borrow-payment__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .borrow-payment__qr {
+    width: min(100%, 220px);
+  }
+
+  .librarian-counter-create__book-list .ant-list-item,
+  .librarian-counter-create__search-results .ant-list-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .librarian-counter-create__book-meta {
+    width: 100%;
+    justify-items: start;
+    padding-left: 24px;
   }
 }

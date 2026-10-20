@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import sparkminds.librarymanagement.loan.service.BorrowExpirationService;
 import sparkminds.librarymanagement.loan.service.BorrowNotificationDispatcher;
+import sparkminds.librarymanagement.loan.service.BorrowPaymentExpirationService;
 import sparkminds.librarymanagement.loan.service.BorrowReminderService;
 
 @Configuration
@@ -19,6 +20,7 @@ public class BorrowSchedulingConfiguration {
     private final BorrowExpirationService expirationService;
     private final BorrowReminderService reminderService;
     private final BorrowNotificationDispatcher dispatcher;
+    private final BorrowPaymentExpirationService paymentExpirationService;
 
     @Bean
     public ThreadPoolTaskScheduler borrowTaskScheduler() {
@@ -35,6 +37,7 @@ public class BorrowSchedulingConfiguration {
             initialDelayString = "${borrow.maintenance.initial-delay-ms:60000}")
     public void maintain() {
         runSafely(expirationService::expirePending, "expiration");
+        runSafely(paymentExpirationService::expirePendingPayments, "payment-expiration");
         runSafely(reminderService::createDueReminders, "reminders");
     }
 

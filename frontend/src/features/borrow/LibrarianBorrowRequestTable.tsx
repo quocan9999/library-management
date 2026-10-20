@@ -1,11 +1,11 @@
-import { Button, Pagination, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { Button, ConfigProvider, Pagination, Spin, Table, Tag, theme, Typography } from 'antd';
 import type { TableColumnsType, TableProps } from 'antd';
 import type { PageResponse, StaffBorrowRequest } from './types';
 import {
-  aggregateStatusTagColor,
+  getRequestDisplayStatuses,
+  statusTagColor,
   formatDeskDate,
   ITEM_STATUS_LABELS,
-  LOAN_STATUS_LABELS,
   requestNeedsStaffAction,
 } from './staffBorrowPresentation';
 
@@ -22,6 +22,7 @@ interface LibrarianBorrowRequestTableProps {
 }
 
 export function LibrarianBorrowRequestTable(props: LibrarianBorrowRequestTableProps) {
+  const { token } = theme.useToken();
   const requests = props.result?.content ?? [];
   const sortOrder = (field: string) => props.sort === `${field},asc` ? 'ascend' as const
     : props.sort === `${field},desc` ? 'descend' as const : null;
@@ -69,13 +70,9 @@ export function LibrarianBorrowRequestTable(props: LibrarianBorrowRequestTablePr
       key: 'status',
       width: 250,
       render: (_, request) => {
-        const statuses = [...new Set(request.items.map((item) => item.status))];
-        const summary = statuses.map((status) =>
-          `${ITEM_STATUS_LABELS[status]}: ${request.items.filter((item) => item.status === status).length}`,
-        ).join(' · ');
         return <span className="librarian-borrow-table__status">
-          <Tag color={aggregateStatusTagColor(request.status)}>{LOAN_STATUS_LABELS[request.status]}</Tag>
-          {summary && <Tooltip title={summary}><Typography.Text type="secondary" ellipsis>{summary}</Typography.Text></Tooltip>}
+          {getRequestDisplayStatuses(request).map((status) =>
+            <Tag key={status} color={statusTagColor(status)}>{ITEM_STATUS_LABELS[status]}</Tag>)}
         </span>;
       },
     },
@@ -108,6 +105,12 @@ export function LibrarianBorrowRequestTable(props: LibrarianBorrowRequestTablePr
 
   return <>
     <div className="member-table-wrap librarian-borrow-table-wrap" aria-busy={props.loading}>
+      <ConfigProvider theme={{ components: { Table: {
+        bodySortBg: token.colorBgContainer,
+        headerBg: token.colorFillAlter,
+        headerSortActiveBg: token.colorFillAlter,
+        headerSortHoverBg: token.colorFillAlter,
+      } } }}>
       <Table<StaffBorrowRequest>
         className="librarian-borrow-table"
         rowKey="loanCode"
@@ -134,6 +137,7 @@ export function LibrarianBorrowRequestTable(props: LibrarianBorrowRequestTablePr
           },
         })}
       />
+      </ConfigProvider>
     </div>
     {props.result && props.result.totalElements > 0 && <div className="member-pagination-row">
       <span role="status">Tổng số {props.result.totalElements} yêu cầu</span>

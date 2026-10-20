@@ -13,7 +13,7 @@ import java.util.List;
 
 public record HandoverRequest(@NotNull Boolean identityVerified,
                               @NotNull @PositiveOrZero Long expectedLoanVersion,
-                              @NotNull @Size(min = 1, max = 3) List<@NotNull @Valid PaymentItem> items) {
+                              @NotNull @Size(max = 3) List<@NotNull @Valid PaymentItem> items) {
     public record PaymentItem(@NotNull @Positive Integer loanItemId,
                                @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2)
                                BigDecimal collectedBorrowFee) {

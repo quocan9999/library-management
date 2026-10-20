@@ -1,5 +1,6 @@
 import { Button, Modal } from 'antd';
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { usePermission } from '../../auth/permissions';
 import { useAppNotification } from '../../components/AppNotificationProvider';
@@ -17,6 +18,7 @@ interface BorrowBookActionProps {
 
 export function BorrowBookAction({ book, onCreated, selected = false, selectionDisabled = false, onToggleSelection }: BorrowBookActionProps) {
   const { role } = useAuth();
+  const navigate = useNavigate();
   const { notify } = useAppNotification();
   const hasCreatePermission = usePermission('borrow:create');
   const canCreate = role === 'USER' && hasCreatePermission;
@@ -31,13 +33,10 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
     pendingRef.current = true;
     setPending(true);
     try {
-      await borrowApi.createRequest([book.id]);
+      const created = await borrowApi.createRequest([book.id]);
       setConfirmOpen(false);
-      notify('success', {
-        title: 'Đã tạo yêu cầu mượn',
-        description: 'Trạng thái được xác nhận từ máy chủ.',
-      });
-      onCreated?.();
+      if (onCreated) onCreated();
+      else navigate(`/borrow-payment/${encodeURIComponent(created.loanCode)}`);
     } catch (error: unknown) {
       notify(borrowErrorNotificationType(error), {
         title: 'Không thể tạo yêu cầu mượn',

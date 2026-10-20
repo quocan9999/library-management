@@ -30,6 +30,7 @@ import { useAppNotification } from '../components/AppNotificationProvider';
 import { CatalogDetailPage, CatalogPage } from '../features/borrow/CatalogPage';
 import { LibrarianBorrowRequestsPage } from '../features/borrow/LibrarianBorrowRequestsPage';
 import { MyLoansPage } from '../features/borrow/MyLoansPage';
+import { BorrowPaymentPage } from '../features/borrow/BorrowPaymentPage';
 
 function SessionBootstrap() {
   return (
@@ -172,6 +173,7 @@ export function App() {
           <Route path="books" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogPage /></RequirePermission>} />
           <Route path="books/:id" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogDetailPage /></RequirePermission>} />
           <Route path="my-loans" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><MyLoansPage /></RequirePermission>} />
+          <Route path="borrow-payment/:loanCode" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><BorrowPaymentPage /></RequirePermission>} />
           <Route path="librarian/borrow-requests" element={<RequirePermission permission="borrow:read" deniedRoles={['USER']}><LibrarianBorrowRequestsPage /></RequirePermission>} />
           <Route path="admin/roles" element={<RequireRole role="ADMIN"><Navigate to="/admin/authorization/groups" replace /></RequireRole>} />
           <Route path="admin/authorization" element={<RequireRole role="ADMIN"><AuthorizationLandingPage /></RequireRole>} />

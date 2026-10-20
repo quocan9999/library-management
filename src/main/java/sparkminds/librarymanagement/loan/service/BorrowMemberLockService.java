@@ -22,6 +22,23 @@ public class BorrowMemberLockService {
 
     /** Account → Member luôn cùng thứ tự với vô hiệu hóa; đếm hạn mức chỉ sau khi đã khóa Member. */
     public Member lock(Integer accountId, boolean requireVerifiedEmail) {
+        lockEligibleAccount(accountId, requireVerifiedEmail);
+        Member member = memberRepository.findByAccountIdForUpdate(accountId).orElseThrow(this::ineligible);
+        entityManager.refresh(member, LockModeType.PESSIMISTIC_WRITE);
+        return member;
+    }
+
+    /** Khóa chủ tài khoản trước hồ sơ để yêu cầu tạo thay độc giả dùng chung thứ tự an toàn với thao tác account. */
+    public Member lockMember(Integer memberId, boolean requireVerifiedEmail) {
+        Member reference = memberRepository.findById(memberId).orElseThrow(this::ineligible);
+        Integer accountId = reference.getAccount().getId();
+        lockEligibleAccount(accountId, requireVerifiedEmail);
+        Member member = memberRepository.findByIdForUpdate(memberId).orElseThrow(this::ineligible);
+        entityManager.refresh(member, LockModeType.PESSIMISTIC_WRITE);
+        return member;
+    }
+
+    private void lockEligibleAccount(Integer accountId, boolean requireVerifiedEmail) {
         Account account = accountRepository.findByIdForUpdate(accountId).orElseThrow(this::ineligible);
         entityManager.refresh(account, LockModeType.PESSIMISTIC_WRITE);
         entityManager.refresh(account.getRole());
@@ -30,9 +47,6 @@ public class BorrowMemberLockService {
                 || (requireVerifiedEmail && !account.isEmailVerified())) {
             throw ineligible();
         }
-        Member member = memberRepository.findByAccountIdForUpdate(accountId).orElseThrow(this::ineligible);
-        entityManager.refresh(member, LockModeType.PESSIMISTIC_WRITE);
-        return member;
     }
 
     private BusinessException ineligible() {
