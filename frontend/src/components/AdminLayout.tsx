@@ -162,7 +162,7 @@ export function AdminLayout() {
           {role === 'USER' ? 'KHÔNG GIAN CÁ NHÂN' : role === 'ADMIN' ? 'KHÔNG GIAN QUẢN TRỊ' : 'DỊCH VỤ THƯ VIỆN'}
         </p>
         <nav className="admin-shell__nav" aria-label="Chính">
-          <PermissionGate permission="book:read" fallback={null}>
+          <PermissionGate permission="book:read" allowedRoles={['USER']} fallback={null}>
             <NavLink
               to="/books"
               className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}

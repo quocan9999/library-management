@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { App } from '../../app/App';
 import { apiClient } from '../../auth/api';
+import { AppNotificationProvider } from '../../components/AppNotificationProvider';
 import type { ApiEnvelope } from '../../auth/types';
 import type { BorrowItem, BorrowRequestSummary, LoanItemStatus, StaffBorrowRequest } from '../../features/borrow/types';
 
@@ -156,6 +157,43 @@ describe('Borrow Book routes and pages', () => {
     expect(staffReads).toBe(0);
   });
 
+  it('keeps the member catalog route and sidebar item out of admin navigation', async () => {
+    Object.assign(auth, {
+      role: 'ADMIN',
+      currentUser: { id: 1, username: 'admin', email: 'admin@example.test', role: 'ADMIN', permissions: ['book:read', 'role:read'] },
+      permissions: ['book:read', 'role:read'],
+    });
+    let catalogReads = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/catalog/books') catalogReads += 1;
+      throw new Error(`Catalog API should not run: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/books']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Danh mục sách' })).toBeNull();
+    expect(catalogReads).toBe(0);
+  });
+
+  it('denies admins direct access to member catalog details', async () => {
+    Object.assign(auth, {
+      role: 'ADMIN',
+      currentUser: { id: 1, username: 'admin', email: 'admin@example.test', role: 'ADMIN', permissions: ['book:read', 'role:read'] },
+      permissions: ['book:read', 'role:read'],
+    });
+    let catalogReads = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url?.startsWith('/api/v1/catalog/books')) catalogReads += 1;
+      throw new Error(`Catalog API should not run: ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/books/5']}><App /></MemoryRouter>);
+
+    expect(await screen.findByRole('heading', { name: 'Không thể truy cập trang này' })).toBeTruthy();
+    expect(catalogReads).toBe(0);
+  });
+
   it('routes an unauthenticated session to login', async () => {
     auth.accessToken = null;
     render(<MemoryRouter initialEntries={['/my-loans']}><App /><LocationProbe /></MemoryRouter>);
@@ -206,6 +244,24 @@ describe('Borrow Book routes and pages', () => {
     expect(await screen.findByText('Lập trình Java')).toBeTruthy();
   });
 
+  it('shows single-book request feedback in the shared top-right notification', async () => {
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/catalog/books/5') return response(config, success('BOOK_CATALOG_DETAIL_SUCCESS', catalogBook(5)));
+      if (config.method === 'post' && config.url === '/api/v1/borrow-requests') {
+        return response(config, success('BORROW_REQUEST_CREATED', ownRequest()));
+      }
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/books/5']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Đặt mượn' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận đặt mượn' }));
+
+    const notice = await screen.findByText('Trạng thái được xác nhận từ máy chủ.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
+    expect(document.querySelector('.borrow-inline-alert')).toBeNull();
+  });
+
   it('explains an expired pickup session when the server rejects an old READY action', async () => {
     const request = ownRequest();
     request.items[1] = { ...request.items[1], pickupExpiresAt: '2025-01-01T00:00:00Z' };
@@ -215,7 +271,7 @@ describe('Borrow Book routes and pages', () => {
       throw new Error(`Unexpected request: ${config.method} ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    render(<MemoryRouter initialEntries={['/my-loans']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/my-loans']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     const readyItem = (await screen.findByText('Nhập môn Java')).closest('[data-loan-item]') as HTMLElement;
     expect(within(readyItem).getByRole('timer').textContent).toContain('Đã hết 72 giờ');
     fireEvent.click(within(readyItem).getByRole('button', { name: 'Hủy sách này' }));
@@ -240,12 +296,15 @@ describe('Borrow Book routes and pages', () => {
       throw new Error(`Unexpected request: ${config.method} ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    render(<MemoryRouter initialEntries={['/my-loans']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/my-loans']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     const readyItem = (await screen.findByText('Nhập môn Java')).closest('[data-loan-item]') as HTMLElement;
     fireEvent.click(within(readyItem).getByRole('button', { name: 'Hủy sách này' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận hủy' }));
 
-    expect(await screen.findByText('Yêu cầu đã thay đổi ở nơi khác. Danh sách đã được tải lại; hãy kiểm tra trạng thái mới.')).toBeTruthy();
+    const notice = await screen.findByText('Yêu cầu đã thay đổi ở nơi khác. Danh sách đã được tải lại; hãy kiểm tra trạng thái mới.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
+    expect(document.querySelector('.ant-notification-topRight')).toBeTruthy();
+    expect(document.querySelector('.borrow-page-alert')).toBeNull();
     await waitFor(() => expect(reads).toBeGreaterThanOrEqual(2));
     const refreshedItem = (await screen.findByText('Nhập môn Java')).closest('[data-loan-item]') as HTMLElement;
     expect(within(refreshedItem).getByText('Đã hủy')).toBeTruthy();
@@ -334,7 +393,7 @@ describe('Borrow Book routes and pages', () => {
       throw new Error(`Unexpected request: ${config.method} ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    render(<MemoryRouter initialEntries={['/books']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/books']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     fireEvent.click(await screen.findByRole('button', { name: 'Chọn sách Lập trình Java' }));
     fireEvent.click(screen.getByRole('button', { name: 'Đặt mượn (1)' }));
     const confirm = await screen.findByRole('button', { name: 'Xác nhận đặt mượn' });
@@ -343,7 +402,9 @@ describe('Borrow Book routes and pages', () => {
     await waitFor(() => expect(postCount).toBe(1));
     await act(async () => { failPost?.(); await Promise.resolve(); });
 
-    expect(await screen.findByText('Chưa xác nhận được kết quả. Hãy tải danh sách yêu cầu trước khi gửi lại để tránh tạo trùng.')).toBeTruthy();
+    const notice = await screen.findByText('Chưa xác nhận được kết quả. Hãy tải danh sách yêu cầu trước khi gửi lại để tránh tạo trùng.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
+    expect(document.querySelector('.borrow-page-alert')).toBeNull();
     expect(postCount).toBe(1);
     expect(screen.queryByText('Đã tạo yêu cầu mượn thành công.')).toBeNull();
   });
@@ -355,13 +416,14 @@ describe('Borrow Book routes and pages', () => {
       throw new Error(`Unexpected request: ${config.method} ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    render(<MemoryRouter initialEntries={['/books']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/books']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     fireEvent.click(await screen.findByRole('button', { name: 'Chọn sách Lập trình Java' }));
     fireEvent.click(screen.getByRole('button', { name: 'Đặt mượn (1)' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận đặt mượn' }));
 
-    expect(await screen.findByRole('alert')).toBeTruthy();
-    expect(screen.getByRole('alert').textContent).toBe('Mỗi thành viên chỉ được có tối đa 3 đầu sách đang hoạt động.');
+    const notice = await screen.findByText('Mỗi thành viên chỉ được có tối đa 3 đầu sách đang hoạt động.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
+    expect(document.querySelector('.borrow-page-alert')).toBeNull();
   });
 
   it('creates one Loan for three distinct catalog books and prevents selecting a fourth', async () => {
@@ -376,7 +438,7 @@ describe('Borrow Book routes and pages', () => {
       throw new Error(`Unexpected request: ${config.method} ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    render(<MemoryRouter initialEntries={['/books']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/books']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     for (const title of ['Sách một', 'Sách hai', 'Sách ba']) {
       fireEvent.click(await screen.findByRole('button', { name: `Chọn sách ${title}` }));
     }
@@ -387,7 +449,8 @@ describe('Borrow Book routes and pages', () => {
 
     await waitFor(() => expect(submittedIds).toEqual([5, 6, 7]));
     expect(new Set(submittedIds).size).toBe(3);
-    expect(screen.getByText(/Đã tạo yêu cầu mượn/)).toBeTruthy();
+    const notice = await screen.findByText('Trạng thái được xác nhận từ máy chủ.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
   });
 
   it('loads staff requests in pages of ten with actionable requests first', async () => {
@@ -415,7 +478,7 @@ describe('Borrow Book routes and pages', () => {
       permissions: ['borrow:read'],
     });
 
-    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Thành viên 11' })).toBeTruthy();
     await waitFor(() => expect(queries[0]).toMatchObject({ page: 0, size: 10, status: 'PENDING', sort: 'createdAt,desc' }));
     fireEvent.click(document.querySelector('.ant-pagination-item-2 a') as HTMLElement);
@@ -450,7 +513,7 @@ describe('Borrow Book routes and pages', () => {
       permissions: ['borrow:read', 'borrow:prepare'],
     });
 
-    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     fireEvent.click(await screen.findByRole('button', { name: 'Ghi nhận không tìm thấy sách' }));
     const rejectDialog = await screen.findByRole('dialog');
     expect(within(rejectDialog).getByText(/không làm tăng số bản sẵn có/)).toBeTruthy();
@@ -458,6 +521,8 @@ describe('Borrow Book routes and pages', () => {
 
     await waitFor(() => expect(rejectCalls).toBe(1));
     expect(await screen.findByText('Không tìm thấy sách')).toBeTruthy();
+    const notice = await screen.findByText('Đã ghi nhận không tìm thấy bản sách vật lý; không tăng số bản sẵn có.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
     await waitFor(() => expect(listReads).toBeGreaterThanOrEqual(2));
     expect(screen.queryByRole('button', { name: 'Ghi nhận không tìm thấy sách' })).toBeNull();
   });
@@ -475,12 +540,14 @@ describe('Borrow Book routes and pages', () => {
       throw new Error(`Unexpected request: ${config.method} ${config.url}`);
     }) satisfies AxiosAdapter;
 
-    render(<MemoryRouter initialEntries={['/my-loans']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/my-loans']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     fireEvent.click(await screen.findByRole('tab', { name: 'Đang mượn' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Gia hạn miễn phí 7 ngày' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Gia hạn thêm 7 ngày' }));
 
     await waitFor(() => expect(body).toEqual({ expectedItemVersion: 4 }));
+    const notice = await screen.findByText('Sách đã được gia hạn miễn phí thêm 7 ngày.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
   });
 
   it('hands over exactly the READY items with their confirmed fees, including a zero fee', async () => {
@@ -521,7 +588,7 @@ describe('Borrow Book routes and pages', () => {
       permissions: ['borrow:read', 'borrow:cancel', 'borrow:handover', 'borrow:fee-confirm'],
     });
 
-    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     const requestHeading = await screen.findByRole('heading', { name: 'Nguyễn An' });
     const card = requestHeading.closest('[data-borrow-request]') as HTMLElement;
     fireEvent.click(within(card).getAllByRole('button', { name: 'Hủy READY theo yêu cầu thành viên' })[0]);
@@ -552,6 +619,8 @@ describe('Borrow Book routes and pages', () => {
         { loanItemId: 4, collectedBorrowFee: 15000 },
       ],
     });
+    const notice = await screen.findByText('Đã xác nhận phí và bàn giao toàn bộ sách READY còn lại.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
   });
 
   it('shows a specific fee mismatch message and keeps the handover unconfirmed', async () => {
@@ -570,13 +639,15 @@ describe('Borrow Book routes and pages', () => {
       permissions: ['borrow:read', 'borrow:handover', 'borrow:fee-confirm'],
     });
 
-    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     const card = (await screen.findByRole('heading', { name: 'Nguyễn An' })).closest('[data-borrow-request]') as HTMLElement;
     fireEvent.click(within(card).getByRole('checkbox', { name: 'Đã xác minh danh tính thành viên tại quầy' }));
     fireEvent.click(within(card).getByRole('button', { name: 'Thu phí và bàn giao' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận thu phí và bàn giao' }));
 
-    expect(await screen.findByText('Số phí xác nhận không khớp phí đã chốt. Hãy tải lại và xác nhận lại các sách sẵn sàng nhận.')).toBeTruthy();
+    const notice = await screen.findByText('Số phí xác nhận không khớp phí đã chốt. Hãy tải lại và xác nhận lại các sách sẵn sàng nhận.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
+    expect(document.querySelector('.borrow-page-alert')).toBeNull();
     expect(handoverCalls).toBe(1);
     expect(screen.queryByText('Đã xác nhận phí và bàn giao toàn bộ sách READY còn lại.')).toBeNull();
   });
@@ -599,7 +670,7 @@ describe('Borrow Book routes and pages', () => {
       permissions: ['borrow:read'],
     });
 
-    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     const qrInput = await screen.findByRole('searchbox', { name: 'Mã QR / mã nhận sách' });
     fireEvent.change(qrInput, { target: { value: 'QR-SECRET-REFERENCE' } });
     fireEvent.click(screen.getByRole('button', { name: 'Tra cứu' }));
@@ -607,6 +678,28 @@ describe('Borrow Book routes and pages', () => {
     expect(await screen.findByText('Nguyễn An')).toBeTruthy();
     expect(screen.getByText(/chuẩn bị quá 24 giờ/i)).toBeTruthy();
     expect(requests).toContain('/api/v1/librarian/pickups/QR-SECRET-REFERENCE');
+  });
+
+  it('shows pickup lookup errors in the shared top-right notification', async () => {
+    apiClient.defaults.adapter = (async (config) => {
+      if (config.url === '/api/v1/librarian/borrow-requests') return response(config, success('BORROW_REQUEST_LIST_SUCCESS', page([])));
+      if (config.url === '/api/v1/librarian/pickups/UNKNOWN-REFERENCE') throw failure(config, 404, 'BORROW_REQUEST_NOT_FOUND');
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`);
+    }) satisfies AxiosAdapter;
+    Object.assign(auth, {
+      role: 'CIRCULATION_CLERK',
+      currentUser: { id: 52, username: 'clerk', email: 'clerk@example.test', role: 'CIRCULATION_CLERK', permissions: ['borrow:read'] },
+      permissions: ['borrow:read'],
+    });
+
+    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
+    const qrInput = await screen.findByRole('searchbox', { name: 'Mã QR / mã nhận sách' });
+    fireEvent.change(qrInput, { target: { value: 'UNKNOWN-REFERENCE' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tra cứu' }));
+
+    const notice = await screen.findByText('Không tìm thấy sách hoặc yêu cầu bằng mã đã nhập.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
+    expect(document.querySelector('.borrow-page-alert')).toBeNull();
   });
 
   it('reloads stale staff state after a 409 instead of advancing the item', async () => {
@@ -627,11 +720,13 @@ describe('Borrow Book routes and pages', () => {
       permissions: ['borrow:read', 'borrow:prepare'],
     });
 
-    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><App /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/librarian/borrow-requests']}><AppNotificationProvider><App /></AppNotificationProvider></MemoryRouter>);
     const card = (await screen.findByText('Nguyễn An')).closest('[data-borrow-request]') as HTMLElement;
     fireEvent.click(within(card).getByRole('button', { name: 'Chuẩn bị sách' }));
 
-    expect(await screen.findByText('Yêu cầu đã thay đổi ở nơi khác. Danh sách đã được tải lại; hãy kiểm tra trạng thái mới.')).toBeTruthy();
+    const notice = await screen.findByText('Yêu cầu đã thay đổi ở nơi khác. Danh sách đã được tải lại; hãy kiểm tra trạng thái mới.');
+    expect(notice.closest('.ant-notification-notice')).toBeTruthy();
+    expect(document.querySelector('.borrow-page-alert')).toBeNull();
     await waitFor(() => expect(reads).toBeGreaterThanOrEqual(2));
   });
 });

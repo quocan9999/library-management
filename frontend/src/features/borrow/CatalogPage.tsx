@@ -3,11 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BORROW_PAGE_SIZE, borrowApi } from './api';
 import { BorrowBookAction } from './BorrowBookAction';
-import { borrowErrorMessage } from './errors';
+import { useAppNotification } from '../../components/AppNotificationProvider';
+import { borrowErrorMessage, borrowErrorNotificationType } from './errors';
 import { formatVnd } from '../books/formatting';
 import type { BorrowListQuery, CatalogBook, PageResponse } from './types';
 
 export function CatalogPage() {
+  const { notify } = useAppNotification();
   const [searchDraft, setSearchDraft] = useState('');
   const [queryText, setQueryText] = useState('');
   const [availability, setAvailability] = useState<'ALL' | 'AVAILABLE' | 'UNAVAILABLE'>('ALL');
@@ -19,7 +21,6 @@ export function CatalogPage() {
   const [confirmRequestOpen, setConfirmRequestOpen] = useState(false);
   const [requestPending, setRequestPending] = useState(false);
   const requestLock = useRef(false);
-  const [requestFeedback, setRequestFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const query = useMemo<BorrowListQuery>(() => ({
     ...(queryText ? { q: queryText } : {}),
@@ -57,7 +58,6 @@ export function CatalogPage() {
   };
 
   const toggleBookSelection = (book: CatalogBook) => {
-    setRequestFeedback(null);
     setSelectedBooks((current) => {
       if (current.some((selected) => selected.id === book.id)) return current.filter((selected) => selected.id !== book.id);
       if (current.length >= 3) return current;
@@ -69,15 +69,20 @@ export function CatalogPage() {
     if (requestLock.current || selectedBooks.length < 1 || selectedBooks.length > 3) return;
     requestLock.current = true;
     setRequestPending(true);
-    setRequestFeedback(null);
     try {
       await borrowApi.createRequest(selectedBooks.map((book) => book.id));
       setConfirmRequestOpen(false);
       setSelectedBooks([]);
-      setRequestFeedback({ type: 'success', message: 'Đã tạo yêu cầu mượn. Trạng thái được xác nhận từ máy chủ.' });
+      notify('success', {
+        title: 'Đã tạo yêu cầu mượn',
+        description: 'Trạng thái được xác nhận từ máy chủ.',
+      });
       setReloadKey((key) => key + 1);
     } catch (error: unknown) {
-      setRequestFeedback({ type: 'error', message: borrowErrorMessage(error, 'create') });
+      notify(borrowErrorNotificationType(error), {
+        title: 'Không thể tạo yêu cầu mượn',
+        description: borrowErrorMessage(error, 'create'),
+      });
     } finally {
       requestLock.current = false;
       setRequestPending(false);
@@ -118,15 +123,6 @@ export function CatalogPage() {
       />
     </section>
 
-    {requestFeedback && <Alert
-      className="borrow-page-alert"
-      type={requestFeedback.type}
-      showIcon
-      role={requestFeedback.type === 'error' ? 'alert' : 'status'}
-      title={requestFeedback.message}
-      closable
-      onClose={() => setRequestFeedback(null)}
-    />}
     {selectedBooks.length > 0 && <section className="borrow-selection" aria-label="Giỏ đặt mượn">
       <div className="borrow-selection__heading">
         <div>

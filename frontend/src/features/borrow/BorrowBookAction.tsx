@@ -1,9 +1,10 @@
-import { Alert, Button, Modal } from 'antd';
+import { Button, Modal } from 'antd';
 import { useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { usePermission } from '../../auth/permissions';
+import { useAppNotification } from '../../components/AppNotificationProvider';
 import { borrowApi } from './api';
-import { borrowErrorMessage } from './errors';
+import { borrowErrorMessage, borrowErrorNotificationType } from './errors';
 import type { CatalogBook } from './types';
 
 interface BorrowBookActionProps {
@@ -16,12 +17,12 @@ interface BorrowBookActionProps {
 
 export function BorrowBookAction({ book, onCreated, selected = false, selectionDisabled = false, onToggleSelection }: BorrowBookActionProps) {
   const { role } = useAuth();
+  const { notify } = useAppNotification();
   const hasCreatePermission = usePermission('borrow:create');
   const canCreate = role === 'USER' && hasCreatePermission;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const waitlistAvailable = book.availableQuantity === 0 && book.waitlistCount < book.waitlistCap;
   const canRequest = book.availableQuantity > 0 || waitlistAvailable;
 
@@ -29,14 +30,19 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
     if (pendingRef.current) return;
     pendingRef.current = true;
     setPending(true);
-    setFeedback(null);
     try {
       await borrowApi.createRequest([book.id]);
       setConfirmOpen(false);
-      setFeedback({ type: 'success', message: 'Đã tạo yêu cầu mượn. Trạng thái được xác nhận từ máy chủ.' });
+      notify('success', {
+        title: 'Đã tạo yêu cầu mượn',
+        description: 'Trạng thái được xác nhận từ máy chủ.',
+      });
       onCreated?.();
     } catch (error: unknown) {
-      setFeedback({ type: 'error', message: borrowErrorMessage(error, 'create') });
+      notify(borrowErrorNotificationType(error), {
+        title: 'Không thể tạo yêu cầu mượn',
+        description: borrowErrorMessage(error, 'create'),
+      });
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -55,10 +61,9 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
   </div>;
 
   return <div className="borrow-action">
-    <Button type="primary" disabled={!canRequest || pending} onClick={() => { setFeedback(null); setConfirmOpen(true); }}>
+    <Button type="primary" disabled={!canRequest || pending} onClick={() => { setConfirmOpen(true); }}>
       {book.availableQuantity > 0 ? 'Đặt mượn' : waitlistAvailable ? 'Vào hàng chờ' : 'Đã đủ hàng chờ'}
     </Button>
-    {feedback && <Alert className="borrow-inline-alert" type={feedback.type} showIcon role={feedback.type === 'error' ? 'alert' : 'status'} title={feedback.message} />}
     <Modal
       open={confirmOpen}
       title={waitlistAvailable ? 'Xác nhận vào hàng chờ' : 'Xác nhận yêu cầu mượn'}

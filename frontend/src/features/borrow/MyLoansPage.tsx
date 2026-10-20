@@ -3,8 +3,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePermission } from '../../auth/permissions';
+import { useAppNotification } from '../../components/AppNotificationProvider';
 import { borrowApi } from './api';
-import { borrowErrorMessage, borrowErrorStatus } from './errors';
+import { borrowErrorMessage, borrowErrorNotificationType, borrowErrorStatus } from './errors';
 import { formatVnd } from '../books/formatting';
 import type { BorrowItem, BorrowRequestFilter, BorrowRequestSummary, LoanItemStatus, PageResponse } from './types';
 
@@ -67,6 +68,7 @@ function requestStatus(filter: LoanFilter): BorrowRequestFilter {
 }
 
 export function MyLoansPage() {
+  const { notify } = useAppNotification();
   const canCancel = usePermission('borrow:cancel-own');
   const canRenew = usePermission('borrow:renew');
   const [page, setPage] = useState(1);
@@ -77,7 +79,6 @@ export function MyLoansPage() {
   const [action, setAction] = useState<LoanAction | null>(null);
   const [pending, setPending] = useState(false);
   const actionLock = useRef(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [now, setNow] = useState<number | null>(null);
   const status = requestStatus(filter);
   const requestKey = `${page}:${status}:${reloadKey}`;
@@ -107,19 +108,25 @@ export function MyLoansPage() {
     if (!action || actionLock.current) return;
     actionLock.current = true;
     setPending(true);
-    setFeedback(null);
     try {
       if (action.type === 'cancel') await borrowApi.cancelMine(action.loanCode, action.item.id);
       else await borrowApi.renewMine(action.loanCode, action.item.id, action.item.version);
       setAction(null);
-      setFeedback(action.type === 'cancel' ? 'Đã cập nhật trạng thái hủy từ máy chủ.' : 'Đã gia hạn miễn phí thêm 7 ngày.');
+      notify('success', {
+        title: action.type === 'cancel' ? 'Đã hủy sách' : 'Đã gia hạn sách',
+        description: action.type === 'cancel' ? 'Trạng thái hủy đã được máy chủ xác nhận.' : 'Sách đã được gia hạn miễn phí thêm 7 ngày.',
+      });
       setReloadKey((key) => key + 1);
     } catch (error: unknown) {
-      if (borrowErrorStatus(error) === 409) {
+      const staleRequest = borrowErrorStatus(error) === 409;
+      if (staleRequest) {
         setReloadKey((key) => key + 1);
         setAction(null);
       }
-      setFeedback(borrowErrorMessage(error));
+      notify(borrowErrorNotificationType(error), {
+        title: staleRequest ? 'Yêu cầu đã thay đổi' : 'Không thể cập nhật yêu cầu',
+        description: borrowErrorMessage(error),
+      });
     } finally {
       actionLock.current = false;
       setPending(false);
@@ -139,7 +146,6 @@ export function MyLoansPage() {
       </div>
     </header>
 
-    {feedback && <Alert className="borrow-page-alert" type={feedback.includes('Đã ') ? 'success' : 'warning'} showIcon role="status" title={feedback} closable onClose={() => setFeedback(null)} />}
     <nav className="borrow-tabs" aria-label="Lọc sách theo trạng thái" role="tablist">
       {LOAN_FILTERS.map((option) => <button
         key={option.key}

@@ -1,8 +1,9 @@
 import { Alert, Button, Checkbox, Input, Modal, Pagination, Select, Skeleton, Tag } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
+import { useAppNotification } from '../../components/AppNotificationProvider';
 import { borrowApi } from './api';
-import { borrowErrorCode, borrowErrorMessage, borrowErrorStatus } from './errors';
+import { borrowErrorCode, borrowErrorMessage, borrowErrorNotificationType, borrowErrorStatus } from './errors';
 import { formatVnd } from '../books/formatting';
 import type { BorrowRequestFilter, HandoverRequest, LoanItemStatus, PageResponse, StaffBorrowRequest } from './types';
 
@@ -25,6 +26,7 @@ function formatDeadline(value: string | null): string {
 
 export function LibrarianBorrowRequestsPage() {
   const { permissions } = useAuth();
+  const { notify } = useAppNotification();
   const canPrepare = permissions.includes('borrow:prepare');
   const canCancel = permissions.includes('borrow:cancel');
   const canHandover = permissions.includes('borrow:handover') && permissions.includes('borrow:fee-confirm');
@@ -32,7 +34,6 @@ export function LibrarianBorrowRequestsPage() {
   const [filter, setFilter] = useState<BorrowRequestFilter>('PENDING');
   const [loaded, setLoaded] = useState<{ key: string; data: PageResponse<StaffBorrowRequest> } | null>(null);
   const [loadFailure, setLoadFailure] = useState<{ key: string; message: string } | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const actionLock = useRef(false);
@@ -41,7 +42,6 @@ export function LibrarianBorrowRequestsPage() {
   const [lookupValue, setLookupValue] = useState('');
   const [lookupResult, setLookupResult] = useState<StaffBorrowRequest | null>(null);
   const [lookupPending, setLookupPending] = useState(false);
-  const [lookupError, setLookupError] = useState('');
   const [cancelAction, setCancelAction] = useState<{ request: StaffBorrowRequest; itemId: number } | null>(null);
   const [rejectAction, setRejectAction] = useState<{ request: StaffBorrowRequest; itemId: number } | null>(null);
   const requestKey = `${page}:${filter}:${reloadKey}`;
@@ -97,7 +97,6 @@ export function LibrarianBorrowRequestsPage() {
     actionLock.current = true;
     const pendingId = `${request.loanCode}:${itemId}`;
     setPendingKey(pendingId);
-    setFeedback(null);
     try {
       if (action === 'prepare') await borrowApi.prepare(request.loanCode, itemId);
       else if (action === 'ready') await borrowApi.markReady(request.loanCode, itemId);
@@ -105,11 +104,14 @@ export function LibrarianBorrowRequestsPage() {
       else await borrowApi.reject(request.loanCode, itemId);
       if (action === 'cancel') setCancelAction(null);
       if (action === 'reject') setRejectAction(null);
-      setFeedback(action === 'cancel'
-        ? 'Đã hủy sách READY theo yêu cầu thành viên.'
-        : action === 'reject'
-          ? 'Đã ghi nhận không tìm thấy bản sách vật lý; không tăng số bản sẵn có.'
-          : 'Đã cập nhật trạng thái từ máy chủ.');
+      notify('success', {
+        title: action === 'cancel' ? 'Đã hủy sách READY' : action === 'reject' ? 'Đã ghi nhận kết quả kiểm tra' : 'Đã cập nhật trạng thái',
+        description: action === 'cancel'
+          ? 'Đã hủy sách theo yêu cầu thành viên.'
+          : action === 'reject'
+            ? 'Đã ghi nhận không tìm thấy bản sách vật lý; không tăng số bản sẵn có.'
+            : 'Trạng thái được xác nhận từ máy chủ.',
+      });
       setReloadKey((key) => key + 1);
       if (lookupResult?.loanCode === request.loanCode) {
         try { setLookupResult(await borrowApi.findPickup(request.pickupReference)); } catch { setLookupResult(null); }
@@ -118,7 +120,11 @@ export function LibrarianBorrowRequestsPage() {
       refreshAfterConflict(error, request);
       if (borrowErrorStatus(error) === 409 && action === 'cancel') setCancelAction(null);
       if (borrowErrorStatus(error) === 409 && action === 'reject') setRejectAction(null);
-      setFeedback(borrowErrorMessage(error));
+      const notificationType = borrowErrorNotificationType(error);
+      notify(notificationType, {
+        title: notificationType === 'warning' ? 'Trạng thái yêu cầu đã thay đổi' : 'Không thể cập nhật yêu cầu',
+        description: borrowErrorMessage(error),
+      });
     } finally {
       actionLock.current = false;
       setPendingKey(null);
@@ -129,14 +135,15 @@ export function LibrarianBorrowRequestsPage() {
     const reference = lookupValue.trim();
     if (!reference || lookupPending) return;
     setLookupPending(true);
-    setLookupError('');
     setLookupResult(null);
     try {
       const found = await borrowApi.findPickup(reference);
       setLookupResult(found);
-      setFeedback(null);
     } catch (error: unknown) {
-      setLookupError(borrowErrorMessage(error, 'read'));
+      notify(borrowErrorNotificationType(error), {
+        title: 'Không thể tra cứu mã nhận sách',
+        description: borrowErrorMessage(error, 'read'),
+      });
     } finally {
       setLookupPending(false);
     }
@@ -148,7 +155,6 @@ export function LibrarianBorrowRequestsPage() {
     if (readyItems.length === 0) return;
     actionLock.current = true;
     setPendingKey(`${handoverRequest.loanCode}:handover`);
-    setFeedback(null);
     const body: HandoverRequest = {
       identityVerified: true,
       expectedLoanVersion: handoverRequest.version,
@@ -162,14 +168,21 @@ export function LibrarianBorrowRequestsPage() {
         next.delete(handoverRequest.loanCode);
         return next;
       });
-      setFeedback('Đã xác nhận phí và bàn giao toàn bộ sách READY còn lại.');
+      notify('success', {
+        title: 'Đã hoàn tất bàn giao',
+        description: 'Đã xác nhận phí và bàn giao toàn bộ sách READY còn lại.',
+      });
       setReloadKey((key) => key + 1);
       if (lookupResult?.loanCode === handoverRequest.loanCode) {
         try { setLookupResult(await borrowApi.findPickup(handoverRequest.pickupReference)); } catch { setLookupResult(null); }
       }
     } catch (error: unknown) {
       refreshAfterConflict(error, handoverRequest);
-      setFeedback(borrowErrorMessage(error));
+      const notificationType = borrowErrorNotificationType(error);
+      notify(notificationType, {
+        title: notificationType === 'warning' ? 'Yêu cầu đã thay đổi' : 'Không thể xác nhận bàn giao',
+        description: borrowErrorMessage(error),
+      });
     } finally {
       actionLock.current = false;
       setPendingKey(null);
@@ -215,8 +228,6 @@ export function LibrarianBorrowRequestsPage() {
       />
     </section>
 
-    {feedback && <Alert className="borrow-page-alert" type={feedback.startsWith('Đã ') ? 'success' : 'warning'} showIcon role="status" title={feedback} closable onClose={() => setFeedback(null)} />}
-    {lookupError && <Alert className="borrow-page-alert" type="error" showIcon role="alert" title={lookupError} closable onClose={() => setLookupError('')} />}
     {loadState === 'loading' && <div className="borrow-loading" role="status"><Skeleton active paragraph={{ rows: 4 }} /></div>}
     {loadState === 'error' && <Alert className="borrow-page-alert" type="error" showIcon role="alert" title={loadError} action={<Button onClick={() => setReloadKey((key) => key + 1)}>Tải lại</Button>} />}
     {loadState === 'ready' && allRequests.length === 0 && <section className="borrow-empty"><h2>{filter === 'PENDING' ? 'Không có yêu cầu cần xử lý' : 'Không có yêu cầu phù hợp'}</h2><p>Yêu cầu mới sẽ xuất hiện tại đây sau khi thành viên đặt mượn.</p></section>}

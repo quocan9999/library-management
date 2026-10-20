@@ -14,6 +14,14 @@ export function borrowErrorCode(error: unknown): string | undefined {
   return axios.isAxiosError<ApiEnvelope<unknown>>(error) ? error.response?.data?.code : undefined;
 }
 
+export function borrowErrorNotificationType(error: unknown): 'warning' | 'error' {
+  const status = borrowErrorStatus(error);
+  const code = borrowErrorCode(error);
+  return status === 409 || ['BORROW_FEE_MISMATCH', 'BORROW_INVALID_HANDOVER_SET', 'BORROW_VERSION_CONFLICT'].includes(code ?? '')
+    ? 'warning'
+    : 'error';
+}
+
 export function borrowErrorMessage(error: unknown, action: 'read' | 'create' | 'update' = 'update'): string {
   if (!axios.isAxiosError<ApiEnvelope<unknown> & ApiErrorData>(error)) {
     return 'Không thể hoàn tất thao tác. Hãy thử lại sau.';
