@@ -1,13 +1,11 @@
-import { Alert, Button, Card, Input, Pagination, Select, Skeleton } from 'antd';
-import { useEffect, useMemo, useState } from 'react';
+import { Alert, Button, Card, Input, Modal, Pagination, Select, Skeleton } from 'antd';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { borrowApi } from './api';
+import { BORROW_PAGE_SIZE, borrowApi } from './api';
 import { BorrowBookAction } from './BorrowBookAction';
 import { borrowErrorMessage } from './errors';
 import { formatVnd } from '../books/formatting';
 import type { BorrowListQuery, CatalogBook, PageResponse } from './types';
-
-const PAGE_SIZE = 12;
 
 export function CatalogPage() {
   const [searchDraft, setSearchDraft] = useState('');
@@ -17,12 +15,17 @@ export function CatalogPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [loaded, setLoaded] = useState<{ key: string; data: PageResponse<CatalogBook> } | null>(null);
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
+  const [selectedBooks, setSelectedBooks] = useState<CatalogBook[]>([]);
+  const [confirmRequestOpen, setConfirmRequestOpen] = useState(false);
+  const [requestPending, setRequestPending] = useState(false);
+  const requestLock = useRef(false);
+  const [requestFeedback, setRequestFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const query = useMemo<BorrowListQuery>(() => ({
     ...(queryText ? { q: queryText } : {}),
     ...(availability === 'ALL' ? {} : { availability }),
     page: page - 1,
-    size: PAGE_SIZE,
+    size: BORROW_PAGE_SIZE,
     sort: 'title,asc',
   }), [availability, page, queryText]);
   const requestKey = `${JSON.stringify(query)}:${reloadKey}`;
@@ -51,6 +54,34 @@ export function CatalogPage() {
   const applySearch = (value: string) => {
     setQueryText(value.trim());
     setPage(1);
+  };
+
+  const toggleBookSelection = (book: CatalogBook) => {
+    setRequestFeedback(null);
+    setSelectedBooks((current) => {
+      if (current.some((selected) => selected.id === book.id)) return current.filter((selected) => selected.id !== book.id);
+      if (current.length >= 3) return current;
+      return [...current, book];
+    });
+  };
+
+  const submitBorrowRequest = async () => {
+    if (requestLock.current || selectedBooks.length < 1 || selectedBooks.length > 3) return;
+    requestLock.current = true;
+    setRequestPending(true);
+    setRequestFeedback(null);
+    try {
+      await borrowApi.createRequest(selectedBooks.map((book) => book.id));
+      setConfirmRequestOpen(false);
+      setSelectedBooks([]);
+      setRequestFeedback({ type: 'success', message: 'Đã tạo yêu cầu mượn. Trạng thái được xác nhận từ máy chủ.' });
+      setReloadKey((key) => key + 1);
+    } catch (error: unknown) {
+      setRequestFeedback({ type: 'error', message: borrowErrorMessage(error, 'create') });
+    } finally {
+      requestLock.current = false;
+      setRequestPending(false);
+    }
   };
 
   return <main className="borrow-stage" aria-labelledby="catalog-heading">
@@ -87,6 +118,33 @@ export function CatalogPage() {
       />
     </section>
 
+    {requestFeedback && <Alert
+      className="borrow-page-alert"
+      type={requestFeedback.type}
+      showIcon
+      role={requestFeedback.type === 'error' ? 'alert' : 'status'}
+      title={requestFeedback.message}
+      closable
+      onClose={() => setRequestFeedback(null)}
+    />}
+    {selectedBooks.length > 0 && <section className="borrow-selection" aria-label="Giỏ đặt mượn">
+      <div className="borrow-selection__heading">
+        <div>
+          <h2>Giỏ đặt mượn</h2>
+          <p>{selectedBooks.length} / 3 đầu sách đã chọn. Các sách sẽ được gộp vào cùng một yêu cầu và mã QR.</p>
+        </div>
+        <Button type="primary" disabled={requestPending} onClick={() => setConfirmRequestOpen(true)}>
+          Đặt mượn ({selectedBooks.length})
+        </Button>
+      </div>
+      <ul className="borrow-selection__items">
+        {selectedBooks.map((book) => <li key={book.id}>
+          <span>{book.title} · {formatVnd(book.borrowFee)}</span>
+          <Button type="link" disabled={requestPending || confirmRequestOpen} onClick={() => toggleBookSelection(book)}>Bỏ chọn {book.title}</Button>
+        </li>)}
+      </ul>
+    </section>}
+
     {loadState === 'loading' && <div className="borrow-loading" role="status"><Skeleton active paragraph={{ rows: 3 }} /><Skeleton active paragraph={{ rows: 3 }} /></div>}
     {loadState === 'error' && <Alert
       className="borrow-page-alert"
@@ -118,20 +176,44 @@ export function CatalogPage() {
               <div><dt>Phí trễ mỗi ngày</dt><dd>{formatVnd(book.lateFeePerDay)}</dd></div>
             </dl>
             {book.availableQuantity === 0 && <p className="catalog-card__queue">Hàng chờ: {book.waitlistCount} / {book.waitlistCap}</p>}
-            <BorrowBookAction key={`${book.id}-${book.availableQuantity}-${book.waitlistCount}`} book={book} onCreated={() => setReloadKey((key) => key + 1)} />
+            <BorrowBookAction
+              key={`${book.id}-${book.availableQuantity}-${book.waitlistCount}`}
+              book={book}
+              selected={selectedBooks.some((selected) => selected.id === book.id)}
+              selectionDisabled={selectedBooks.length >= 3}
+              onToggleSelection={toggleBookSelection}
+            />
           </div>
         </Card>)}
       </section>
       {result.totalPages > 1 && <Pagination
         className="borrow-pagination"
         current={page}
-        pageSize={PAGE_SIZE}
+        pageSize={BORROW_PAGE_SIZE}
         total={result.totalElements}
         showSizeChanger={false}
         onChange={setPage}
         aria-label="Trang danh mục sách"
       />}
     </>}
+    <Modal
+      open={confirmRequestOpen}
+      title="Xác nhận yêu cầu mượn"
+      okText={requestPending ? 'Đang gửi…' : 'Xác nhận đặt mượn'}
+      cancelText="Xem lại"
+      confirmLoading={requestPending}
+      onCancel={() => { if (!requestPending) setConfirmRequestOpen(false); }}
+      onOk={() => { void submitBorrowRequest(); }}
+    >
+      <p>Các sách đã chọn sẽ nằm trong cùng một yêu cầu và dùng chung một mã QR nhận sách.</p>
+      <ul className="borrow-selection__items">
+        {selectedBooks.map((book) => <li key={book.id}>
+          <span><strong>{book.title}</strong> · {formatVnd(book.borrowFee)}</span>
+          {book.availableQuantity === 0 && <span>Hàng chờ: {book.waitlistCount} / {book.waitlistCap}</span>}
+        </li>)}
+      </ul>
+      <p>Chỉ xác nhận thành công khi máy chủ trả kết quả. Nếu kết nối hết thời gian chờ, hãy tải danh sách yêu cầu trước khi gửi lại.</p>
+    </Modal>
   </main>;
 }
 

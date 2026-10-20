@@ -2,6 +2,7 @@ import { apiClient } from '../../auth/api';
 import type { ApiEnvelope } from '../../auth/types';
 import type {
   BorrowListQuery,
+  BorrowRequestFilter,
   BorrowRequest,
   BorrowRequestSummary,
   CatalogBook,
@@ -9,6 +10,8 @@ import type {
   PageResponse,
   StaffBorrowRequest,
 } from './types';
+
+export const BORROW_PAGE_SIZE = 10;
 
 function readRequiredData<T>(envelope: ApiEnvelope<T>, expectedCode: string): T {
   if (!envelope.success || envelope.code !== expectedCode || envelope.data === null) {
@@ -28,14 +31,17 @@ export const borrowApi = {
     return readRequiredData(response.data, 'BOOK_CATALOG_DETAIL_SUCCESS');
   },
 
-  async createRequest(bookId: number): Promise<BorrowRequest> {
-    const response = await apiClient.post<ApiEnvelope<BorrowRequest>>('/api/v1/borrow-requests', { bookIds: [bookId] });
+  async createRequest(bookIds: number[]): Promise<BorrowRequest> {
+    if (bookIds.length < 1 || bookIds.length > 3 || new Set(bookIds).size !== bookIds.length) {
+      throw new Error('Chọn từ 1 đến 3 đầu sách khác nhau.');
+    }
+    const response = await apiClient.post<ApiEnvelope<BorrowRequest>>('/api/v1/borrow-requests', { bookIds });
     return readRequiredData(response.data, 'BORROW_REQUEST_CREATED');
   },
 
-  async listMine(page = 0, signal?: AbortSignal): Promise<PageResponse<BorrowRequestSummary>> {
+  async listMine(page = 0, status: BorrowRequestFilter = 'ALL', signal?: AbortSignal): Promise<PageResponse<BorrowRequestSummary>> {
     const response = await apiClient.get<ApiEnvelope<PageResponse<BorrowRequestSummary>>>('/api/v1/borrow-requests/mine', {
-      params: { page, size: 20, sort: 'createdAt,desc' },
+      params: { page, size: BORROW_PAGE_SIZE, sort: 'createdAt,desc', status },
       signal,
     });
     return readRequiredData(response.data, 'BORROW_REQUEST_LIST_SUCCESS');
@@ -54,9 +60,9 @@ export const borrowApi = {
     return readRequiredData(response.data, 'BORROW_ITEM_RENEWED');
   },
 
-  async listStaff(): Promise<PageResponse<StaffBorrowRequest>> {
+  async listStaff(page = 0, status: BorrowRequestFilter = 'PENDING'): Promise<PageResponse<StaffBorrowRequest>> {
     const response = await apiClient.get<ApiEnvelope<PageResponse<StaffBorrowRequest>>>('/api/v1/librarian/borrow-requests', {
-      params: { page: 0, size: 50, sort: 'createdAt,asc' },
+      params: { page, size: BORROW_PAGE_SIZE, sort: 'createdAt,desc', status },
     });
     return readRequiredData(response.data, 'BORROW_REQUEST_LIST_SUCCESS');
   },
@@ -78,6 +84,10 @@ export const borrowApi = {
 
   async cancelReady(loanCode: string, itemId: number): Promise<StaffBorrowRequest> {
     return this.postStaffItem(loanCode, itemId, 'cancel', 'BORROW_ITEM_CANCELLED');
+  },
+
+  async reject(loanCode: string, itemId: number): Promise<StaffBorrowRequest> {
+    return this.postStaffItem(loanCode, itemId, 'reject', 'BORROW_ITEM_REJECTED');
   },
 
   async handover(loanCode: string, body: HandoverRequest): Promise<StaffBorrowRequest> {

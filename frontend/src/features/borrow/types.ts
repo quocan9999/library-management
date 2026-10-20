@@ -8,6 +8,20 @@ export interface PageResponse<T> {
   last: boolean;
 }
 
+export type BorrowRequestFilter =
+  | 'ALL'
+  | 'PENDING'
+  | 'HISTORY'
+  | 'WAITLISTED'
+  | 'RESERVED'
+  | 'PREPARING'
+  | 'READY_FOR_PICKUP'
+  | 'BORROWED'
+  | 'RETURNED'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'REJECTED';
+
 export interface CatalogBook {
   id: number;
   bookCode: string;

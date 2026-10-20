@@ -6,7 +6,15 @@ import { borrowApi } from './api';
 import { borrowErrorMessage } from './errors';
 import type { CatalogBook } from './types';
 
-export function BorrowBookAction({ book, onCreated }: { book: CatalogBook; onCreated?: () => void }) {
+interface BorrowBookActionProps {
+  book: CatalogBook;
+  onCreated?: () => void;
+  selected?: boolean;
+  selectionDisabled?: boolean;
+  onToggleSelection?: (book: CatalogBook) => void;
+}
+
+export function BorrowBookAction({ book, onCreated, selected = false, selectionDisabled = false, onToggleSelection }: BorrowBookActionProps) {
   const { role } = useAuth();
   const hasCreatePermission = usePermission('borrow:create');
   const canCreate = role === 'USER' && hasCreatePermission;
@@ -23,7 +31,7 @@ export function BorrowBookAction({ book, onCreated }: { book: CatalogBook; onCre
     setPending(true);
     setFeedback(null);
     try {
-      await borrowApi.createRequest(book.id);
+      await borrowApi.createRequest([book.id]);
       setConfirmOpen(false);
       setFeedback({ type: 'success', message: 'Đã tạo yêu cầu mượn. Trạng thái được xác nhận từ máy chủ.' });
       onCreated?.();
@@ -36,6 +44,15 @@ export function BorrowBookAction({ book, onCreated }: { book: CatalogBook; onCre
   };
 
   if (!canCreate) return null;
+
+  if (onToggleSelection) return <div className="borrow-action">
+    <Button
+      type={selected ? 'default' : 'primary'}
+      disabled={!canRequest || (!selected && selectionDisabled)}
+      aria-pressed={selected}
+      onClick={() => onToggleSelection(book)}
+    >{selected ? `Bỏ ${book.title} khỏi giỏ` : `Chọn sách ${book.title}`}</Button>
+  </div>;
 
   return <div className="borrow-action">
     <Button type="primary" disabled={!canRequest || pending} onClick={() => { setFeedback(null); setConfirmOpen(true); }}>

@@ -6,7 +6,7 @@ import { usePermission } from '../../auth/permissions';
 import { borrowApi } from './api';
 import { borrowErrorMessage, borrowErrorStatus } from './errors';
 import { formatVnd } from '../books/formatting';
-import type { BorrowItem, BorrowRequestSummary, LoanItemStatus, PageResponse } from './types';
+import type { BorrowItem, BorrowRequestFilter, BorrowRequestSummary, LoanItemStatus, PageResponse } from './types';
 
 type LoanFilter = 'ALL' | 'PENDING' | 'WAITLISTED' | 'READY' | 'BORROWED' | 'HISTORY';
 type LoanAction = { type: 'cancel' | 'renew'; loanCode: string; item: BorrowItem };
@@ -61,6 +61,11 @@ function getVisibleItems(requests: BorrowRequestSummary[], filter: LoanFilter) {
     .filter((request) => request.items.length > 0);
 }
 
+function requestStatus(filter: LoanFilter): BorrowRequestFilter {
+  if (filter === 'READY') return 'READY_FOR_PICKUP';
+  return filter;
+}
+
 export function MyLoansPage() {
   const canCancel = usePermission('borrow:cancel-own');
   const canRenew = usePermission('borrow:renew');
@@ -74,7 +79,8 @@ export function MyLoansPage() {
   const actionLock = useRef(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [now, setNow] = useState<number | null>(null);
-  const requestKey = `${page}:${reloadKey}`;
+  const status = requestStatus(filter);
+  const requestKey = `${page}:${status}:${reloadKey}`;
   const result = loaded?.key === requestKey ? loaded.data : null;
   const loadError = failed?.key === requestKey ? failed.message : '';
   const loadState = result ? 'ready' : loadError ? 'error' : 'loading';
@@ -89,11 +95,11 @@ export function MyLoansPage() {
   useEffect(() => {
     const controller = new AbortController();
     let current = true;
-    void borrowApi.listMine(page - 1, controller.signal)
+    void borrowApi.listMine(page - 1, status, controller.signal)
       .then((data) => { if (current) setLoaded({ key: requestKey, data }); })
       .catch((error: unknown) => { if (current) setFailed({ key: requestKey, message: borrowErrorMessage(error, 'read') }); });
     return () => { current = false; controller.abort(); };
-  }, [page, reloadKey, requestKey]);
+  }, [page, reloadKey, requestKey, status]);
 
   const visible = useMemo(() => getVisibleItems(result?.content ?? [], filter), [filter, result]);
 
@@ -141,7 +147,7 @@ export function MyLoansPage() {
         role="tab"
         aria-selected={filter === option.key}
         className={`borrow-tab${filter === option.key ? ' is-active' : ''}`}
-        onClick={() => setFilter(option.key)}
+        onClick={() => { setFilter(option.key); setPage(1); }}
       >{option.label}</button>)}
     </nav>
 
