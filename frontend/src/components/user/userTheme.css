@@ -1,0 +1,155 @@
+/* User Site Design System — Libby */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,700;800&display=swap');
+
+:root {
+  /* Core Color Tokens */
+  --user-primary: #6C4DFF;
+  --user-ink: #14112B;
+  --user-lime: #C8FF3D;
+  --user-lilac: #EFEBFF;
+  --user-bg: #F4F1FF;
+  --user-white: #FFFFFF;
+  --user-subtle-bg: #F7F5FF;
+
+  /* Semantic Feedback Tokens */
+  --user-error-bg: #FFE4E8;
+  --user-error-text: #9B1C31;
+  --user-warning-bg: #FFF1C2;
+  --user-warning-text: #7A4B00;
+  --user-waitlist-bg: #E3DCFF;
+  --user-waitlist-text: #14112B;
+
+  /* Text Muted Tokens */
+  --user-text-muted: #4B4570;
+  --user-text-light-muted: #C9C3F0;
+  --user-disabled-text: #7A7499;
+
+  /* Typography Families */
+  --user-font-display: 'Bricolage Grotesque', sans-serif;
+  --user-font-body: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Borders & Radii */
+  --user-border-main: 2px solid #14112B;
+  --user-border-subtle: 1px solid #EFEBFF;
+  --user-radius-pill: 9999px;
+  --user-radius-card: 28px;
+  --user-radius-card-sm: 24px;
+  --user-radius-modal: 32px;
+  --user-radius-badge: 14px;
+  --user-radius-cover: 14px;
+}
+
+/* User Site Scope Wrapper */
+.user-site {
+  min-height: 100vh;
+  background-color: var(--user-bg);
+  color: var(--user-ink);
+  font-family: var(--user-font-body);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.user-site * {
+  box-sizing: border-box;
+}
+
+/* Display Titles */
+.user-title-display-64 {
+  font-family: var(--user-font-display);
+  font-weight: 800;
+  font-size: 64px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.user-title-heading-40 {
+  font-family: var(--user-font-display);
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.user-title-heading-32 {
+  font-family: var(--user-font-display);
+  font-weight: 800;
+  font-size: 32px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.user-title-24 {
+  font-family: var(--user-font-display);
+  font-weight: 800;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+
+.user-title-22 {
+  font-family: var(--user-font-display);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+/* Subtitles & Descriptions */
+.user-subtitle {
+  font-size: 18px;
+  color: var(--user-text-muted);
+  line-height: 1.5;
+}
+
+/* Cards & Surfaces */
+.user-card {
+  background: var(--user-white);
+  border: var(--user-border-main);
+  border-radius: var(--user-radius-card);
+  overflow: hidden;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.user-card--subtle {
+  background: var(--user-white);
+  border: 2px solid var(--user-lilac);
+  border-radius: var(--user-radius-card);
+}
+
+.user-card--dark {
+  background: var(--user-ink);
+  color: var(--user-white);
+  border-radius: var(--user-radius-card);
+  border: none;
+}
+
+/* Modal and Drawer Backdrop */
+.user-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 17, 43, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 1000;
+}
+
+/* Pill Search Bar */
+.user-search-input {
+  height: 52px;
+  border: var(--user-border-main);
+  border-radius: var(--user-radius-pill);
+  background: var(--user-white);
+  padding: 0 22px;
+  font-size: 15px;
+  font-family: var(--user-font-body);
+  color: var(--user-ink);
+  outline: none;
+  width: 100%;
+}
+
+.user-search-input::placeholder {
+  color: var(--user-text-muted);
+}
+
+.user-search-input:focus {
+  border-color: var(--user-primary);
+}
