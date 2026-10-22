@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 034-book-cover-image
-      author: codex
+      author: quocan9999
       comment: "Lưu URL HTTPS và public ID của ảnh bìa trên Cloudinary; sách cũ giữ giá trị null."
       changes:
         - addColumn:

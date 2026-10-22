@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 030-dynamic-role-account-foundation
-      author: codex
+      author: quocan9999
       comment: "Chuẩn hóa Role động và đánh dấu tài khoản ADMIN hệ thống"
       preConditions:
         - onFail: HALT

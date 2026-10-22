@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 033-book-similarity-lock
-      author: codex
+      author: quocan9999
       comment: "Tạo khóa singleton để tuần tự hóa thao tác kiểm tra và thêm sách không ISBN tương tự."
       changes:
         - createTable:
