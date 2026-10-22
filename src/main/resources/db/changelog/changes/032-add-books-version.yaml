@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 032-add-books-version
-      author: codex
+      author: quocan9999
       comment: "Bổ sung optimistic locking cho cập nhật thông tin sách."
       changes:
         - addColumn:

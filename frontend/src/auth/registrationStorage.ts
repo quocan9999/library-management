@@ -1,17 +1,19 @@
 export const REGISTRATION_EMAIL_KEY = 'registrationEmail';
 const REGISTRATION_COOLDOWN_KEY = 'registrationCooldownUntil';
 
-export function saveRegistrationEmail(email: string, cooldownSeconds = 0): void {
+export function saveRegistrationEmail(email: string, cooldownSeconds = 0): number {
+  const cooldownUntil = cooldownSeconds > 0 ? Date.now() + cooldownSeconds * 1000 : null;
   try {
     window.sessionStorage.setItem(REGISTRATION_EMAIL_KEY, email.trim().toLowerCase());
-    if (cooldownSeconds > 0) {
-      window.sessionStorage.setItem(REGISTRATION_COOLDOWN_KEY, String(Date.now() + cooldownSeconds * 1000));
+    if (cooldownUntil !== null) {
+      window.sessionStorage.setItem(REGISTRATION_COOLDOWN_KEY, String(cooldownUntil));
     } else {
       window.sessionStorage.removeItem(REGISTRATION_COOLDOWN_KEY);
     }
   } catch {
     // Lưu email chỉ hỗ trợ hiển thị lại trên trang; tiếp tục luồng nếu storage không dùng được.
   }
+  return Math.max(0, cooldownSeconds);
 }
 
 export function readRegistrationCooldownSeconds(): number {

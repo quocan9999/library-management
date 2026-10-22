@@ -27,6 +27,10 @@ import { ProfilePage } from '../profile/ProfilePage';
 import { ChangePasswordPage } from '../profile/ChangePasswordPage';
 import { ChangeEmailPage } from '../profile/ChangeEmailPage';
 import { useAppNotification } from '../components/AppNotificationProvider';
+import { CatalogDetailPage, CatalogPage } from '../features/borrow/CatalogPage';
+import { LibrarianBorrowRequestsPage } from '../features/borrow/LibrarianBorrowRequestsPage';
+import { MyLoansPage } from '../features/borrow/MyLoansPage';
+import { BorrowPaymentPage } from '../features/borrow/BorrowPaymentPage';
 
 function SessionBootstrap() {
   return (
@@ -52,10 +56,10 @@ function RedirectSignedInUser({ children }: { children: React.ReactNode }) {
 function RequireAuthFlow({ children, registration = false }: { children: React.ReactNode; registration?: boolean }) {
   const { accessToken, isBootstrapping } = useAuth();
   const location = useLocation();
-  const state = location.state as { verificationRequestKey?: string; registrationCooldownUntil?: number } | null;
+  const state = location.state as { verificationRequestKey?: string; registrationCooldownSeconds?: number } | null;
   const hasFlow = registration
-    ? (Boolean(readRegistrationEmail()) || (typeof state?.registrationCooldownUntil === 'number'
-      && Number.isFinite(state.registrationCooldownUntil))) && !accessToken
+    ? (Boolean(readRegistrationEmail()) || (typeof state?.registrationCooldownSeconds === 'number'
+      && Number.isFinite(state.registrationCooldownSeconds) && state.registrationCooldownSeconds > 0)) && !accessToken
     : Boolean(new URLSearchParams(location.search).get('token'))
       || (location.pathname === '/verify-email' && typeof state?.verificationRequestKey === 'string');
   if (isBootstrapping) return <SessionBootstrap />;
@@ -166,6 +170,11 @@ export function App() {
           element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
         >
           <Route index element={<DefaultAccountRoute />} />
+          <Route path="books" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogPage /></RequirePermission>} />
+          <Route path="books/:id" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogDetailPage /></RequirePermission>} />
+          <Route path="my-loans" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><MyLoansPage /></RequirePermission>} />
+          <Route path="borrow-payment/:loanCode" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><BorrowPaymentPage /></RequirePermission>} />
+          <Route path="librarian/borrow-requests" element={<RequirePermission permission="borrow:read" deniedRoles={['USER']}><LibrarianBorrowRequestsPage /></RequirePermission>} />
           <Route path="admin/roles" element={<RequireRole role="ADMIN"><Navigate to="/admin/authorization/groups" replace /></RequireRole>} />
           <Route path="admin/authorization" element={<RequireRole role="ADMIN"><AuthorizationLandingPage /></RequireRole>} />
           <Route path="admin/authorization/groups" element={

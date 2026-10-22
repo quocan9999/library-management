@@ -12,6 +12,28 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PermissionDependencyRegistryTests {
 
     @Test
+    void handoverRequiresReadAndFeeConfirmationWithoutChangingCreateContract() {
+        PermissionDependencyRegistry registry = new PermissionDependencyRegistry();
+
+        assertThat(registry.requiredPermissionsFor(List.of("borrow:handover")))
+                .containsExactly("borrow:fee-confirm", "borrow:read");
+        assertThat(registry.missingDependencies(List.of("borrow:handover", "borrow:read")))
+                .containsEntry("borrow:handover", Set.of("borrow:fee-confirm"));
+        assertThat(registry.requiredPermissionsFor(List.of("borrow:create"))).isEmpty();
+    }
+
+    @Test
+    void ownActionsAndStaffActionsUseSeparateReadScopes() {
+        PermissionDependencyRegistry registry = new PermissionDependencyRegistry();
+
+        assertThat(registry.requiredPermissionsFor(List.of("borrow:cancel-own", "borrow:renew")))
+                .containsExactly("borrow:read-own");
+        assertThat(registry.requiredPermissionsFor(List.of(
+                "borrow:prepare", "borrow:cancel", "borrow:fee-confirm")))
+                .containsExactly("borrow:read");
+    }
+
+    @Test
     void usesOnlyTheExplicitBusinessDependencies() {
         PermissionDependencyRegistry registry = new PermissionDependencyRegistry();
 

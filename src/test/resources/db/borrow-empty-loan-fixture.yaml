@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: borrow-empty-loan-test-fixture
+      author: quocan9999
+      context: test
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO accounts (username, email, password_hash, role_id, email_verified, enabled)
+              SELECT 'borrowempty', 'borrowempty@example.test', 'fixture-hash', id, true, true
+              FROM roles WHERE code = 'USER';
+              INSERT INTO members (account_id, member_code, full_name)
+              SELECT id, 'BORROW-EMPTY', 'Empty loan fixture' FROM accounts WHERE username = 'borrowempty';
+              INSERT INTO loans (loan_code, member_id, borrowed_at, due_date, status)
+              SELECT 'BORROW-EMPTY', id, '2026-10-01 08:30:00', '2026-10-15', 'ACTIVE'
+              FROM members WHERE member_code = 'BORROW-EMPTY';

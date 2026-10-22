@@ -159,9 +159,39 @@ export function AdminLayout() {
         </header>
 
         <p className="admin-shell__section-label">
-          {role === 'USER' ? 'KHÔNG GIAN CÁ NHÂN' : 'KHÔNG GIAN QUẢN TRỊ'}
+          {role === 'USER' ? 'KHÔNG GIAN CÁ NHÂN' : role === 'ADMIN' ? 'KHÔNG GIAN QUẢN TRỊ' : 'DỊCH VỤ THƯ VIỆN'}
         </p>
         <nav className="admin-shell__nav" aria-label="Chính">
+          <PermissionGate permission="book:read" allowedRoles={['USER']} fallback={null}>
+            <NavLink
+              to="/books"
+              className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <BooksIcon />
+              <span>Danh mục sách</span>
+            </NavLink>
+          </PermissionGate>
+          <PermissionGate permission="borrow:read-own" allowedRoles={['USER']} fallback={null}>
+            <NavLink
+              to="/my-loans"
+              className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <BooksIcon />
+              <span>Sách của tôi</span>
+            </NavLink>
+          </PermissionGate>
+          <PermissionGate permission="borrow:read" deniedRoles={['USER']} fallback={null}>
+            <NavLink
+              to="/librarian/borrow-requests"
+              className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <MembersIcon />
+              <span>Xử lý mượn sách</span>
+            </NavLink>
+          </PermissionGate>
           <PermissionGate permission="book:read" deniedRoles={['USER']} fallback={null}>
             <NavLink
               to="/admin/books"

@@ -13,6 +13,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
@@ -50,7 +51,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE, printOnlyOnFailure = false)
 @ActiveProfiles("test")
 @Transactional
 @ExtendWith(OutputCaptureExtension.class)
@@ -73,6 +74,52 @@ class RolePermissionMutationIntegrationTests {
 
     @Autowired
     private PermissionMutationTestHooks testHooks;
+
+    @Test
+    void dynamicCounterRoleGetsHandoverDependenciesAndKeepsBaseWhenOperationIsRemoved() throws Exception {
+        jdbcTemplate.update("INSERT INTO roles (code, display_name) VALUES ('BORROW_COUNTER', 'Borrow fixture')");
+        String token = accessToken("admin", "admin");
+        MvcResult grant = patchRequest(token, "BORROW_COUNTER",
+                body(roleVersion("BORROW_COUNTER"), List.of("book:read", "borrow:handover"), List.of()));
+        assertThat(grant.getResponse().getStatus()).isEqualTo(200);
+        assertThat(permissionCount("BORROW_COUNTER", "borrow:handover")).isEqualTo(1);
+        assertThat(permissionCount("BORROW_COUNTER", "borrow:fee-confirm")).isEqualTo(1);
+        assertThat(permissionCount("BORROW_COUNTER", "borrow:read")).isEqualTo(1);
+
+        long version = roleVersion("BORROW_COUNTER");
+        MvcResult conflict = patchRequest(token, "BORROW_COUNTER",
+                body(version, List.of(), List.of("borrow:read")));
+        assertThat(conflict.getResponse().getStatus()).isEqualTo(400);
+        assertThat(JsonPath.<String>read(conflict.getResponse().getContentAsString(), "$.code"))
+                .isEqualTo("ROLE_PERMISSION_DEPENDENCY_CONFLICT");
+        assertThat(roleVersion("BORROW_COUNTER")).isEqualTo(version);
+        assertThat(permissionCount("BORROW_COUNTER", "borrow:read")).isEqualTo(1);
+
+        MvcResult remove = patchRequest(token, "BORROW_COUNTER",
+                body(version, List.of(), List.of("borrow:handover")));
+        assertThat(remove.getResponse().getStatus()).isEqualTo(200);
+        assertThat(permissionCount("BORROW_COUNTER", "borrow:handover")).isZero();
+        assertThat(permissionCount("BORROW_COUNTER", "borrow:fee-confirm")).isEqualTo(1);
+        assertThat(permissionCount("BORROW_COUNTER", "borrow:read")).isEqualTo(1);
+        MvcResult removeAll = patchRequest(token, "BORROW_COUNTER",
+                body(roleVersion("BORROW_COUNTER"), List.of(), List.of("borrow:fee-confirm", "borrow:read")));
+        assertThat(removeAll.getResponse().getStatus()).isEqualTo(200);
+        assertThat(permissionCount("BORROW_COUNTER", "borrow:read")).isZero();
+        assertThat(permissionCount("BORROW_COUNTER", "book:read")).isEqualTo(1);
+    }
+
+    @Test
+    void userCannotReceiveCounterPermissionsAndRejectedDeltaDoesNotWrite() throws Exception {
+        String token = accessToken("admin", "admin");
+        long version = roleVersion("USER");
+        MvcResult response = patchRequest(token, "USER",
+                body(version, List.of("borrow:handover"), List.of()));
+        assertThat(response.getResponse().getStatus()).isEqualTo(403);
+        assertThat(roleVersion("USER")).isEqualTo(version);
+        assertThat(permissionCount("USER", "borrow:handover")).isZero();
+        assertThat(permissionCount("USER", "borrow:fee-confirm")).isZero();
+        assertThat(permissionCount("USER", "borrow:read")).isZero();
+    }
 
     @Test
     void adminAppliesDeltaIncrementsVersionOnceAndKeepsUnchangedPermissions() throws Exception {

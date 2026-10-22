@@ -4,17 +4,19 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import sparkminds.librarymanagement.loan.service.LoanTimestampListener;
 import sparkminds.librarymanagement.book.entity.Book;
+import sparkminds.librarymanagement.auth.entity.Account;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
+@EntityListeners(LoanTimestampListener.class)
 @Table(
         name = "loan_items",
         uniqueConstraints = {
@@ -50,14 +52,51 @@ public class LoanItem {
     @Column(name = "late_fee", nullable = false, precision = 12, scale = 2)
     private BigDecimal lateFee = BigDecimal.ZERO;
 
+    @Column(name = "waitlisted_at")
+    private LocalDateTime waitlistedAt;
+
+    @Column(name = "ready_at")
+    private LocalDateTime readyAt;
+
+    @Column(name = "pickup_expires_at")
+    private LocalDateTime pickupExpiresAt;
+
+    @Column(name = "borrowed_at")
+    private LocalDateTime borrowedAt;
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
+    @Column(name = "renewal_count", nullable = false)
+    private byte renewalCount;
+
+    @Column(name = "paid_borrow_fee", precision = 12, scale = 2)
+    private BigDecimal paidBorrowFee;
+
+    @Column(name = "borrow_fee_paid_at")
+    private LocalDateTime borrowFeePaidAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "borrow_fee_confirmed_by_account_id")
+    private Account borrowFeeConfirmedByAccount;
+
+    @Column(name = "late_fee_paid_at")
+    private LocalDateTime lateFeePaidAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "late_fee_paid_by_account_id")
+    private Account lateFeePaidByAccount;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
     @Column(name = "returned_at")
     private LocalDateTime returnedAt;
 
-    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 }

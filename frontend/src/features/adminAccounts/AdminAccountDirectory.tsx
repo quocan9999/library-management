@@ -539,7 +539,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       <section className="role-workspace admin-account-workspace" aria-labelledby="admin-account-title">
         <div className="role-heading">
           <div>
-            <p className="role-eyebrow">QUẢN TRỊ HỆ THỐNG</p>
             <h1 id="admin-account-title">{heading}</h1>
             <p className="role-intro">{mode === 'management'
               ? 'Tìm và quản lý tài khoản có quyền quản trị thư viện.'

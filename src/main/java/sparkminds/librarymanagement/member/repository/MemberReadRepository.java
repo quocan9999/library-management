@@ -136,7 +136,7 @@ public class MemberReadRepository {
         List<LoanHistoryItemResponse> content = jdbcTemplate.query("""
                 SELECT li.id AS loan_item_id, l.id AS loan_id, l.loan_code, l.status AS loan_status,
                        b.id AS book_id, b.book_code, b.title AS book_title, b.author AS book_author, b.isbn,
-                       li.status AS item_status, l.borrowed_at, l.due_date, li.returned_at,
+                       li.status AS item_status, li.borrowed_at, li.due_date, li.returned_at,
                        li.borrow_fee, li.late_fee_per_day, li.late_fee,
                        li.borrow_fee + li.late_fee AS recorded_total_fee
                 FROM loan_items li
@@ -146,7 +146,7 @@ public class MemberReadRepository {
                 JOIN accounts a ON a.id = m.account_id
                 JOIN roles r ON r.id = a.role_id AND r.code = 'USER'
                 WHERE l.member_id = ?
-                """ + statusClause + " ORDER BY l.borrowed_at DESC, l.id DESC, li.id DESC LIMIT ? OFFSET ?",
+                """ + statusClause + " ORDER BY li.borrowed_at DESC, l.id DESC, li.id DESC LIMIT ? OFFSET ?",
                 LOAN_HISTORY_ROW,
                 pageArguments.toArray()
         );

@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 031-account-session-change-reason
-      author: codex
+      author: quocan9999
       changes:
         - addColumn:
             tableName: accounts

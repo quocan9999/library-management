@@ -18,7 +18,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function mount(path: string, signedIn: boolean, state?: { registrationCooldownUntil: number }) {
+function mount(path: string, signedIn: boolean, state?: { registrationCooldownSeconds: number }) {
   apiClient.defaults.adapter = (async (config) => {
     const response = (code: string, data: unknown, status = 200) => ({
       config, status, statusText: 'OK', headers: new AxiosHeaders(),
@@ -62,8 +62,9 @@ describe('special authentication routes', () => {
   });
 
   it('accepts registration navigation context even without saved email', async () => {
-    mount('/check-email', false, { registrationCooldownUntil: Date.now() + 60_000 });
+    mount('/check-email', false, { registrationCooldownSeconds: 60 });
     expect(await screen.findByRole('heading', { name: 'Kiểm tra email' })).toBeTruthy();
+    expect(screen.getByText('Vui lòng chờ 60 giây trước khi gửi yêu cầu tiếp theo.')).toBeTruthy();
     expect(screen.getByLabelText('current path').textContent).toBe('/check-email');
   });
 

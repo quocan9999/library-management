@@ -438,8 +438,8 @@ class MemberAdminLifecycleIntegrationTests {
                     .andReturn());
             assertThat(historyChecked.await(10, TimeUnit.SECONDS)).isTrue();
             jdbcTemplate.update("""
-                            INSERT INTO loans (loan_code, member_id, borrowed_at, due_date, status)
-                            VALUES (?, ?, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY), 'ACTIVE')
+                            INSERT INTO loans (loan_code, member_id, borrowed_at, pickup_reference, status)
+                            VALUES (?, ?, CURRENT_TIMESTAMP, UUID(), 'ACTIVE')
                             """,
                     "MMV8-P05-RACE-" + UUID.randomUUID().toString().substring(0, 8), memberId);
             allowDeleteToContinue.countDown();
@@ -492,8 +492,8 @@ class MemberAdminLifecycleIntegrationTests {
         Integer accountId = jdbcTemplate.queryForObject(
                 "SELECT account_id FROM members WHERE id = ?", Integer.class, memberId);
         jdbcTemplate.update("""
-                        INSERT INTO loans (loan_code, member_id, borrowed_at, due_date, status)
-                        VALUES (?, ?, CURRENT_TIMESTAMP, DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY), 'RETURNED')
+                        INSERT INTO loans (loan_code, member_id, borrowed_at, pickup_reference, status)
+                        VALUES (?, ?, CURRENT_TIMESTAMP, UUID(), 'RETURNED')
                         """,
                 "MMV8-P05-RETURNED-" + UUID.randomUUID().toString().substring(0, 8), memberId);
 

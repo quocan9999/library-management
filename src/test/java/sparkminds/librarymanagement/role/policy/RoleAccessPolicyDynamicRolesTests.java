@@ -9,6 +9,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RoleAccessPolicyDynamicRolesTests {
 
+    @Test
+    void userCanReceiveOwnBorrowPermissionsButNeverCounterPermissions() {
+        List<String> catalog = List.of("borrow:read-own", "borrow:cancel-own", "borrow:renew",
+                "borrow:read", "borrow:prepare", "borrow:cancel", "borrow:fee-confirm", "borrow:handover");
+        java.util.Set<String> actorPermissions = new java.util.HashSet<>(catalog);
+        actorPermissions.add("role:update");
+
+        assertThat(policy.editablePermissions("ADMIN", "USER", actorPermissions, catalog))
+                .containsExactly("borrow:cancel-own", "borrow:read-own", "borrow:renew");
+        assertThat(policy.editablePermissions("ADMIN", "COUNTER_TEAM", actorPermissions, catalog))
+                .containsAll(catalog);
+    }
+
     private final RoleAccessPolicy policy = new RoleAccessPolicy();
     private final Set<String> adminPermissions = Set.of("role:read", "role:update", "book:read", "book:create",
             "member:read", "member:status:update", "account:change-email", "account:manage-users");

@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: borrow-legacy-test-fixture
+      author: quocan9999
+      context: test
+      changes:
+        - sql:
+            sql: |
+              INSERT INTO accounts (username, email, password_hash, role_id, email_verified, enabled)
+              SELECT 'borrowlegacy', 'borrowlegacy@example.test', 'fixture-hash', id, true, true
+              FROM roles WHERE code = 'USER';
+              INSERT INTO members (account_id, member_code, full_name)
+              SELECT id, 'BORROW-LEGACY', 'Legacy migration fixture' FROM accounts WHERE username = 'borrowlegacy';
+              INSERT INTO books (book_code, title, author, total_quantity, available_quantity, borrow_fee, late_fee_per_day)
+              VALUES ('BORROW-LEGACY', 'Legacy fixture', 'Fixture', 2, 1, 99.00, 9.00);
+              INSERT INTO loans (loan_code, member_id, borrowed_at, due_date, status)
+              SELECT 'BORROW-LEGACY-ACTIVE', id, '2026-10-01 08:30:00', '2026-10-15', 'ACTIVE'
+              FROM members WHERE member_code = 'BORROW-LEGACY';
+              INSERT INTO loans (loan_code, member_id, borrowed_at, due_date, status)
+              SELECT 'BORROW-LEGACY-RETURNED', id, '2026-09-01 09:15:00', '2026-09-15', 'RETURNED'
+              FROM members WHERE member_code = 'BORROW-LEGACY';
+              INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, returned_at)
+              SELECT l.id, b.id, 'BORROWED', 25.00, 1.50, 6.00, NULL
+              FROM loans l CROSS JOIN books b
+              WHERE l.loan_code = 'BORROW-LEGACY-ACTIVE' AND b.book_code = 'BORROW-LEGACY';
+              INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, returned_at)
+              SELECT l.id, b.id, 'RETURNED', 20.00, 1.00, 3.00, '2026-09-18 10:00:00'
+              FROM loans l CROSS JOIN books b
+              WHERE l.loan_code = 'BORROW-LEGACY-RETURNED' AND b.book_code = 'BORROW-LEGACY';

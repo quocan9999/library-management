@@ -1,0 +1,59 @@
+databaseChangeLog:
+  - changeSet:
+      id: 037-borrow-counter-and-mock-payment
+      author: quocan9999
+      comment: "Phân biệt yêu cầu trực tuyến/tại quầy và lưu trạng thái VietQR mô phỏng ngay trên Loan."
+      changes:
+        - sql:
+            dbms: mysql
+            sql: |
+              ALTER TABLE loans
+                ADD COLUMN origin VARCHAR(12) NOT NULL DEFAULT 'ONLINE',
+                ADD COLUMN payment_status VARCHAR(20) NOT NULL DEFAULT 'NOT_REQUIRED',
+                ADD COLUMN payment_method VARCHAR(20) NULL,
+                ADD COLUMN payment_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+                ADD COLUMN payment_expires_at DATETIME(6) NULL,
+                ADD COLUMN paid_at DATETIME(6) NULL;
+              UPDATE loans loan
+              JOIN (
+                SELECT loan_id,
+                  SUM(CASE WHEN status IN ('WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP')
+                        AND paid_borrow_fee IS NULL THEN borrow_fee ELSE 0 END) AS unpaid_amount,
+                  SUM(CASE WHEN status IN ('WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP') THEN 1 ELSE 0 END) AS active_count,
+                  MAX(borrow_fee_paid_at) AS last_paid_at
+                FROM loan_items GROUP BY loan_id
+              ) items ON items.loan_id = loan.id
+              SET loan.origin = 'ONLINE',
+                  loan.payment_amount = items.unpaid_amount,
+                  loan.payment_status = CASE
+                    WHEN items.active_count = 0 THEN 'NOT_REQUIRED'
+                    WHEN items.unpaid_amount > 0 THEN 'PENDING'
+                    ELSE 'PAID' END,
+                  loan.payment_method = CASE
+                    WHEN items.unpaid_amount > 0 THEN 'MOCK_VIETQR'
+                    WHEN items.active_count = 0 THEN NULL
+                    WHEN items.last_paid_at IS NULL THEN 'NO_CHARGE'
+                    ELSE 'COUNTER' END,
+                  loan.payment_expires_at = CASE WHEN items.unpaid_amount > 0
+                    THEN DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 15 MINUTE) ELSE NULL END,
+                  loan.paid_at = CASE WHEN items.active_count > 0 AND items.unpaid_amount = 0
+                    THEN COALESCE(items.last_paid_at, UTC_TIMESTAMP(6)) ELSE NULL END;
+              ALTER TABLE loans
+                ADD CONSTRAINT chk_loans_origin CHECK (origin IN ('ONLINE', 'COUNTER')),
+                ADD CONSTRAINT chk_loans_payment_status CHECK (payment_status IN ('PENDING', 'PAID', 'NOT_REQUIRED', 'EXPIRED')),
+                ADD CONSTRAINT chk_loans_payment_method CHECK (payment_method IS NULL OR payment_method IN ('MOCK_VIETQR', 'COUNTER', 'NO_CHARGE')),
+                ADD CONSTRAINT chk_loans_payment_values CHECK (
+                  payment_amount >= 0 AND
+                  ((payment_status = 'PENDING' AND payment_expires_at IS NOT NULL AND paid_at IS NULL)
+                    OR (payment_status = 'PAID' AND payment_expires_at IS NULL AND paid_at IS NOT NULL)
+                    OR (payment_status = 'NOT_REQUIRED' AND payment_expires_at IS NULL AND paid_at IS NULL)
+                    OR (payment_status = 'EXPIRED' AND payment_expires_at IS NOT NULL AND paid_at IS NULL))),
+                ADD INDEX idx_loans_payment_expiry (payment_status, payment_expires_at);
+              ALTER TABLE loan_item_status_history DROP CHECK chk_loan_item_history_reason;
+              ALTER TABLE loan_item_status_history ADD CONSTRAINT chk_loan_item_history_reason CHECK (reason_code IN (
+                'REQUEST_CREATED', 'QUEUE_PROMOTED', 'PREPARATION_STARTED', 'READY_CONFIRMED', 'USER_CANCELLED',
+                'COUNTER_CANCELLED', 'PICKUP_EXPIRED', 'PHYSICAL_COPY_UNAVAILABLE', 'HANDOVER_COMPLETED',
+                'MOCK_PAYMENT_CONFIRMED', 'PAYMENT_EXPIRED', 'RENEWAL_COMPLETED', 'RETURN_COMPLETED',
+                'LEGACY_IMPORTED', 'DUE_REMINDER_THREE_DAYS', 'DUE_REMINDER_TODAY', 'OVERDUE_REMINDER_FIRST_DAY'));
+              UPDATE permissions SET description = 'Hủy sách READY tại quầy; khoản đã thanh toán được hoàn trực tiếp ngoài hệ thống'
+              WHERE code = 'borrow:cancel';

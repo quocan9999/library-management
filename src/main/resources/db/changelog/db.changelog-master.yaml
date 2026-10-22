@@ -134,3 +134,15 @@ databaseChangeLog:
   - include:
       file: changes/034-book-cover-image.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/035-borrow-foundation.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/036-borrow-permissions.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/037-borrow-counter-and-mock-payment.yaml
+      relativeToChangelogFile: true

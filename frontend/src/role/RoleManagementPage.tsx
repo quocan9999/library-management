@@ -344,7 +344,6 @@ function RolePermissionEditor({
       <section id="role-permission-editor" className="role-workspace" aria-labelledby="role-title">
         <div className="role-heading">
           <div>
-            <p className="role-eyebrow">QUẢN TRỊ HỆ THỐNG</p>
             <h1 id="role-title">Quản lý quyền theo nhóm</h1>
             <p className="role-intro">Xem quyền hiệu lực và cập nhật tập quyền được gán cho nhóm.</p>
           </div>

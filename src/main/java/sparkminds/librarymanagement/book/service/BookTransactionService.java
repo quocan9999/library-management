@@ -1,11 +1,15 @@
 package sparkminds.librarymanagement.book.service;
 
 import lombok.RequiredArgsConstructor;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.OptimisticLockException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import sparkminds.librarymanagement.book.dto.BookDetailResponse;
 import sparkminds.librarymanagement.book.dto.CreateBookRequest;
 import sparkminds.librarymanagement.book.dto.UpdateBookRequest;
@@ -17,11 +21,14 @@ import sparkminds.librarymanagement.book.repository.BookSimilarityRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.common.api.FieldValidationException;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
+import sparkminds.librarymanagement.loan.service.BorrowInventoryService;
+import sparkminds.librarymanagement.loan.service.LoanAggregateService;
 
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.TreeSet;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +38,9 @@ public class BookTransactionService {
     private final BookSimilarityRepository bookSimilarityRepository;
     private final LoanItemRepository loanItemRepository;
     private final ApplicationEventPublisher events;
+    private final BorrowInventoryService inventoryService;
+    private final LoanAggregateService aggregateService;
+    private final EntityManager entityManager;
 
     /**
      * Tạo một đầu sách sau khi chuẩn hóa thông tin và kiểm tra ISBN/sách tương tự.
@@ -90,16 +100,22 @@ public class BookTransactionService {
      * <p>Kiểm tra version trước khi thay đổi và flush ngay trong transaction để phát hiện cả stale request
      * lẫn cuộc đua xảy ra sau lần đọc; số lượng unavailable được giữ nguyên khi tổng số lượng thay đổi.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public BookDetailResponse update(Integer id, UpdateBookRequest request) {
         return update(id, request, null);
     }
 
     /** Giữ nguyên ảnh khi cover=null; xóa ảnh cũ bằng sự kiện AFTER_COMMIT để rollback không làm mất ảnh. */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public BookDetailResponse update(Integer id, UpdateBookRequest request, UploadedBookCover cover) {
         Book book = bookRepository.findById(id)
                 .orElseThrow(BookTransactionService::bookNotFound);
+        try {
+            // Chung khóa Book với đặt mượn; refresh rồi mới kiểm tra version client để không ghi từ snapshot cũ.
+            entityManager.refresh(book, LockModeType.PESSIMISTIC_WRITE);
+        } catch (OptimisticLockException exception) {
+            throw versionConflict();
+        }
         if (!Objects.equals(book.getVersion(), request.version())) {
             throw versionConflict();
         }
@@ -137,8 +153,11 @@ public class BookTransactionService {
         }
 
         try {
+            var affectedLoans = new TreeSet<Integer>();
+            inventoryService.allocateWaiting(book, affectedLoans);
+            aggregateService.refresh(affectedLoans);
             bookRepository.saveAndFlush(book);
-        } catch (OptimisticLockingFailureException exception) {
+        } catch (OptimisticLockingFailureException | OptimisticLockException exception) {
             throw versionConflict();
         }
         return BookMapper.toDetail(book);

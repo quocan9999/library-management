@@ -172,7 +172,7 @@ export function BookListPage() {
     { title: 'Phí mượn', dataIndex: 'borrowFee', key: 'borrowFee', sorter: true, sortOrder: sortOrder('borrowFee'), align: 'right', render: formatVnd, width: 135 },
     { title: 'Phí trễ/ngày', dataIndex: 'lateFeePerDay', key: 'lateFeePerDay', sorter: true, sortOrder: sortOrder('lateFeePerDay'), align: 'right', render: formatVnd, width: 145 },
     { title: 'Cập nhật', dataIndex: 'updatedAt', key: 'updatedAt', sorter: true, sortOrder: sortOrder('updatedAt'), render: formatDate, width: 125 },
-    { title: 'Thao tác', key: 'action', render: (_value, book) => <Link to={`/admin/books/${book.id}`} aria-label={`Xem chi tiết ${book.bookCode}`}>Chi tiết</Link>, width: 100 },
+    { title: 'Thao tác', key: 'action', render: (_value, book) => <Link to={`/admin/books/${book.id}`} aria-label={`Xem chi tiết ${book.bookCode}`}>Xem chi tiết</Link>, width: 120 },
   ];
 
   const dateRange: [Dayjs | null, Dayjs | null] = [asDayjs(draftFilters.publishedFrom), asDayjs(draftFilters.publishedTo)];
@@ -182,7 +182,6 @@ export function BookListPage() {
       <section className="role-workspace member-workspace book-workspace" aria-labelledby="book-list-title">
         <div className="role-heading">
           <div>
-            <p className="role-eyebrow">QUẢN TRỊ KHO SÁCH</p>
             <h1 id="book-list-title">Quản lý sách</h1>
             <p className="role-intro">Tra cứu thông tin xuất bản, số lượng và mức phí mượn.</p>
           </div>

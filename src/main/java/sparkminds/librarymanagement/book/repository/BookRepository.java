@@ -2,6 +2,10 @@ package sparkminds.librarymanagement.book.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import sparkminds.librarymanagement.book.entity.Book;
 
 import java.util.Optional;
@@ -20,4 +24,8 @@ public interface BookRepository extends JpaRepository<Book, Integer>, JpaSpecifi
     boolean existsByIsbn(String isbn);
 
     boolean existsByIsbnAndIdNot(String isbn, Integer id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select book from Book book where book.id = :bookId")
+    Optional<Book> findByIdForUpdate(@Param("bookId") Integer bookId);
 }

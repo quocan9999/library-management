@@ -7,7 +7,6 @@ export function AuthorizationLandingPage() {
       <section className="role-workspace authorization-workspace" aria-labelledby="authorization-title">
         <div className="role-heading">
           <div>
-            <p className="role-eyebrow">QUẢN TRỊ HỆ THỐNG</p>
             <h1 id="authorization-title">Quản lý phân quyền</h1>
             <p className="role-intro">Quản lý nhóm quyền và phạm vi truy cập trong thư viện.</p>
           </div>

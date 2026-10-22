@@ -430,7 +430,7 @@ class MemberQueryApiIntegrationTests {
     }
 
     @Test
-    void disableCountsBorrowedItemsAcrossLoansWithoutChangingLoanHistory() throws Exception {
+    void disableRejectsBorrowedItemsAcrossLoansWithoutChangingAccountOrLoanHistory() throws Exception {
         String token = login("admin", "admin");
         MemberFixture fixture = createMember("MMV8-P04-COUNT-" + UUID.randomUUID().toString().substring(0, 8),
                 "Borrow Count Fixture", "0370000093", LocalDate.of(1990, 1, 1), true, true, LocalDateTime.now());
@@ -453,8 +453,14 @@ class MemberQueryApiIntegrationTests {
                 BigDecimal.ZERO, null);
 
         patchAccountStatus(token, fixture.memberId(), true, false)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MEMBER_HAS_ACTIVE_BORROW_ACTIVITY"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT a.enabled FROM accounts a JOIN members m ON m.account_id = a.id WHERE m.id = ?",
+                Boolean.class, fixture.memberId())).isTrue();
+        mockMvc.perform(get("/api/v1/members/{id}", fixture.memberId())
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.enabled").value(false))
                 .andExpect(jsonPath("$.data.borrowedItemCount").value(3));
         history(token, fixture.memberId(), "status", "BORROWED")
                 .andExpect(status().isOk())
@@ -1404,9 +1410,9 @@ class MemberQueryApiIntegrationTests {
 
     private int createLoan(Integer memberId, String code, LocalDateTime borrowedAt, String status) {
         jdbcTemplate.update("""
-                INSERT INTO loans (loan_code, member_id, borrowed_at, due_date, status)
+                INSERT INTO loans (loan_code, member_id, borrowed_at, pickup_reference, status)
                 VALUES (?, ?, ?, ?, ?)
-                """, code, memberId, borrowedAt, borrowedAt.toLocalDate().plusDays(14), status);
+                """, code, memberId, borrowedAt, UUID.randomUUID().toString(), status);
         return jdbcTemplate.queryForObject("SELECT id FROM loans WHERE loan_code = ?", Integer.class, code);
     }
 
@@ -1420,9 +1426,11 @@ class MemberQueryApiIntegrationTests {
             LocalDateTime returnedAt
     ) {
         jdbcTemplate.update("""
-                INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, returned_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, loanId, bookId, status, borrowFee, lateFeePerDay, lateFee, returnedAt);
+                INSERT INTO loan_items (loan_id, book_id, status, borrow_fee, late_fee_per_day, late_fee, returned_at,
+                                        borrowed_at, due_date)
+                SELECT ?, ?, ?, ?, ?, ?, ?, borrowed_at, DATE_ADD(DATE(borrowed_at), INTERVAL 14 DAY)
+                FROM loans WHERE id = ?
+                """, loanId, bookId, status, borrowFee, lateFeePerDay, lateFee, returnedAt, loanId);
     }
 
     private void setPermission(String roleCode, String permissionCode, boolean assigned) {
