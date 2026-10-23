@@ -343,13 +343,22 @@
   height: 32px;
   border-radius: 50%;
   background: var(--user-lilac);
-  border: none;
+  border: var(--user-border-main);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--user-ink);
   padding: 0;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.user-search-clear-btn:hover {
+  background: var(--user-waitlist-bg);
+}
+
+.user-search-clear-btn.user-pressable:active {
+  transform: translateY(-50%) scale(0.92);
 }
 
 /* Catalog Books Grid (Responsive) */

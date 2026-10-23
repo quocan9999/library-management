@@ -148,7 +148,9 @@ Bo góc chuẩn 14px, padding `4px 12px`, font `Be Vietnam Pro` weight 600:
 ### 5.4. Thẻ Sách (`UserBookCard`) & Bìa Sách (`UserBookCover`)
 
 * Bìa sách đồ họa phẳng: chiều cao 170px trên catalog, hoặc 56px - 100px trên danh sách giỏ/mượn.
-* 4 gam màu bìa xoay vòng: Ink `#14112B` + chữ Lime; Violet `#6C4DFF` + chữ Trắng; Lime `#C8FF3D` + chữ Ink; Lilac `#EFEBFF` + chữ Ink. Tự động hiển thị ảnh bìa thật nếu có URL hợp lệ.
+* **Viền bìa cỡ nhỏ (`size="sm" | "md" | "lg"`):** Bổ sung viền `2px solid #14112B` bo tròn theo thẻ (`border-radius: 12px` – `16px`) giúp ảnh bìa có nền sáng/trắng (như Effective Java) tách biệt rõ ràng, không bị chìm hay hòa vào nền hàng của giỏ mượn và danh sách.
+* **Ảnh bìa mặc định:** Khi sách chưa có ảnh bìa (admin không tải lên ảnh bìa, `coverImageUrl` rỗng hoặc `null`), mặc định sử dụng ảnh Cloudinary: `https://res.cloudinary.com/dcz9x5e9/image/upload/v1792744188/defbookcover-min_lbjfkz.jpg`.
+* **Cơ chế fallback:** Tự động hiển thị ảnh bìa từ URL thật; nếu không có hoặc link ảnh lỗi thì nạp ảnh bìa mặc định; nếu vẫn lỗi thì rơi về bìa typographic đồ họa với 4 gam màu xoay vòng (Ink `#14112B` + chữ Lime; Violet `#6C4DFF` + chữ Trắng; Lime `#C8FF3D` + chữ Ink; Lilac `#EFEBFF` + chữ Ink).
 * Card chứa đầy đủ: Bìa, Tên sách (tối đa 2 dòng), Tác giả, Giá mượn/lượt, Phí trễ/ngày, Badge tình trạng, Vị trí hàng chờ, và Nút hành động tương ứng:
   * "Chọn mượn" (`primary`): khi sách còn khả dụng.
   * "Vào hàng chờ" (`outline`): khi sách hết nhưng còn slot chờ FIFO.
@@ -184,9 +186,7 @@ Bo góc chuẩn 14px, padding `4px 12px`, font `Be Vietnam Pro` weight 600:
   * Effect quản lý phụ thuộc duy nhất vào `[open]`, lưu callback `onClose` vào `useRef` (`onCloseRef`). Nhờ đó, khi danh sách thay đổi (ví dụ độc giả xóa một sách khỏi giỏ), focus không bị nhảy đột ngột về nút Đóng và `document.body.style.overflow` không bị giật mở/khóa lại.
   * Tự động focus vào nút Đóng khi mở, giữ vòng lặp phím Tab/Shift+Tab trong drawer, khôi phục focus về nút đã bấm mở sau khi đóng.
 * **Giới hạn 3 đầu sách:**
-  * Tiêu đề kèm mô tả kép:
-    1. `"{n} sách. Các sách sẽ được gộp vào một yêu cầu và một mã QR."`
-    2. `"Tối đa 3 đầu sách cho mỗi lượt mượn trực tuyến."`
+  * Tiêu đề kèm mô tả: `"Tối đa 3 đầu sách cho mỗi lượt mượn trực tuyến."`
   * Khi độc giả cố thêm sách thứ 4: hiển thị thông báo cảnh báo qua `message.warning('Mỗi lượt mượn trực tuyến tối đa 3 đầu sách')` và **không tự mở drawer**.
   * Khi độc giả thêm cuốn sách đã có trong giỏ: hiển thị `message.warning('Sách này đã có trong giỏ mượn')` và **không tự mở drawer**.
 * **Trạng thái giỏ trống:** Hiển thị icon túi mượn, dòng thông báo "Giỏ mượn chưa có sách nào" và lời hướng dẫn.

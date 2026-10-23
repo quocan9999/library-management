@@ -66,7 +66,6 @@ const UserLayoutContent: React.FC = () => {
       return false;
     }
     setCartItems((prev) => [...prev, item]);
-    setIsCartOpen(true);
     return true;
   };
 

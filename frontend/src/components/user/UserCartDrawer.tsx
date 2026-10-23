@@ -189,13 +189,8 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
               </svg>
             </button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#14112B' }}>
-              {items.length} sách. Các sách sẽ được gộp vào một yêu cầu và một mã QR.
-            </div>
-            <div style={{ fontSize: '13px', color: '#4B4570' }}>
-              Tối đa 3 đầu sách cho mỗi lượt mượn trực tuyến.
-            </div>
+          <div style={{ fontSize: '13px', color: '#4B4570' }}>
+            Tối đa 3 đầu sách cho mỗi lượt mượn trực tuyến.
           </div>
         </div>
 

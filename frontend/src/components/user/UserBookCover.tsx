@@ -4,6 +4,9 @@ export type UserBookCoverTheme = 'ink' | 'violet' | 'lime' | 'lilac';
 
 export type UserBookCoverSize = 'sm' | 'md' | 'lg' | 'catalog';
 
+export const DEFAULT_BOOK_COVER_URL =
+  'https://res.cloudinary.com/dcz9x5e9/image/upload/v1792744188/defbookcover-min_lbjfkz.jpg';
+
 export interface UserBookCoverProps {
   title: string;
   coverImageUrl?: string | null;
@@ -30,7 +33,23 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
   className = '',
   style = {},
 }) => {
-  const [imageError, setImageError] = useState(false);
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
+
+  const effectiveCoverUrl = (() => {
+    if (coverImageUrl && !failedUrls.has(coverImageUrl)) {
+      return coverImageUrl;
+    }
+    if (!failedUrls.has(DEFAULT_BOOK_COVER_URL)) {
+      return DEFAULT_BOOK_COVER_URL;
+    }
+    return null;
+  })();
+
+  const handleImageError = () => {
+    if (effectiveCoverUrl) {
+      setFailedUrls((prev) => new Set(prev).add(effectiveCoverUrl));
+    }
+  };
 
   const activePair = theme
     ? COLOR_PAIRS.find((p) => p.theme === theme) || COLOR_PAIRS[0]
@@ -81,8 +100,9 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
   };
 
   const dim = getSizeStyles();
+  const isSmall = size !== 'catalog';
 
-  if (coverImageUrl && !imageError) {
+  if (effectiveCoverUrl) {
     return (
       <div
         className={`user-book-cover user-no-select ${className}`}
@@ -90,6 +110,8 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
           width: dim.width,
           height: dim.height,
           borderRadius: dim.borderRadius,
+          border: isSmall ? '2px solid #14112B' : 'none',
+          boxSizing: 'border-box',
           backgroundColor: activePair.bg,
           overflow: 'hidden',
           position: 'relative',
@@ -98,14 +120,15 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
         }}
       >
         <img
-          src={coverImageUrl}
+          src={effectiveCoverUrl}
           alt={title}
-          onError={() => setImageError(true)}
+          onError={handleImageError}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
             display: 'block',
+            borderRadius: 'inherit',
           }}
         />
       </div>
@@ -119,6 +142,7 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
         width: dim.width,
         height: dim.height,
         borderRadius: dim.borderRadius,
+        border: isSmall ? '2px solid #14112B' : 'none',
         backgroundColor: activePair.bg,
         color: activePair.color,
         padding: dim.padding,
