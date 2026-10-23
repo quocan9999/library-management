@@ -11,6 +11,7 @@ export interface UserFilterChipsProps {
   onChange: (value: string) => void;
   ariaLabel: string;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export const UserFilterChips: React.FC<UserFilterChipsProps> = ({
@@ -19,12 +20,14 @@ export const UserFilterChips: React.FC<UserFilterChipsProps> = ({
   onChange,
   ariaLabel,
   className = '',
+  style = {},
 }) => {
   return (
     <div
       role="group"
       aria-label={ariaLabel}
       className={`user-filter-chips ${className}`.trim()}
+      style={style}
     >
       {options.map((option) => {
         const isSelected = option.value === value;

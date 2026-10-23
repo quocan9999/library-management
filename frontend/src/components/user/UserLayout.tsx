@@ -1,10 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { ConfigProvider, App } from 'antd';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { userAntdTheme } from './userAntdTheme';
 import { UserHeader } from './UserHeader';
 import { UserCartDrawer, type UserCartItem } from './UserCartDrawer';
 import { useAuth } from '../../auth/AuthContext';
+import { useAppNotification } from '../AppNotificationProvider';
+import { borrowApi } from '../../features/borrow/api';
+import { borrowErrorMessage, borrowErrorNotificationType } from '../../features/borrow/errors';
 import './userTheme.css';
 
 // Context for managing user cart across reader pages
@@ -34,6 +37,7 @@ const CART_STORAGE_KEY = 'libby_user_cart_items';
 const UserLayoutContent: React.FC = () => {
   const { currentUser, logout } = useAuth();
   const { message } = App.useApp();
+  const { notify } = useAppNotification();
   const navigate = useNavigate();
 
   // Load cart items from sessionStorage
@@ -47,6 +51,8 @@ const UserLayoutContent: React.FC = () => {
   });
 
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const checkoutLockRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -75,6 +81,35 @@ const UserLayoutContent: React.FC = () => {
 
   const clearCart = () => {
     setCartItems([]);
+  };
+
+  const handleCheckout = async () => {
+    if (cartItems.length === 0 || checkoutLockRef.current) return;
+    checkoutLockRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const bookIds = cartItems.map((item) => Number(item.id));
+      const created = await borrowApi.createRequest(bookIds);
+      clearCart();
+      setIsCartOpen(false);
+      if (created.paymentStatus === 'PENDING') {
+        navigate(`/borrow-payment/${encodeURIComponent(created.loanCode)}`);
+      } else {
+        notify('success', {
+          title: 'Đặt mượn thành công',
+          description: `Yêu cầu ${created.loanCode} đã được tạo thành công.`,
+        });
+        navigate('/my-loans');
+      }
+    } catch (error: unknown) {
+      notify(borrowErrorNotificationType(error), {
+        title: 'Không thể đặt mượn sách',
+        description: borrowErrorMessage(error, 'create'),
+      });
+    } finally {
+      checkoutLockRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -129,10 +164,8 @@ const UserLayoutContent: React.FC = () => {
           onClose={() => setIsCartOpen(false)}
           items={cartItems}
           onRemoveItem={removeFromCart}
-          onCheckout={() => {
-            setIsCartOpen(false);
-            navigate('/borrow-payment/cart');
-          }}
+          onCheckout={handleCheckout}
+          isSubmitting={isSubmitting}
         />
       </div>
     </UserCartContext.Provider>

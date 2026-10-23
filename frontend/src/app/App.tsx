@@ -181,15 +181,36 @@ export function App() {
               </RequirePermission>
             }
           />
+          <Route
+            path="books/:id"
+            element={
+              <RequirePermission permission="book:read" allowedRoles={['USER']}>
+                <CatalogDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="my-loans"
+            element={
+              <RequirePermission permission="borrow:read-own" allowedRoles={['USER']}>
+                <MyLoansPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="borrow-payment/:loanCode"
+            element={
+              <RequirePermission permission="borrow:read-own" allowedRoles={['USER']}>
+                <BorrowPaymentPage />
+              </RequirePermission>
+            }
+          />
         </Route>
         <Route
           path="/"
           element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
         >
           <Route index element={<DefaultAccountRoute />} />
-          <Route path="books/:id" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogDetailPage /></RequirePermission>} />
-          <Route path="my-loans" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><MyLoansPage /></RequirePermission>} />
-          <Route path="borrow-payment/:loanCode" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><BorrowPaymentPage /></RequirePermission>} />
           <Route path="librarian/borrow-requests" element={<RequirePermission permission="borrow:read" deniedRoles={['USER']}><LibrarianBorrowRequestsPage /></RequirePermission>} />
           <Route path="admin/roles" element={<RequireRole role="ADMIN"><Navigate to="/admin/authorization/groups" replace /></RequireRole>} />
           <Route path="admin/authorization" element={<RequireRole role="ADMIN"><AuthorizationLandingPage /></RequireRole>} />
