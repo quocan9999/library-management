@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { UserBookCover } from './UserBookCover';
 import { UserButton } from './UserButton';
 
@@ -28,6 +28,72 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
   onCheckout,
   isSubmitting = false,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Focus management & scroll lock
+  useEffect(() => {
+    if (!open) return undefined;
+
+    // Save active element that opened the drawer
+    triggerRef.current = document.activeElement as HTMLElement | null;
+
+    // Lock body scroll
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    // Focus close button initially
+    const timer = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 50);
+
+    // Escape listener and focus trap
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusableElements = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.clearTimeout(timer);
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+      triggerRef.current?.focus();
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const totalFee = items.reduce((sum, item) => sum + (item.borrowFee ?? 0), 0);
@@ -38,7 +104,7 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
 
   return (
     <div
-      className="user-cart-overlay select-none"
+      className="user-cart-overlay user-no-select"
       style={{
         position: 'fixed',
         inset: 0,
@@ -51,22 +117,20 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
       <div
         className="user-overlay-backdrop"
         onClick={onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(20, 17, 43, 0.38)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
-        }}
+        aria-hidden="true"
       />
 
       {/* Drawer content */}
       <div
-        className="user-cart-content"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-cart-drawer-title"
+        className="user-cart-content user-cart-drawer-panel"
         style={{
           position: 'relative',
           width: '440px',
-          maxWidth: '100%',
+          maxWidth: 'calc(100vw - 20px)',
           height: '100%',
           backgroundColor: '#FFFFFF',
           borderLeft: '2px solid #14112B',
@@ -81,8 +145,10 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
         {/* Header */}
         <div style={{ padding: '28px 28px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div
+            <h2
+              id="user-cart-drawer-title"
               style={{
+                margin: 0,
                 fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
                 fontWeight: 800,
                 fontSize: '32px',
@@ -90,11 +156,13 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
               }}
             >
               Giỏ mượn
-            </div>
+            </h2>
             <button
+              ref={closeButtonRef}
               type="button"
-              aria-label="Đóng"
+              aria-label="Đóng giỏ mượn"
               onClick={onClose}
+              className="user-pressable"
               style={{
                 width: '44px',
                 height: '44px',
@@ -105,7 +173,6 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                outline: 'none',
               }}
             >
               <svg
@@ -122,8 +189,13 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
               </svg>
             </button>
           </div>
-          <div style={{ fontSize: '13px', color: '#4B4570' }}>
-            Tối đa 3 đầu sách cho mỗi lượt mượn trực tuyến.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#14112B' }}>
+              {items.length} sách. Các sách sẽ được gộp vào một yêu cầu và một mã QR.
+            </div>
+            <div style={{ fontSize: '13px', color: '#4B4570' }}>
+              Tối đa 3 đầu sách cho mỗi lượt mượn trực tuyến.
+            </div>
           </div>
         </div>
 
@@ -221,6 +293,7 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
                   type="button"
                   aria-label={`Xóa ${item.title} khỏi giỏ`}
                   onClick={() => onRemoveItem(item.id)}
+                  className="user-pressable"
                   style={{
                     flex: 'none',
                     width: '36px',
@@ -232,7 +305,6 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    outline: 'none',
                   }}
                 >
                   <svg

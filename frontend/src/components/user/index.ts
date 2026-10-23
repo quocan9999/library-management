@@ -10,3 +10,4 @@ export * from './UserAvatarMenu';
 export * from './UserHeader';
 export * from './UserQrModal';
 export * from './UserLayout';
+export * from './UserFilterChips';

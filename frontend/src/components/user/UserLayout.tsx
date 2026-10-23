@@ -8,7 +8,7 @@ import { useAuth } from '../../auth/AuthContext';
 import './userTheme.css';
 
 // Context for managing user cart across reader pages
-interface UserCartContextType {
+export interface UserCartContextType {
   cartItems: UserCartItem[];
   addToCart: (item: UserCartItem) => boolean;
   removeFromCart: (id: number | string) => void;
@@ -19,7 +19,7 @@ interface UserCartContextType {
   closeCart: () => void;
 }
 
-const UserCartContext = createContext<UserCartContextType | undefined>(undefined);
+export const UserCartContext = createContext<UserCartContextType | undefined>(undefined);
 
 export const useUserCart = (): UserCartContextType => {
   const context = useContext(UserCartContext);
@@ -31,8 +31,9 @@ export const useUserCart = (): UserCartContextType => {
 
 const CART_STORAGE_KEY = 'libby_user_cart_items';
 
-export const UserLayout: React.FC = () => {
+const UserLayoutContent: React.FC = () => {
   const { currentUser, logout } = useAuth();
+  const { message } = App.useApp();
   const navigate = useNavigate();
 
   // Load cart items from sessionStorage
@@ -57,9 +58,11 @@ export const UserLayout: React.FC = () => {
 
   const addToCart = (item: UserCartItem): boolean => {
     if (cartItems.some((ci) => String(ci.id) === String(item.id))) {
+      message.warning('Sách này đã có trong giỏ mượn');
       return false;
     }
     if (cartItems.length >= 3) {
+      message.warning('Mỗi lượt mượn trực tuyến tối đa 3 đầu sách');
       return false;
     }
     setCartItems((prev) => [...prev, item]);
@@ -88,54 +91,60 @@ export const UserLayout: React.FC = () => {
   const userInitial = displayName.trim().charAt(0).toUpperCase() || 'Đ';
 
   return (
-    <ConfigProvider theme={userAntdTheme}>
-      <App>
-        <UserCartContext.Provider
-          value={{
-            cartItems,
-            addToCart,
-            removeFromCart,
-            clearCart,
-            isCartOpen,
-            setIsCartOpen,
-            openCart: () => setIsCartOpen(true),
-            closeCart: () => setIsCartOpen(false),
+    <UserCartContext.Provider
+      value={{
+        cartItems,
+        addToCart,
+        removeFromCart,
+        clearCart,
+        isCartOpen,
+        setIsCartOpen,
+        openCart: () => setIsCartOpen(true),
+        closeCart: () => setIsCartOpen(false),
+      }}
+    >
+      <div className="user-site">
+        <UserHeader
+          cartCount={cartItems.length}
+          onOpenCart={() => setIsCartOpen(true)}
+          userFullName={displayName}
+          userEmail={currentUser?.email || ''}
+          userInitial={userInitial}
+          onLogout={handleLogout}
+        />
+
+        <main
+          style={{
+            flex: 1,
+            width: '100%',
+            maxWidth: '1280px',
+            margin: '0 auto',
+            boxSizing: 'border-box',
           }}
         >
-          <div className="user-site">
-            <UserHeader
-              cartCount={cartItems.length}
-              onOpenCart={() => setIsCartOpen(true)}
-              userFullName={displayName}
-              userEmail={currentUser?.email || ''}
-              userInitial={userInitial}
-              onLogout={handleLogout}
-            />
+          <Outlet />
+        </main>
 
-            <main
-              style={{
-                flex: 1,
-                width: '100%',
-                maxWidth: '1280px',
-                margin: '0 auto',
-                boxSizing: 'border-box',
-              }}
-            >
-              <Outlet />
-            </main>
+        <UserCartDrawer
+          open={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          items={cartItems}
+          onRemoveItem={removeFromCart}
+          onCheckout={() => {
+            setIsCartOpen(false);
+            navigate('/borrow-payment/cart');
+          }}
+        />
+      </div>
+    </UserCartContext.Provider>
+  );
+};
 
-            <UserCartDrawer
-              open={isCartOpen}
-              onClose={() => setIsCartOpen(false)}
-              items={cartItems}
-              onRemoveItem={removeFromCart}
-              onCheckout={() => {
-                setIsCartOpen(false);
-                navigate('/borrow-payment/cart');
-              }}
-            />
-          </div>
-        </UserCartContext.Provider>
+export const UserLayout: React.FC = () => {
+  return (
+    <ConfigProvider theme={userAntdTheme}>
+      <App>
+        <UserLayoutContent />
       </App>
     </ConfigProvider>
   );

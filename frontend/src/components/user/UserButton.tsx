@@ -6,6 +6,7 @@ export type UserButtonVariant =
   | 'dark'
   | 'dark-outline'
   | 'lime-outline'
+  | 'lime-accent'
   | 'muted'
   | 'ghost';
 
@@ -22,6 +23,7 @@ export const UserButton: React.FC<UserButtonProps> = ({
   variant = 'primary',
   size = 'md',
   fullWidth = false,
+  type = 'button',
   children,
   className = '',
   style = {},
@@ -69,6 +71,12 @@ export const UserButton: React.FC<UserButtonProps> = ({
           color: '#C8FF3D',
           border: '2px solid #C8FF3D',
         };
+      case 'lime-accent':
+        return {
+          background: '#C8FF3D',
+          color: '#14112B',
+          border: '2px solid #14112B',
+        };
       case 'ghost':
         return {
           background: 'transparent',
@@ -109,7 +117,8 @@ export const UserButton: React.FC<UserButtonProps> = ({
 
   return (
     <button
-      className={`user-button select-none transition-colors duration-150 inline-flex items-center justify-center font-semibold ${className}`}
+      type={type}
+      className={`user-button user-no-select ${disabled ? '' : 'user-pressable'} ${className}`}
       disabled={disabled}
       style={{
         display: 'inline-flex',
@@ -117,7 +126,6 @@ export const UserButton: React.FC<UserButtonProps> = ({
         justifyContent: 'center',
         fontFamily: 'var(--user-font-body, "Be Vietnam Pro", sans-serif)',
         fontWeight: 600,
-        outline: 'none',
         cursor: disabled ? 'not-allowed' : 'pointer',
         width: fullWidth ? '100%' : 'auto',
         ...getSizeStyles(),

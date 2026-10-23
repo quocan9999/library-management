@@ -175,7 +175,7 @@ export function MyLoansPage() {
     </section>}
     {loadState === 'ready' && visible.length > 0 && <section className="borrow-requests" aria-label="Yêu cầu và sách">
       {visible.map((request) => <article key={request.loanCode} className="borrow-request" data-borrow-request={request.loanCode}>
-        <header className="borrow-request__heading">
+        <header className="user-loan-card__header">
           <div>
             <p className="role-eyebrow">YÊU CẦU {request.loanCode}</p>
             <h2>{request.items.length} {request.items.length === 1 ? 'cuốn' : 'cuốn'} trong nhóm này</h2>

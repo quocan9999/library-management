@@ -3,10 +3,18 @@ import React from 'react';
 export type LibbyLogoVariant = 'dark' | 'light' | 'violet' | 'lime';
 
 export interface LibbyLogoProps {
+  /**
+   * Biến thể logo dựa trên màu nền hiển thị:
+   * - 'dark': dùng trên nền tối (vd: Header #14112B)
+   * - 'light': dùng trên nền sáng (vd: Nền trắng #FFFFFF / #F4F1FF)
+   * - 'violet': dùng trên nền màu thương hiệu #6C4DFF
+   * - 'lime': dùng trên nền màu điểm nhấn #C8FF3D
+   */
   variant?: LibbyLogoVariant;
   size?: 'sm' | 'md' | 'lg' | 'hero';
   showText?: boolean;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export const LibbyLogo: React.FC<LibbyLogoProps> = ({
@@ -14,8 +22,8 @@ export const LibbyLogo: React.FC<LibbyLogoProps> = ({
   size = 'md',
   showText = true,
   className = '',
+  style = {},
 }) => {
-  // Dimension mapping
   const dimensions = {
     sm: { icon: 32, fontSize: 26, gap: 8 },
     md: { icon: 40, fontSize: 36, gap: 10 },
@@ -23,7 +31,7 @@ export const LibbyLogo: React.FC<LibbyLogoProps> = ({
     hero: { icon: 120, fontSize: 104, gap: 24 },
   }[size];
 
-  // Palette per variant
+  // Palette theo biến thể nền hiển thị
   let rectFill = '#6C4DFF';
   let pathFill = '#FFFFFF';
   let dotFill = '#C8FF3D';
@@ -52,12 +60,13 @@ export const LibbyLogo: React.FC<LibbyLogoProps> = ({
 
   return (
     <div
-      className={`inline-flex items-center select-none ${className}`}
+      className={`user-logo user-no-select ${className}`}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: `${dimensions.gap}px`,
         textDecoration: 'none',
+        ...style,
       }}
     >
       <svg

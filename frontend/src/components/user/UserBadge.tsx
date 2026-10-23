@@ -7,7 +7,8 @@ export type UserBadgeVariant =
   | 'waitlist'
   | 'neutral'
   | 'subtle'
-  | 'outline';
+  | 'outline'
+  | 'preparing';
 
 export interface UserBadgeProps {
   variant?: UserBadgeVariant;
@@ -36,6 +37,8 @@ export const UserBadge: React.FC<UserBadgeProps> = ({
         return { bg: '#14112B', text: '#FFFFFF' };
       case 'subtle':
         return { bg: '#EFEBFF', text: '#14112B' };
+      case 'preparing':
+        return { bg: '#EFEBFF', text: '#4B4570' };
       case 'outline':
         return { bg: 'transparent', text: '#14112B', border: '2px solid #14112B' };
       default:
@@ -47,7 +50,7 @@ export const UserBadge: React.FC<UserBadgeProps> = ({
 
   return (
     <span
-      className={`user-badge ${className}`}
+      className={`user-badge user-no-select ${className}`}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

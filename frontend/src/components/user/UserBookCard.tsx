@@ -23,6 +23,7 @@ export interface UserBookCardProps {
   theme?: UserBookCoverTheme;
   isInCart?: boolean;
   onAction?: (book: UserBookCardItem) => void;
+  onOpenCart?: () => void;
   onClickTitle?: (book: UserBookCardItem) => void;
   className?: string;
   style?: React.CSSProperties;
@@ -34,6 +35,7 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
   theme,
   isInCart = false,
   onAction,
+  onOpenCart,
   onClickTitle,
   className = '',
   style = {},
@@ -67,7 +69,13 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
         <UserButton
           variant="outline"
           fullWidth
-          onClick={() => onAction?.(book)}
+          onClick={() => {
+            if (onOpenCart) {
+              onOpenCart();
+            } else {
+              onAction?.(book);
+            }
+          }}
           style={{ marginTop: 'auto' }}
         >
           Đã trong giỏ
@@ -115,7 +123,7 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
 
   return (
     <div
-      className={`user-book-card bg-white flex flex-col ${className}`}
+      className={`user-book-card ${className}`}
       style={{
         backgroundColor: '#FFFFFF',
         border: '2px solid #14112B',

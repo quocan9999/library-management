@@ -10,6 +10,7 @@ import { SessionTabSync } from '../auth/SessionTabSync';
 import { readRegistrationEmail } from '../auth/registrationStorage';
 import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
+import { UserLayout } from '../components/user';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
@@ -166,11 +167,26 @@ export function App() {
         <Route path="/verify-email" element={<RequireAuthFlow><VerifyEmailPage /></RequireAuthFlow>} />
         <Route path="/403" element={<ForbiddenPage />} />
         <Route
+          element={
+            <RequireAuthentication>
+              <UserLayout />
+            </RequireAuthentication>
+          }
+        >
+          <Route
+            path="books"
+            element={
+              <RequirePermission permission="book:read" allowedRoles={['USER']}>
+                <CatalogPage />
+              </RequirePermission>
+            }
+          />
+        </Route>
+        <Route
           path="/"
           element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
         >
           <Route index element={<DefaultAccountRoute />} />
-          <Route path="books" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogPage /></RequirePermission>} />
           <Route path="books/:id" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogDetailPage /></RequirePermission>} />
           <Route path="my-loans" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><MyLoansPage /></RequirePermission>} />
           <Route path="borrow-payment/:loanCode" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><BorrowPaymentPage /></RequirePermission>} />

@@ -32,7 +32,6 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
 }) => {
   const [imageError, setImageError] = useState(false);
 
-  // Pick color pair either by explicit theme or cyclic index
   const activePair = theme
     ? COLOR_PAIRS.find((p) => p.theme === theme) || COLOR_PAIRS[0]
     : COLOR_PAIRS[Math.abs(themeIndex) % COLOR_PAIRS.length];
@@ -86,12 +85,15 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
   if (coverImageUrl && !imageError) {
     return (
       <div
-        className={`user-book-cover overflow-hidden flex-none relative ${className}`}
+        className={`user-book-cover user-no-select ${className}`}
         style={{
           width: dim.width,
           height: dim.height,
           borderRadius: dim.borderRadius,
           backgroundColor: activePair.bg,
+          overflow: 'hidden',
+          position: 'relative',
+          flexShrink: 0,
           ...style,
         }}
       >
@@ -112,7 +114,7 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
 
   return (
     <div
-      className={`user-book-cover flex-none select-none ${className}`}
+      className={`user-book-cover user-no-select ${className}`}
       style={{
         width: dim.width,
         height: dim.height,
@@ -124,6 +126,7 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
         display: 'flex',
         alignItems: 'flex-end',
         overflow: 'hidden',
+        flexShrink: 0,
         fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
         fontWeight: 800,
         fontSize: dim.fontSize,

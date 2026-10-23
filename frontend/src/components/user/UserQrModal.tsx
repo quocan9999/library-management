@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { UserBadge } from './UserBadge';
 
 export interface UserQrModalProps {
   open: boolean;
@@ -20,13 +21,75 @@ export const UserQrModal: React.FC<UserQrModalProps> = ({
   bookSubtitle,
   className = '',
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Focus management & scroll lock
+  useEffect(() => {
+    if (!open) return undefined;
+
+    triggerRef.current = document.activeElement as HTMLElement | null;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const timer = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusableElements = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.clearTimeout(timer);
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+      triggerRef.current?.focus();
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const valueToEncode = qrPayload || loanCode || 'LIBBY_DEFAULT';
 
   return (
     <div
-      className={`user-qr-modal-overlay select-none ${className}`}
+      className={`user-qr-modal-overlay user-no-select ${className}`}
       style={{
         position: 'fixed',
         inset: 0,
@@ -42,18 +105,16 @@ export const UserQrModal: React.FC<UserQrModalProps> = ({
       <div
         className="user-overlay-backdrop"
         onClick={onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(20, 17, 43, 0.38)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
-        }}
+        aria-hidden="true"
       />
 
       {/* Modal Dialog */}
       <div
-        className="user-qr-dialog"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-qr-modal-title"
+        className="user-qr-dialog user-qr-modal-panel"
         style={{
           position: 'relative',
           width: '440px',
@@ -65,16 +126,21 @@ export const UserQrModal: React.FC<UserQrModalProps> = ({
           padding: '32px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px',
+          gap: '16px',
           zIndex: 1001,
           fontFamily: 'var(--user-font-body, "Be Vietnam Pro", sans-serif)',
           color: '#14112B',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div>
+              <UserBadge variant="success">Mã nhận sách</UserBadge>
+            </div>
+            <h2
+              id="user-qr-modal-title"
               style={{
+                margin: 0,
                 fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
                 fontWeight: 800,
                 fontSize: '32px',
@@ -83,12 +149,14 @@ export const UserQrModal: React.FC<UserQrModalProps> = ({
               }}
             >
               Yêu cầu {loanCode}
-            </div>
+            </h2>
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
-            aria-label="Đóng"
+            aria-label="Đóng mã QR"
             onClick={onClose}
+            className="user-pressable"
             style={{
               width: '44px',
               height: '44px',
@@ -100,7 +168,6 @@ export const UserQrModal: React.FC<UserQrModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              outline: 'none',
               flexShrink: 0,
             }}
           >
@@ -136,7 +203,7 @@ export const UserQrModal: React.FC<UserQrModalProps> = ({
           style={{
             backgroundColor: '#EFEBFF',
             borderRadius: '24px',
-            padding: '24px',
+            padding: '20px',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
@@ -154,7 +221,7 @@ export const UserQrModal: React.FC<UserQrModalProps> = ({
           >
             <QRCodeSVG
               value={valueToEncode}
-              size={220}
+              size={260}
               fgColor="#14112B"
               bgColor="#FFFFFF"
               level="H"

@@ -1,36 +1,56 @@
-import { Alert, Button, Card, Input, Modal, Pagination, Select, Skeleton, Tag } from 'antd';
+import { Alert, Button, Modal, Pagination, Skeleton } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BORROW_PAGE_SIZE, MAX_BORROW_BOOKS, borrowApi } from './api';
+import { BORROW_PAGE_SIZE, borrowApi } from './api';
 import { BorrowBookAction } from './BorrowBookAction';
-import { BorrowCart } from './BorrowCart';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { borrowErrorMessage, borrowErrorNotificationType } from './errors';
 import { formatVnd } from '../books/formatting';
 import type { BorrowListQuery, CatalogBook, PageResponse } from './types';
+import {
+  UserBookCard,
+  UserButton,
+  UserFilterChips,
+  useUserCart,
+  type UserBookCardItem,
+  type UserCartItem,
+} from '../../components/user';
 
-function stockLabel(book: CatalogBook): { label: string; tone: 'available' | 'low' | 'unavailable' } {
-  if (book.availableQuantity === 0) return { label: 'Hết sách', tone: 'unavailable' };
-  if (book.availableQuantity === 1) return { label: 'Sắp hết · còn 1', tone: 'low' };
-  return { label: `Còn ${book.availableQuantity}/${book.totalQuantity}`, tone: 'available' };
-}
+const AVAILABILITY_CHIPS = [
+  { value: 'ALL', label: 'Tất cả' },
+  { value: 'AVAILABLE', label: 'Còn sách' },
+  { value: 'UNAVAILABLE', label: 'Hết sách' },
+];
 
 export function CatalogPage() {
   const navigate = useNavigate();
   const { notify } = useAppNotification();
+  const { cartItems, addToCart, openCart } = useUserCart();
+
   const [searchDraft, setSearchDraft] = useState('');
   const [queryText, setQueryText] = useState('');
   const [availability, setAvailability] = useState<'ALL' | 'AVAILABLE' | 'UNAVAILABLE'>('ALL');
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
+
   const [loaded, setLoaded] = useState<{ key: string; data: PageResponse<CatalogBook> } | null>(null);
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
-  const [selectedBooks, setSelectedBooks] = useState<CatalogBook[]>([]);
-  const [confirmRequestOpen, setConfirmRequestOpen] = useState(false);
-  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
-  const [requestPending, setRequestPending] = useState(false);
-  const requestLock = useRef(false);
-  const totalBorrowFee = useMemo(() => selectedBooks.reduce((total, book) => total + book.borrowFee, 0), [selectedBooks]);
+
+  // Waitlist confirmation modal
+  const [waitlistBook, setWaitlistBook] = useState<CatalogBook | null>(null);
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+  const waitlistLockRef = useRef(false);
+
+  // Debounce timer for search
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const query = useMemo<BorrowListQuery>(() => ({
     ...(queryText ? { q: queryText } : {}),
@@ -39,6 +59,7 @@ export function CatalogPage() {
     size: BORROW_PAGE_SIZE,
     sort: 'title,asc',
   }), [availability, page, queryText]);
+
   const requestKey = `${JSON.stringify(query)}:${reloadKey}`;
   const result = loaded?.key === requestKey ? loaded.data : null;
   const loadError = failed?.key === requestKey ? failed.message : '';
@@ -47,6 +68,7 @@ export function CatalogPage() {
   useEffect(() => {
     const controller = new AbortController();
     let current = true;
+
     void borrowApi.listCatalog(query, controller.signal)
       .then((data) => {
         if (!current) return;
@@ -54,180 +76,327 @@ export function CatalogPage() {
       })
       .catch((error: unknown) => {
         if (!current) return;
+        if (controller.signal.aborted) return;
         setFailed({ key: requestKey, message: borrowErrorMessage(error, 'read') });
       });
+
     return () => {
       current = false;
       controller.abort();
     };
   }, [query, requestKey]);
 
-  const applySearch = (value: string) => {
-    setQueryText(value.trim());
-    setPage(1);
+  // Handle typing in search input with 400ms debounce
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const val = event.target.value;
+    setSearchDraft(val);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      const trimmed = val.trim();
+      if (trimmed !== queryText) {
+        setQueryText(trimmed);
+        setPage(1);
+      }
+    }, 400);
   };
 
-  const toggleBookSelection = (book: CatalogBook) => {
-    if (selectedBooks.length === 1 && selectedBooks[0].id === book.id) setCartDrawerOpen(false);
-    setSelectedBooks((current) => {
-      if (current.some((selected) => selected.id === book.id)) return current.filter((selected) => selected.id !== book.id);
-      if (current.length >= MAX_BORROW_BOOKS) return current;
-      return [...current, book];
-    });
-  };
-
-  const submitBorrowRequest = async () => {
-    if (requestLock.current || selectedBooks.length < 1 || selectedBooks.length > MAX_BORROW_BOOKS) return;
-    requestLock.current = true;
-    setRequestPending(true);
-    try {
-      const created = await borrowApi.createRequest(selectedBooks.map((book) => book.id));
-      setConfirmRequestOpen(false);
-      setCartDrawerOpen(false);
-      setSelectedBooks([]);
-      navigate(`/borrow-payment/${encodeURIComponent(created.loanCode)}`);
-    } catch (error: unknown) {
-      notify(borrowErrorNotificationType(error), {
-        title: 'Không thể tạo yêu cầu mượn',
-        description: borrowErrorMessage(error, 'create'),
-      });
-    } finally {
-      requestLock.current = false;
-      setRequestPending(false);
+  // Handle Enter key for immediate search
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      const trimmed = searchDraft.trim();
+      if (trimmed !== queryText) {
+        setQueryText(trimmed);
+        setPage(1);
+      }
     }
   };
 
-  return <main className={`borrow-stage${selectedBooks.length > 0 ? ' borrow-stage--with-cart' : ''}`} aria-labelledby="catalog-heading">
-    <header className="borrow-heading">
-      <div>
-        <p className="role-eyebrow">DANH MỤC THƯ VIỆN</p>
-        <h1 id="catalog-heading">Khám phá sách</h1>
-        <p className="role-intro">Tra cứu tình trạng bản sách, phí mượn và sức chứa hàng chờ hiện tại.</p>
-      </div>
-      <div className="borrow-heading-actions">
-        <Button onClick={() => setReloadKey((key) => key + 1)}>Tải lại</Button>
-        <Link className="member-back-link" to="/my-loans">Sách của tôi</Link>
-      </div>
-    </header>
+  // Handle clear button
+  const handleClearSearch = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    setSearchDraft('');
+    if (queryText !== '') {
+      setQueryText('');
+      setPage(1);
+    }
+  };
 
-    <section className="borrow-toolbar" aria-label="Tìm sách">
-      <Input.Search
-        aria-label="Tìm sách"
-        placeholder="Tên sách, tác giả hoặc mã sách"
-        value={searchDraft}
-        onChange={(event) => setSearchDraft(event.target.value)}
-        onSearch={applySearch}
-        allowClear
-      />
-      <Select
-        aria-label="Lọc tình trạng sách"
-        value={availability}
-        onChange={(value: 'ALL' | 'AVAILABLE' | 'UNAVAILABLE') => { setAvailability(value); setPage(1); }}
-        options={[
-          { value: 'ALL', label: 'Mọi tình trạng' },
-          { value: 'AVAILABLE', label: 'Còn bản để mượn' },
-          { value: 'UNAVAILABLE', label: 'Đang hết bản' },
-        ]}
-      />
-    </section>
+  // Handle filter chip change
+  const handleAvailabilityChange = (val: string) => {
+    setAvailability(val as 'ALL' | 'AVAILABLE' | 'UNAVAILABLE');
+    setPage(1);
+  };
 
-    {loadState === 'loading' && <div className="borrow-loading" role="status"><Skeleton active paragraph={{ rows: 3 }} /><Skeleton active paragraph={{ rows: 3 }} /></div>}
-    {loadState === 'error' && <Alert
-      className="borrow-page-alert"
-      type="error"
-      showIcon
-      role="alert"
-      title={loadError}
-      action={<Button onClick={() => setReloadKey((key) => key + 1)}>Tải lại</Button>}
-    />}
-    {loadState === 'ready' && result?.content.length === 0 && <section className="borrow-empty" aria-live="polite">
-      <h2>Chưa tìm thấy sách phù hợp</h2>
-      <p>Thử một từ khóa khác hoặc xóa bộ lọc tình trạng.</p>
-    </section>}
-    {loadState === 'ready' && result && result.content.length > 0 && <>
-      <section className="catalog-grid" aria-label="Sách trong danh mục">
-        {result.content.map((book) => {
-          const selected = selectedBooks.some((selection) => selection.id === book.id);
-          const stock = stockLabel(book);
-          return <Card
-            key={book.id}
-            className={`catalog-card${selected ? ' catalog-card--selected' : ''}`}
-            data-catalog-book={book.id}
+  // Reset filters
+  const handleResetFilters = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    setSearchDraft('');
+    setQueryText('');
+    setAvailability('ALL');
+    setPage(1);
+  };
+
+  // Handle book card action button
+  const handleBookAction = (book: CatalogBook) => {
+    if (book.availableQuantity > 0) {
+      const cartItem: UserCartItem = {
+        id: book.id,
+        title: book.title,
+        borrowFee: book.borrowFee,
+        coverImageUrl: book.coverImageUrl,
+        bookCode: book.bookCode,
+      };
+      addToCart(cartItem);
+    } else {
+      setWaitlistBook(book);
+    }
+  };
+
+  // Submit waitlist request
+  const submitWaitlist = async (book: CatalogBook) => {
+    if (waitlistLockRef.current) return;
+    waitlistLockRef.current = true;
+    setWaitlistSubmitting(true);
+    try {
+      const created = await borrowApi.createRequest([book.id]);
+      setWaitlistBook(null);
+      navigate(`/borrow-payment/${encodeURIComponent(created.loanCode)}`);
+    } catch (error: unknown) {
+      notify(borrowErrorNotificationType(error), {
+        title: 'Không thể vào hàng chờ',
+        description: borrowErrorMessage(error, 'create'),
+      });
+    } finally {
+      waitlistLockRef.current = false;
+      setWaitlistSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="user-catalog-page">
+      {/* 1. Tiêu đề trang */}
+      <div className="user-catalog-header">
+        <h1 className="user-title-display-64">Khám phá sách</h1>
+        <p className="user-subtitle">
+          Tra cứu tình trạng bản sách, phí mượn và hàng chờ hiện tại.
+        </p>
+      </div>
+
+      {/* 2. Thanh công cụ */}
+      <div className="user-catalog-toolbar">
+        {/* Hàng 1: Ô tìm kiếm pill với nút xóa tròn */}
+        <div className="user-catalog-search-wrapper">
+          <input
+            type="search"
+            aria-label="Tìm sách"
+            className="user-search-input"
+            placeholder="Tên sách, tác giả hoặc mã sách"
+            value={searchDraft}
+            onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
+          />
+          {searchDraft.length > 0 && (
+            <button
+              type="button"
+              className="user-search-clear-btn user-pressable"
+              aria-label="Xóa từ khóa"
+              onClick={handleClearSearch}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Hàng 2: Bộ lọc tình trạng bằng chip */}
+        <UserFilterChips
+          ariaLabel="Lọc sách theo tình trạng"
+          options={AVAILABILITY_CHIPS}
+          value={availability}
+          onChange={handleAvailabilityChange}
+        />
+      </div>
+
+      {/* 3. Các trạng thái giao diện */}
+      {/* Đang tải: 8 ô skeleton phẳng */}
+      {loadState === 'loading' && (
+        <section className="user-catalog-grid" role="status" aria-label="Đang tải danh sách sách">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div key={index} className="user-book-skeleton" />
+          ))}
+        </section>
+      )}
+
+      {/* Lỗi tải */}
+      {loadState === 'error' && (
+        <section
+          className="user-card"
+          style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '48px',
+          }}
+          role="alert"
+        >
+          <h2 className="user-title-24" style={{ margin: 0 }}>
+            Không tải được danh sách sách
+          </h2>
+          <p
+            className="user-subtitle"
+            style={{ margin: 0, fontSize: '16px', color: 'var(--user-error-text)' }}
           >
-            <Link className="catalog-card__cover" to={`/books/${book.id}`} aria-label={`Xem chi tiết ${book.title}`}>
-              {book.coverImageUrl
-                ? <img src={book.coverImageUrl} alt={`Bìa sách ${book.title}`} loading="lazy" />
-                : <span className="catalog-card__cover-placeholder">{book.title}</span>}
-              {selected && <span className="catalog-card__selected-mark" aria-hidden="true">
-                <svg viewBox="0 0 16 16" fill="none" focusable="false">
-                  <path d="m3.5 8.2 2.8 2.7 6.2-6" />
-                </svg>
-              </span>}
-            </Link>
-            <div className="catalog-card__body">
-              <Link className="catalog-card__title" to={`/books/${book.id}`}>{book.title}</Link>
-              <p className="catalog-card__author">{book.author}</p>
-              <div className="catalog-card__price-row">
-                <p className="catalog-card__price"><strong>{formatVnd(book.borrowFee)}</strong><span>/lượt</span></p>
-                <Tag className={`catalog-stock-tag catalog-stock-tag--${stock.tone}`}>{stock.label}</Tag>
-              </div>
-              <div className="catalog-card__meta-row">
-                <span>{book.bookCode}</span>
-                <span>Trễ {formatVnd(book.lateFeePerDay)}/ngày</span>
-              </div>
-              {book.availableQuantity === 0 && <p className="catalog-card__queue">Hàng chờ: {book.waitlistCount} / {book.waitlistCap}</p>}
-              <BorrowBookAction
-                key={`${book.id}-${book.availableQuantity}-${book.waitlistCount}`}
-                book={book}
-                selected={selected}
-                selectionDisabled={selectedBooks.length >= MAX_BORROW_BOOKS}
-                onToggleSelection={toggleBookSelection}
+            {loadError || 'Đã có lỗi xảy ra trong quá trình tải dữ liệu.'}
+          </p>
+          <div style={{ marginTop: '12px' }}>
+            <UserButton variant="primary" onClick={() => setReloadKey((k) => k + 1)}>
+              Thử lại
+            </UserButton>
+          </div>
+        </section>
+      )}
+
+      {/* Không có kết quả */}
+      {loadState === 'ready' && result?.content.length === 0 && (
+        <section
+          className="user-card"
+          style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '48px',
+          }}
+          aria-live="polite"
+        >
+          <h2 className="user-title-24" style={{ margin: 0 }}>
+            Không tìm thấy sách phù hợp
+          </h2>
+          <p className="user-subtitle" style={{ margin: 0, fontSize: '16px' }}>
+            Thử đổi từ khóa hoặc bỏ bộ lọc tình trạng.
+          </p>
+          <div style={{ marginTop: '12px' }}>
+            <UserButton variant="outline" onClick={handleResetFilters}>
+              Xóa bộ lọc
+            </UserButton>
+          </div>
+        </section>
+      )}
+
+      {/* Sẵn sàng: Lưới sách */}
+      {loadState === 'ready' && result && result.content.length > 0 && (
+        <>
+          <section className="user-catalog-grid" aria-label="Sách trong danh mục">
+            {result.content.map((book, index) => {
+              const isInCart = cartItems.some((ci) => String(ci.id) === String(book.id));
+              const bookCardItem: UserBookCardItem = {
+                id: book.id,
+                bookCode: book.bookCode,
+                title: book.title,
+                author: book.author,
+                coverImageUrl: book.coverImageUrl,
+                borrowFee: book.borrowFee,
+                lateFeePerDay: book.lateFeePerDay,
+                availableQuantity: book.availableQuantity,
+                totalQuantity: book.totalQuantity,
+                waitlistCount: book.waitlistCount,
+                maxWaitlistSlots: book.waitlistCap,
+              };
+
+              return (
+                <UserBookCard
+                  key={book.id}
+                  book={bookCardItem}
+                  themeIndex={index}
+                  isInCart={isInCart}
+                  onOpenCart={openCart}
+                  onClickTitle={() => navigate(`/books/${book.id}`)}
+                  onAction={() => handleBookAction(book)}
+                />
+              );
+            })}
+          </section>
+
+          {result.totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '48px' }}>
+              <Pagination
+                current={page}
+                pageSize={BORROW_PAGE_SIZE}
+                total={result.totalElements}
+                showSizeChanger={false}
+                onChange={setPage}
+                aria-label="Trang danh mục sách"
               />
             </div>
-          </Card>;
-        })}
-      </section>
-      {result.totalPages > 1 && <Pagination
-        className="borrow-pagination"
-        current={page}
-        pageSize={BORROW_PAGE_SIZE}
-        total={result.totalElements}
-        showSizeChanger={false}
-        onChange={setPage}
-        aria-label="Trang danh mục sách"
-      />}
-    </>}
-    <BorrowCart
-      books={selectedBooks}
-      maximumBooks={MAX_BORROW_BOOKS}
-      totalFee={totalBorrowFee}
-      locked={requestPending || confirmRequestOpen}
-      drawerOpen={cartDrawerOpen}
-      onOpenDrawer={() => setCartDrawerOpen(true)}
-      onCloseDrawer={() => setCartDrawerOpen(false)}
-      onRemove={toggleBookSelection}
-      onSubmit={() => setConfirmRequestOpen(true)}
-    />
-    <Modal
-      open={confirmRequestOpen}
-      centered
-      title="Xác nhận yêu cầu mượn"
-      okText={requestPending ? 'Đang gửi…' : 'Xác nhận đặt mượn'}
-      cancelText="Xem lại"
-      confirmLoading={requestPending}
-      onCancel={() => { if (!requestPending) setConfirmRequestOpen(false); }}
-      onOk={() => { void submitBorrowRequest(); }}
-    >
-      <p>Các sách đã chọn sẽ nằm trong cùng một yêu cầu và dùng chung một mã QR nhận sách.</p>
-      <ul className="borrow-selection__items">
-        {selectedBooks.map((book) => <li key={book.id}>
-          <span><strong>{book.title}</strong> · {formatVnd(book.borrowFee)}</span>
-          {book.availableQuantity === 0 && <span>Hàng chờ: {book.waitlistCount} / {book.waitlistCap}</span>}
-        </li>)}
-      </ul>
-      <p>Chỉ xác nhận thành công khi máy chủ trả kết quả. Nếu kết nối hết thời gian chờ, hãy tải danh sách yêu cầu trước khi gửi lại.</p>
-    </Modal>
-  </main>;
+          )}
+        </>
+      )}
+
+      {/* Modal xác nhận vào hàng chờ */}
+      <Modal
+        open={Boolean(waitlistBook)}
+        centered
+        title="Xác nhận vào hàng chờ"
+        okText={waitlistSubmitting ? 'Đang gửi…' : 'Xác nhận vào hàng chờ'}
+        cancelText="Hủy"
+        confirmLoading={waitlistSubmitting}
+        onCancel={() => {
+          if (!waitlistSubmitting) setWaitlistBook(null);
+        }}
+        onOk={() => {
+          if (waitlistBook) {
+            void submitWaitlist(waitlistBook);
+          }
+        }}
+      >
+        {waitlistBook && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <p style={{ margin: 0 }}>
+              <strong>{waitlistBook.title}</strong> · {waitlistBook.author}
+            </p>
+            <p style={{ margin: 0 }}>
+              Phí mượn: {formatVnd(waitlistBook.borrowFee)}
+            </p>
+            <p style={{ margin: 0 }}>
+              Hiện có {waitlistBook.waitlistCount} người trong hàng chờ; sức chứa tối đa {waitlistBook.waitlistCap}.
+            </p>
+            <p style={{ margin: 0, color: 'var(--user-text-muted)', fontSize: '13px' }}>
+              Chỉ xác nhận thành công khi máy chủ trả kết quả. Khi có sách, bạn sẽ nhận được thông báo để tới nhận sách.
+            </p>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
 }
 
 export function CatalogDetailPage() {

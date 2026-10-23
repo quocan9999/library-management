@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dropdown } from 'antd';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 export interface UserAvatarMenuProps {
   fullName?: string;
@@ -17,15 +17,23 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
   onLogout,
   className = '',
 }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+
   const displayInitial =
     initial ||
     (fullName ? fullName.trim().charAt(fullName.trim().length - 1).toUpperCase() : 'T');
 
+  const isMyLoansActive =
+    location.pathname === '/my-loans' || location.pathname.startsWith('/my-loans/');
+  const isProfileActive =
+    location.pathname === '/profile' || location.pathname.startsWith('/profile/');
+
   const menuContent = (
     <div
-      className="user-avatar-popup select-none"
+      className="user-avatar-popup user-no-select"
       style={{
-        width: '272px',
+        width: '280px',
         boxSizing: 'border-box',
         backgroundColor: '#FFFFFF',
         border: '2px solid #14112B',
@@ -36,6 +44,7 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
         gap: '2px',
         fontFamily: 'var(--user-font-body, "Be Vietnam Pro", sans-serif)',
         boxShadow: 'none',
+        overflow: 'hidden',
       }}
     >
       <div
@@ -46,21 +55,40 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: '2px',
+          minWidth: 0,
+          overflow: 'hidden',
         }}
       >
         <span
+          title={fullName}
           style={{
             fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
             fontWeight: 800,
             fontSize: '18px',
             letterSpacing: '-0.02em',
             color: '#14112B',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'block',
+            maxWidth: '100%',
           }}
         >
           {fullName}
         </span>
         {email && (
-          <span style={{ fontSize: '13px', color: '#4B4570', wordBreak: 'break-all' }}>
+          <span
+            title={email}
+            style={{
+              fontSize: '13px',
+              color: '#4B4570',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              display: 'block',
+              maxWidth: '100%',
+            }}
+          >
             {email}
           </span>
         )}
@@ -68,10 +96,11 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
 
       <Link
         to="/my-loans"
+        onClick={() => setIsOpen(false)}
         style={{
           height: '44px',
           borderRadius: '14px',
-          backgroundColor: 'transparent',
+          backgroundColor: isMyLoansActive ? '#EFEBFF' : 'transparent',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
@@ -82,8 +111,12 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
           textDecoration: 'none',
           transition: 'background-color 0.15s ease',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#EFEBFF')}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+        onMouseEnter={(e) => {
+          if (!isMyLoansActive) e.currentTarget.style.backgroundColor = '#EFEBFF';
+        }}
+        onMouseLeave={(e) => {
+          if (!isMyLoansActive) e.currentTarget.style.backgroundColor = 'transparent';
+        }}
       >
         <svg
           width="20"
@@ -103,10 +136,11 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
 
       <Link
         to="/profile"
+        onClick={() => setIsOpen(false)}
         style={{
           height: '44px',
           borderRadius: '14px',
-          backgroundColor: 'transparent',
+          backgroundColor: isProfileActive ? '#EFEBFF' : 'transparent',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
@@ -117,8 +151,12 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
           textDecoration: 'none',
           transition: 'background-color 0.15s ease',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#EFEBFF')}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+        onMouseEnter={(e) => {
+          if (!isProfileActive) e.currentTarget.style.backgroundColor = '#EFEBFF';
+        }}
+        onMouseLeave={(e) => {
+          if (!isProfileActive) e.currentTarget.style.backgroundColor = 'transparent';
+        }}
       >
         <svg
           width="20"
@@ -141,7 +179,10 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
 
       <button
         type="button"
-        onClick={onLogout}
+        onClick={() => {
+          setIsOpen(false);
+          onLogout?.();
+        }}
         style={{
           height: '44px',
           borderRadius: '14px',
@@ -182,20 +223,23 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
 
   return (
     <Dropdown
-      dropdownRender={() => menuContent}
+      open={isOpen}
+      onOpenChange={(nextOpen) => setIsOpen(nextOpen)}
+      popupRender={() => menuContent}
       trigger={['click']}
       placement="bottomRight"
     >
       <button
         type="button"
         aria-label="Menu tài khoản"
-        className={`user-avatar-button cursor-pointer transition-transform active:scale-95 ${className}`}
+        aria-expanded={isOpen}
+        className={`user-avatar-button user-pressable ${className}`}
         style={{
           width: '44px',
           height: '44px',
           boxSizing: 'border-box',
           borderRadius: '22px',
-          border: '2px solid #6C4DFF',
+          border: isOpen ? '2px solid #6C4DFF' : '2px solid #C8FF3D',
           backgroundColor: '#C8FF3D',
           color: '#14112B',
           display: 'flex',
@@ -204,8 +248,8 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
           fontWeight: 700,
           fontSize: '16px',
           fontFamily: 'var(--user-font-body, "Be Vietnam Pro", sans-serif)',
-          outline: 'none',
           padding: 0,
+          transition: 'border-color 0.15s ease',
         }}
       >
         {displayInitial}

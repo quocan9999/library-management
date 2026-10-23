@@ -20,7 +20,7 @@ export const UserCartButton: React.FC<UserCartButtonProps> = ({
       type="button"
       aria-label={`Giỏ mượn, ${count} sách`}
       onClick={onClick}
-      className={`user-cart-button transition-transform active:scale-95 cursor-pointer ${className}`}
+      className={`user-cart-button user-no-select user-pressable ${className}`}
       style={{
         position: 'relative',
         width: '48px',
@@ -31,7 +31,7 @@ export const UserCartButton: React.FC<UserCartButtonProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        outline: 'none',
+        cursor: 'pointer',
         flexShrink: 0,
         ...style,
       }}

@@ -54,6 +54,43 @@
   box-sizing: border-box;
 }
 
+/* Keyboard Focus Visibility */
+.user-site :focus-visible {
+  outline: 3px solid #6C4DFF;
+  outline-offset: 2px;
+}
+
+.user-header :focus-visible {
+  outline: 3px solid #C8FF3D;
+  outline-offset: 2px;
+}
+
+.user-avatar-popup :focus-visible {
+  outline: 3px solid #6C4DFF;
+  outline-offset: 2px;
+}
+
+/* Dark header strip of loan request card */
+.user-loan-card__header :focus-visible {
+  outline: 3px solid #C8FF3D;
+  outline-offset: 2px;
+}
+
+/* Utility Helpers */
+.user-no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.user-pressable {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.user-pressable:active {
+  transform: scale(0.95);
+}
+
 /* Display Titles */
 .user-title-display-64 {
   font-family: var(--user-font-display);
@@ -122,7 +159,7 @@
   border: none;
 }
 
-/* Modal and Drawer Backdrop */
+/* Overlay Backdrop & Dialog Animations */
 .user-overlay-backdrop {
   position: fixed;
   inset: 0;
@@ -130,6 +167,56 @@
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: 1000;
+  animation: userFadeIn 0.2s ease-out;
+}
+
+.user-cart-drawer-panel {
+  animation: userSlideInRight 0.2s ease-out;
+}
+
+.user-qr-modal-panel {
+  animation: userModalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes userFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes userSlideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes userModalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-pressable,
+  .user-pressable:active,
+  .user-overlay-backdrop,
+  .user-cart-drawer-panel,
+  .user-qr-modal-panel {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 /* Pill Search Bar */
@@ -142,7 +229,6 @@
   font-size: 15px;
   font-family: var(--user-font-body);
   color: var(--user-ink);
-  outline: none;
   width: 100%;
 }
 
@@ -152,4 +238,225 @@
 
 .user-search-input:focus {
   border-color: var(--user-primary);
+}
+
+.user-search-input::-webkit-search-cancel-button,
+.user-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* User Filter Chips */
+.user-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-filter-chip {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: var(--user-radius-pill);
+  font-family: var(--user-font-body);
+  font-size: 14px;
+  font-weight: 600;
+  border: var(--user-border-main);
+  background: var(--user-white);
+  color: var(--user-ink);
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.user-filter-chip--active,
+.user-filter-chip[aria-pressed="true"] {
+  background: var(--user-ink);
+  color: var(--user-white);
+  border-color: var(--user-ink);
+}
+
+@media (max-width: 480px) {
+  .user-filter-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .user-filter-chips::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Catalog Page Layout */
+.user-catalog-page {
+  width: 100%;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .user-catalog-page {
+    padding: 0 20px;
+  }
+}
+
+.user-catalog-header {
+  padding-top: 48px;
+  padding-bottom: 24px;
+}
+
+.user-catalog-header h1 {
+  margin: 0 0 12px;
+}
+
+.user-catalog-header p {
+  margin: 0;
+}
+
+.user-catalog-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.user-catalog-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.user-catalog-search-wrapper .user-search-input {
+  padding-right: 54px;
+}
+
+.user-search-clear-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--user-lilac);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--user-ink);
+  padding: 0;
+}
+
+/* Catalog Books Grid (Responsive) */
+.user-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+@media (max-width: 1099px) {
+  .user-catalog-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 799px) {
+  .user-catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 559px) {
+  .user-catalog-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Skeleton loader for Catalog books */
+.user-book-skeleton {
+  background: var(--user-lilac);
+  border: var(--user-border-main);
+  border-radius: 24px;
+  height: 420px;
+  width: 100%;
+  animation: userSkeletonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes userSkeletonPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-book-skeleton {
+    animation: none !important;
+  }
+}
+
+/* Ant Design Form Overrides: TextArea, Select, DatePicker */
+.user-site textarea.ant-input,
+.user-site .ant-input-textarea textarea {
+  border-radius: 20px !important;
+  padding: 12px 18px !important;
+}
+
+.user-site .ant-select-single .ant-select-selector {
+  border-radius: 9999px !important;
+}
+
+.user-site .ant-picker {
+  border-radius: 9999px !important;
+}
+
+/* Header inner layout and responsive */
+.user-header__inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .user-header__inner {
+    padding: 0 20px;
+    gap: 16px;
+  }
+
+  .user-title-display-64 {
+    font-size: 38px;
+  }
+
+  .user-title-heading-40 {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-header__inner {
+    padding: 0 16px;
+    gap: 12px;
+  }
+
+  .user-header__inner nav {
+    display: none !important;
+  }
+
+  .user-header__inner > div:last-child {
+    gap: 10px !important;
+  }
 }
