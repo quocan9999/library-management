@@ -239,6 +239,20 @@ Bo góc chuẩn 14px, padding `4px 12px`, font `Be Vietnam Pro` weight 600:
   * **Cột phải:** Các thẻ trắng viền `2px solid #14112B` bo góc 28px (Thông tin cá nhân, Tài khoản & bảo mật).
   * **Các ô thông tin chi tiết:** Nền `#F7F5FF` bo góc 16px, padding `14px 18px`.
 
+### 6.5. Bố cục Trang Thanh Toán Yêu Cầu Mượn (Borrow Payment Layout)
+* **Bố cục 2 cột (Desktop) / 1 cột (Mobile):**
+  * **Cột trái (360px):** Thẻ QR (`.user-payment-qr-card`) viền `2px solid #14112B` bo góc 28px, chứa khung QR nền Lilac `#EFEBFF` bo góc 20px, kích thước 220px, huy hiệu `UserBadge success` "VietQR mô phỏng".
+  * **Cột phải:** Thẻ chi tiết thanh toán (`.user-payment-details-card`) bo góc 28px viền `2px solid #14112B`:
+    * Dòng tổng số tiền nổi bật: nền `#F7F5FF` bo 16px, số tiền font Bricolage Grotesque 28px weight 800.
+    * Nút bấm Sao chép (Copy) tiện lợi ngay cạnh Số tài khoản và Nội dung chuyển khoản.
+    * Đếm ngược thời gian giữ yêu cầu động (`formatRemainingTime`), đổi sang huy hiệu cảnh báo đỏ khi còn dưới 5 phút.
+    * Callout mô phỏng nền `#FFF1C2` kèm huy hiệu `UserBadge warning`.
+    * Nút "Tôi đã thanh toán" `UserButton primary` cỡ lớn `size="lg"` fullWidth.
+* **Khối Sách Trong Yêu Cầu:**
+  * Thẻ trắng viền `2px solid #14112B` bo 28px, hiển thị đầy đủ `UserBookCover size="sm"` cho từng cuốn sách kèm mã sách, tác giả và phí mượn riêng biệt.
+* **Trạng thái Hoàn thành / Hết hạn:**
+  * Thẻ kết quả trắng (`.user-payment-result-card`) bo 28px viền `2px solid #14112B`, icon tròn 80px nổi bật, tiêu đề Bricolage Grotesque 32px, nút điều hướng về "Sách của tôi" và "Tiếp tục khám phá sách".
+
 ---
 
 ## 7. Khả Năng Tiếp Cận & Tương Thích (Accessibility & Responsiveness)
