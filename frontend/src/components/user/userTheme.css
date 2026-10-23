@@ -844,3 +844,372 @@
     flex-direction: column;
   }
 }
+
+
+/* ==========================================================================
+   User Profile Page & Settings — Libby Style
+   ========================================================================== */
+
+.user-profile-page {
+  width: 100%;
+  padding: 40px 0 64px;
+}
+
+@media (max-width: 768px) {
+  .user-profile-page {
+    padding: 24px 16px 48px;
+  }
+}
+
+.user-profile-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.user-profile-breadcrumb__link {
+  color: var(--user-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.user-profile-breadcrumb__link:hover {
+  color: var(--user-primary);
+}
+
+.user-profile-breadcrumb__separator {
+  color: var(--user-text-light-muted);
+}
+
+.user-profile-breadcrumb__current {
+  color: var(--user-ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.user-profile-header {
+  margin-bottom: 32px;
+}
+
+.user-profile-header h1 {
+  margin: 0 0 12px;
+}
+
+.user-profile-header p {
+  margin: 0;
+}
+
+.user-profile-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .user-profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Profile Identity Card */
+.user-profile-card {
+  padding: 36px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+  box-sizing: border-box;
+}
+
+.user-profile-card__avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background-color: var(--user-lime);
+  border: var(--user-border-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--user-font-display);
+  font-weight: 800;
+  font-size: 40px;
+  color: var(--user-ink);
+  box-shadow: 0 4px 16px rgba(20, 17, 43, 0.08);
+}
+
+.user-profile-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.user-profile-card__name {
+  margin: 0;
+  font-family: var(--user-font-display);
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--user-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-profile-card__email {
+  margin: 0;
+  font-size: 14px;
+  color: var(--user-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-profile-card__badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.user-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  border-radius: var(--user-radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.user-profile-badge--role {
+  background-color: var(--user-lilac);
+  color: var(--user-primary);
+}
+
+.user-profile-badge--status {
+  background-color: #E8F7EE;
+  color: #128042;
+}
+
+.user-profile-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #128042;
+}
+
+.user-profile-card__divider {
+  width: 100%;
+  height: 1px;
+  background-color: var(--user-lilac);
+  margin: 4px 0;
+}
+
+.user-profile-card__loans-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: var(--user-radius-pill);
+  background-color: var(--user-ink);
+  color: var(--user-white);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--user-font-body);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.user-profile-card__loans-btn:hover {
+  opacity: 0.92;
+  color: var(--user-white);
+}
+
+/* Profile Summary & Security Card */
+.user-profile-summary-card {
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .user-profile-summary-card {
+    padding: 24px 18px;
+  }
+}
+
+.user-profile-summary-card__header h2 {
+  margin: 0 0 6px;
+}
+
+.user-profile-summary-card__desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--user-text-muted);
+  line-height: 1.5;
+}
+
+.user-profile-summary-card__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.user-site .profile-summary__row.user-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 24px;
+  background: var(--user-subtle-bg);
+  border: 1px solid var(--user-lilac);
+  border-radius: 20px;
+  border-top: 1px solid var(--user-lilac);
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .user-site .profile-summary__row.user-profile-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 18px 16px;
+  }
+}
+
+.user-profile-row__icon-col {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background-color: var(--user-lilac);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--user-primary);
+  flex-shrink: 0;
+}
+
+.user-profile-row__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-profile-row__content h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--user-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.user-profile-row__val {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--user-ink);
+  overflow-wrap: anywhere;
+}
+
+.user-profile-row__masked-pwd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--user-text-muted);
+}
+
+.user-profile-action-btn {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: var(--user-radius-pill);
+  border: var(--user-border-main);
+  background-color: var(--user-white);
+  color: var(--user-ink);
+  font-family: var(--user-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.user-profile-action-btn:hover {
+  background-color: var(--user-lilac);
+  color: var(--user-ink);
+}
+
+/* Form Pages (Change Password & Change Email) inside User Site */
+.user-site .profile-page--form {
+  margin: 40px auto 64px;
+  width: min(600px, 100%);
+  padding: 0 20px;
+}
+
+.user-site .profile-page--form .profile-page__heading h1 {
+  font-family: var(--user-font-display);
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: -0.03em;
+  color: var(--user-ink);
+  margin: 0 0 8px;
+}
+
+.user-site .profile-page--form .profile-page__heading p {
+  color: var(--user-text-muted);
+  font-size: 16px;
+  margin: 0;
+}
+
+.user-site .profile-form-card {
+  background: var(--user-white);
+  border: var(--user-border-main);
+  border-radius: var(--user-radius-card);
+  padding: 36px 32px;
+  box-shadow: none;
+}
+
+.user-site .profile-password-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.user-site .profile-password-form__actions a {
+  color: var(--user-text-muted);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.user-site .profile-password-form__actions a:hover {
+  color: var(--user-primary);
+  text-decoration: underline;
+}
+
+.user-site .profile-password-form__actions .ant-btn-primary {
+  height: 48px;
+  padding: 0 28px;
+  border-radius: var(--user-radius-pill);
+  background-color: var(--user-primary);
+  font-weight: 600;
+  font-size: 15px;
+}

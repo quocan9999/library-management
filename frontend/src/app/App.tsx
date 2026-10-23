@@ -67,6 +67,11 @@ function RequireAuthFlow({ children, registration = false }: { children: React.R
   return hasFlow ? children : <Navigate to={accessToken ? '/' : '/login'} replace />;
 }
 
+function ProfileShellLayout() {
+  const { role } = useAuth();
+  return role === 'USER' ? <UserLayout /> : <AdminLayout />;
+}
+
 function CapabilityRouteSync() {
   const location = useLocation();
   const auth = useOptionalAuth();
@@ -267,6 +272,14 @@ export function App() {
               </RequirePermission>
             }
           />
+        </Route>
+        <Route
+          element={
+            <RequireAuthentication>
+              <ProfileShellLayout />
+            </RequireAuthentication>
+          }
+        >
           <Route
             path="profile"
             element={<ProfilePage />}

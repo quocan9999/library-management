@@ -110,6 +110,9 @@ export function ChangeEmailPage() {
             <div className="form-field">
               <label htmlFor="profile-current-email">Email hiện tại</label>
               <Input id="profile-current-email" value={currentEmail} readOnly size="large" />
+              <span className="profile-current-email-text" style={{ fontSize: '13px', color: '#4B4570', marginTop: '4px', display: 'block' }}>
+                {currentEmail}
+              </span>
             </div>
             <div className="form-field">
               <label htmlFor="profile-new-email">Email mới</label>
