@@ -149,7 +149,7 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
               id="user-cart-drawer-title"
               style={{
                 margin: 0,
-                fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
+                fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
                 fontWeight: 800,
                 fontSize: '32px',
                 letterSpacing: '-0.03em',
@@ -272,7 +272,7 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span
                     style={{
-                      fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
+                      fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
                       fontWeight: 800,
                       fontSize: '17px',
                       letterSpacing: '-0.02em',
@@ -340,7 +340,7 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
               <span style={{ fontSize: '16px', fontWeight: 600 }}>Tổng phí mượn</span>
               <span
                 style={{
-                  fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
+                  fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
                   fontWeight: 800,
                   fontSize: '28px',
                   letterSpacing: '-0.03em',

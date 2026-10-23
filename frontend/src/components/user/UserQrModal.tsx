@@ -141,7 +141,7 @@ export const UserQrModal: React.FC<UserQrModalProps> = ({
               id="user-qr-modal-title"
               style={{
                 margin: 0,
-                fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
+                fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
                 fontWeight: 800,
                 fontSize: '32px',
                 letterSpacing: '-0.03em',

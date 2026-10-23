@@ -85,7 +85,7 @@ export const LibbyLogo: React.FC<LibbyLogoProps> = ({
       {showText && (
         <span
           style={{
-            fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
+            fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
             fontWeight: 800,
             fontSize: `${dimensions.fontSize}px`,
             letterSpacing: '-0.04em',

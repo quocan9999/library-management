@@ -62,7 +62,7 @@ export const UserAvatarMenu: React.FC<UserAvatarMenuProps> = ({
         <span
           title={fullName}
           style={{
-            fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
+            fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
             fontWeight: 800,
             fontSize: '18px',
             letterSpacing: '-0.02em',

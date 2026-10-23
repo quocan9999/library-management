@@ -127,7 +127,7 @@ export const UserBookCover: React.FC<UserBookCoverProps> = ({
         alignItems: 'flex-end',
         overflow: 'hidden',
         flexShrink: 0,
-        fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
+        fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
         fontWeight: 800,
         fontSize: dim.fontSize,
         lineHeight: 1,

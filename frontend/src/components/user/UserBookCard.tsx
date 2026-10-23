@@ -159,7 +159,7 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
         <div
           onClick={() => onClickTitle?.(book)}
           style={{
-            fontFamily: 'var(--user-font-display, "Bricolage Grotesque", sans-serif)',
+            fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
             fontWeight: 800,
             fontSize: '20px',
             letterSpacing: '-0.02em',

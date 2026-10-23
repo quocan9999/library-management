@@ -50,10 +50,16 @@ Hệ thống màu sắc của Libby được phân tách rõ ràng giữa màu n
 
 ## 3. Kiểu Chữ (Typography)
 
-Sử dụng kết hợp 2 font chữ tạo bản sắc riêng biệt:
+Sử dụng kết hợp 2 font chữ tạo bản sắc riêng biệt, nạp trực tiếp qua Google Fonts API đúng cú pháp trục `opsz,wght`:
 
-1. **Bricolage Grotesque (Weight 800):** Dành riêng cho Logo, Tiêu đề lớn, Số liệu nổi bật, Bìa sách đồ họa.
-2. **Be Vietnam Pro (Weight 400, 500, 600, 700):** Dành cho toàn bộ nội dung, nút bấm, bảng biểu, thanh điều hướng và nhãn phụ (hỗ trợ hoàn hảo dấu tiếng Việt).
+```css
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap');
+```
+
+1. **Bricolage Grotesque (Weight 700, 800):** Dành riêng cho Logo, Tiêu đề lớn, Số liệu nổi bật, Bìa sách đồ họa.
+   * **Chuỗi font dự phòng:** `'Bricolage Grotesque', 'Be Vietnam Pro', sans-serif;`. Nếu xảy ra lỗi mạng hoặc ký tự đặc biệt, phông chữ sẽ rơi về **Be Vietnam Pro** (hỗ trợ toàn diện dấu tiếng Việt) thay vì font hệ thống mặc định.
+2. **Be Vietnam Pro (Weight 400, 500, 600, 700):** Dành cho toàn bộ nội dung, nút bấm, bảng biểu, thanh điều hướng và nhãn phụ.
+   * **Chuỗi font dự phòng:** `'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;`.
 
 ### Thang đo Typography (Typography Scale)
 
