@@ -11,6 +11,8 @@ import { setAccessToken } from '../../auth/tokenStore';
 
 vi.mock('../../features/members/MemberListPage', () => ({ MemberListPage: () => <h1>Members page</h1> }));
 vi.mock('../../role/RoleManagementPage', () => ({ RoleManagementPage: () => <h1>Roles page</h1> }));
+vi.mock('../../features/catalog/CatalogPage', () => ({ CatalogPage: () => <h1>Catalog page</h1> }));
+vi.mock('../../features/borrow/LibrarianBorrowRequestsPage', () => ({ LibrarianBorrowRequestsPage: () => <h1>Borrow requests page</h1> }));
 const originalAdapter = apiClient.defaults.adapter;
 afterEach(() => {
   cleanup();
@@ -101,5 +103,59 @@ describe('default route for administrators without permissions', () => {
     await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/'));
     expect(screen.queryByRole('heading', { name: 'Roles page' })).toBeNull();
     expect(view.container.querySelector('.admin-shell__content')?.textContent).toBe('');
+  });
+
+  it('routes USER to /books as the default route after login', async () => {
+    const user = userEvent.setup();
+    apiClient.defaults.adapter = (async (config) => {
+      const response = (code: string, data: unknown, status = 200) => ({
+        config, status, statusText: 'OK', headers: new AxiosHeaders(),
+        data: { success: status === 200, status, code, data, message: '', timestamp: new Date().toISOString() },
+      });
+      if (config.url === '/api/v1/auth/refresh') {
+        throw new AxiosError('missing', undefined, config, undefined, response('AUTH_REFRESH_TOKEN_MISSING', null, 401));
+      }
+      if (config.url === '/api/v1/auth/login') return response('AUTH_LOGIN_SUCCESS', {
+        accessToken: 'user-token', tokenType: 'Bearer', accessTokenExpiresIn: 900,
+      });
+      if (config.url === '/api/v1/auth/me') return response('AUTH_ME_SUCCESS', {
+        id: 42, username: 'reader', email: 'reader@example.com', role: 'USER', permissions: ['book:read'],
+      });
+      throw new Error(`Unexpected request ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/login']}><AuthProvider><App /><Probe /></AuthProvider></MemoryRouter>);
+    await user.type(await screen.findByLabelText('Tên đăng nhập hoặc email'), 'reader@example.com');
+    await user.type(screen.getByLabelText('Mật khẩu'), 'Current1!');
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/books'));
+    expect(await screen.findByRole('heading', { name: 'Khám phá sách' })).toBeTruthy();
+  });
+
+  it('routes admin or staff with borrow:read to /librarian/borrow-requests as the default route after login', async () => {
+    const user = userEvent.setup();
+    apiClient.defaults.adapter = (async (config) => {
+      const response = (code: string, data: unknown, status = 200) => ({
+        config, status, statusText: 'OK', headers: new AxiosHeaders(),
+        data: { success: status === 200, status, code, data, message: '', timestamp: new Date().toISOString() },
+      });
+      if (config.url === '/api/v1/auth/refresh') {
+        throw new AxiosError('missing', undefined, config, undefined, response('AUTH_REFRESH_TOKEN_MISSING', null, 401));
+      }
+      if (config.url === '/api/v1/auth/login') return response('AUTH_LOGIN_SUCCESS', {
+        accessToken: 'admin-token', tokenType: 'Bearer', accessTokenExpiresIn: 900,
+      });
+      if (config.url === '/api/v1/auth/me') return response('AUTH_ME_SUCCESS', {
+        id: 1, username: 'admin', email: 'admin@example.com', role: 'ADMIN', permissions: ['borrow:read', 'member:read'],
+      });
+      throw new Error(`Unexpected request ${config.url}`);
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter initialEntries={['/login']}><AuthProvider><App /><Probe /></AuthProvider></MemoryRouter>);
+    await user.type(await screen.findByLabelText('Tên đăng nhập hoặc email'), 'admin@example.com');
+    await user.type(screen.getByLabelText('Mật khẩu'), 'Current1!');
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/librarian/borrow-requests'));
+    expect(await screen.findByRole('heading', { name: 'Borrow requests page' })).toBeTruthy();
   });
 });
