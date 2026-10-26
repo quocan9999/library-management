@@ -62,6 +62,7 @@ export interface BorrowItem {
   dueDate: string | null;
   readyAt: string | null;
   pickupExpiresAt: string | null;
+  returnedAt?: string | null;
   renewalCount: number;
   version: number;
 }
@@ -126,6 +127,12 @@ export interface HandoverRequest {
   identityVerified: true;
   expectedLoanVersion: number;
   items: Array<{ loanItemId: number; collectedBorrowFee: number }>;
+}
+
+export interface ReturnBorrowItemsRequest {
+  itemIds: number[];
+  physicalBookReceived: boolean;
+  lateFeeCollected?: boolean;
 }
 
 export interface BorrowListQuery {

@@ -81,6 +81,14 @@ function formatDate(value: string | null): string {
     : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
 }
 
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
 function readyCountdown(expiresAt: string | null, now: number | null): string | null {
   if (!expiresAt || now === null) return null;
   const remaining = Date.parse(expiresAt) - now;
@@ -366,10 +374,43 @@ export function MyLoansPage() {
                           </p>
                         )}
 
-                        {loanItem.status === 'BORROWED' && (
-                          <p style={{ margin: 0, fontSize: '14px', color: 'var(--user-ink)' }}>
-                            Hạn trả {formatDate(loanItem.dueDate)} · Đã gia hạn {loanItem.renewalCount} / 1 lần
-                          </p>
+                        {loanItem.status === 'BORROWED' && (() => {
+                          const today = new Date();
+                          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                          const isOverdue = Boolean(loanItem.dueDate && loanItem.dueDate < todayStr);
+                          let diffDays = 0;
+                          let calculatedLateFee = 0;
+                          if (isOverdue && loanItem.dueDate) {
+                            const due = new Date(loanItem.dueDate + 'T00:00:00Z');
+                            const cur = new Date(todayStr + 'T00:00:00Z');
+                            diffDays = Math.max(1, Math.floor((cur.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
+                            calculatedLateFee = diffDays * loanItem.lateFeePerDay;
+                          }
+                          return (
+                            <div>
+                              <p style={{ margin: 0, fontSize: '14px', color: 'var(--user-ink)' }}>
+                                Hạn trả {formatDate(loanItem.dueDate)} · Đã gia hạn {loanItem.renewalCount} / 1 lần
+                              </p>
+                              {isOverdue && (
+                                <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#cf1322', fontWeight: 600 }}>
+                                  ⚠️ Quá hạn {diffDays} ngày · Phí trễ tích lũy: {formatVnd(calculatedLateFee)}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {loanItem.status === 'RETURNED' && (
+                          <div style={{ margin: 0, fontSize: '14px', color: 'var(--user-ink)' }}>
+                            <p style={{ margin: 0 }}>
+                              Ngày trả: {formatDateTime(loanItem.returnedAt)}
+                            </p>
+                            {loanItem.lateFee > 0 && (
+                              <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#cf1322', fontWeight: 600 }}>
+                                Phí phạt trễ đã nộp: {formatVnd(loanItem.lateFee)}
+                              </p>
+                            )}
+                          </div>
                         )}
 
                         <div className="user-loan-item__fees">

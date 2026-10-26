@@ -154,6 +154,7 @@ public class PermissionDependencyRegistry {
         dependencies.put("borrow:cancel", Set.of("borrow:read"));
         dependencies.put("borrow:fee-confirm", Set.of("borrow:read"));
         dependencies.put("borrow:handover", Set.of("borrow:read", "borrow:fee-confirm"));
+        dependencies.put("borrow:return", Set.of("borrow:read"));
         return dependencies;
     }
 }

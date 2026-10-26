@@ -150,3 +150,7 @@ databaseChangeLog:
   - include:
       file: changes/038-remove-borrow-waitlist.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/039-borrow-return-permission.yaml
+      relativeToChangelogFile: true

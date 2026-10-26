@@ -10,6 +10,7 @@ import type {
   CounterMemberOption,
   HandoverRequest,
   PageResponse,
+  ReturnBorrowItemsRequest,
   StaffBorrowRequest,
 } from './types';
 
@@ -138,6 +139,14 @@ export const borrowApi = {
       body,
     );
     return readRequiredData(response.data, 'BORROW_HANDOVER_COMPLETED');
+  },
+
+  async returnItems(loanCode: string, body: ReturnBorrowItemsRequest): Promise<StaffBorrowRequest> {
+    const response = await apiClient.post<ApiEnvelope<StaffBorrowRequest>>(
+      `/api/v1/librarian/borrow-requests/${encodeURIComponent(loanCode)}/return`,
+      body,
+    );
+    return readRequiredData(response.data, 'BORROW_RETURN_SUCCESS');
   },
 
   async postStaffItem(loanCode: string, itemId: number, action: string, expectedCode: string): Promise<StaffBorrowRequest> {

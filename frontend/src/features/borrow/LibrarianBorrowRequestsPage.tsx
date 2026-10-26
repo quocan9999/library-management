@@ -32,6 +32,7 @@ export function LibrarianBorrowRequestsPage() {
   const canPrepare = permissions.includes('borrow:prepare');
   const canCancel = permissions.includes('borrow:cancel');
   const canHandover = permissions.includes('borrow:handover') && permissions.includes('borrow:fee-confirm');
+  const canReturn = permissions.includes('borrow:return');
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedReference = searchParams.get('request')?.trim() ?? '';
   const [page, setPage] = useState(1);
@@ -177,6 +178,42 @@ export function LibrarianBorrowRequestsPage() {
       refreshAfterConflict(error, request);
       notify(borrowErrorNotificationType(error), {
         title: 'Không thể xác nhận đã chuẩn bị sách',
+        description: borrowErrorMessage(error),
+      });
+    } finally {
+      actionLock.current = false;
+      setPendingKey(null);
+    }
+  };
+
+  const returnSelectedBooks = async (
+    request: StaffBorrowRequest,
+    itemIds: number[],
+    physicalBookReceived: boolean,
+    lateFeeCollected: boolean
+  ) => {
+    if (itemIds.length === 0 || !canReturn || actionLock.current) return;
+
+    actionLock.current = true;
+    setPendingKey(`${request.loanCode}:return-selected`);
+    try {
+      const updatedRequest = await borrowApi.returnItems(request.loanCode, {
+        itemIds,
+        physicalBookReceived,
+        lateFeeCollected,
+      });
+      setDrawerRequestState((current) => current?.request?.loanCode === request.loanCode
+        ? { ...current, status: 'ready', request: updatedRequest }
+        : current);
+      setReloadKey((key) => key + 1);
+      notify('success', {
+        title: 'Tiếp nhận trả sách thành công',
+        description: `Đã hoàn tất tiếp nhận ${itemIds.length} cuốn sách vào kho.`,
+      });
+    } catch (error: unknown) {
+      refreshAfterConflict(error, request);
+      notify(borrowErrorNotificationType(error), {
+        title: 'Không thể tiếp nhận trả sách',
         description: borrowErrorMessage(error),
       });
     } finally {
@@ -360,6 +397,7 @@ export function LibrarianBorrowRequestsPage() {
       canPrepare={canPrepare}
       canCancel={canCancel}
       canHandover={canHandover}
+      canReturn={canReturn}
       pendingKey={pendingKey}
       onClose={closeDrawer}
       onRetry={retryDrawerRequest}
@@ -367,6 +405,7 @@ export function LibrarianBorrowRequestsPage() {
       onCancelReady={(request, item) => setCancelAction({ request, item })}
       onReject={(request, item) => setRejectAction({ request, item })}
       onHandover={setHandoverRequest}
+      onReturn={(request, itemIds, physical, late) => { void returnSelectedBooks(request, itemIds, physical, late); }}
       onCopyReference={(reference) => { void copyReference(reference); }}
     />
 

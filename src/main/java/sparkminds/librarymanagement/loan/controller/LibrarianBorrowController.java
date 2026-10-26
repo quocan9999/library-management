@@ -20,6 +20,8 @@ import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
 import sparkminds.librarymanagement.common.api.ApiResponse;
 import sparkminds.librarymanagement.common.api.PagedResponse;
 import sparkminds.librarymanagement.loan.dto.HandoverRequest;
+import sparkminds.librarymanagement.loan.dto.ReturnBorrowItemsRequest;
+import sparkminds.librarymanagement.loan.service.StaffBorrowReturnService;
 import sparkminds.librarymanagement.loan.dto.PrepareBorrowItemsRequest;
 import sparkminds.librarymanagement.loan.dto.StaffBorrowHistoryResponse;
 import sparkminds.librarymanagement.loan.dto.StaffBorrowResponse;
@@ -42,6 +44,7 @@ public class LibrarianBorrowController {
     private final BorrowHandoverService handoverService;
     private final BorrowReservationService reservationService;
     private final StaffCounterBorrowService counterBorrowService;
+    private final StaffBorrowReturnService returnService;
 
     @GetMapping("/borrow-requests")
     @Operation(summary = "Liệt kê yêu cầu cần xử lý tại quầy", description = "Tìm theo q: QR, mã yêu cầu, mã hoặc họ tên thành viên; lọc trạng thái và phân trang. Sort hỗ trợ loanCode, memberName, itemCount, createdAt với asc/desc; mặc định createdAt,desc. PREPARING quá 24 giờ được đánh dấu cảnh báo, không tự hủy.")
@@ -203,6 +206,17 @@ public class LibrarianBorrowController {
     public ResponseEntity<ApiResponse<StaffBorrowResponse>> handover(@AuthenticationPrincipal CustomUserPrincipal principal,
             @PathVariable String loanCode, @Valid @RequestBody HandoverRequest request) {
         return success("BORROW_HANDOVER_COMPLETED", "Đã xác nhận phí và bàn giao sách", handoverService.handover(principal.getAccountId(), loanCode, request));
+    }
+
+    @PostMapping("/borrow-requests/{loanCode}/return")
+    @Operation(summary = "Tiếp nhận trả sách tại quầy", description = "Xác nhận nhận sách vật lý và thu phí trễ hạn (nếu có). Hỗ trợ trả lẻ từng cuốn.")
+    @PreAuthorize("hasAuthority('borrow:return') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<StaffBorrowResponse>> returnItems(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @PathVariable String loanCode,
+            @Valid @RequestBody ReturnBorrowItemsRequest request) {
+        return success("BORROW_RETURN_SUCCESS", "Tiếp nhận trả sách thành công",
+                returnService.returnItems(principal.getAccountId(), loanCode, request));
     }
 
     private <T> ResponseEntity<ApiResponse<T>> success(String code, String message, T data) {
