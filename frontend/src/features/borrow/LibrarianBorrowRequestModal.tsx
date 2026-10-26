@@ -215,9 +215,6 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
                 {isReady && <Typography.Text type="secondary" className="librarian-borrow-modal-item__deadline">
                   Hạn nhận: {item.pickupExpiresAt ? formatDeskDate(item.pickupExpiresAt) : '—'}
                 </Typography.Text>}
-                {item.status === 'WAITLISTED' && item.waitlistPosition !== null && <Typography.Text type="secondary" className="librarian-borrow-modal-item__waitlist">
-                  Hàng chờ: {item.waitlistPosition} / {item.waitlistTotal ?? '—'}
-                </Typography.Text>}
                 <ItemAction
                   item={item}
                   request={request}

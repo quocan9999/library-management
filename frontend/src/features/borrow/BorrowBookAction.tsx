@@ -25,8 +25,7 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
-  const waitlistAvailable = book.availableQuantity === 0 && book.waitlistCount < book.waitlistCap;
-  const canRequest = book.availableQuantity > 0 || waitlistAvailable;
+  const canRequest = book.availableQuantity > 0;
 
   const submit = async () => {
     if (pendingRef.current) return;
@@ -57,9 +56,7 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
         ? 'Hết sách'
         : selectionDisabled
           ? `Đã đủ ${MAX_BORROW_BOOKS} sách`
-          : book.availableQuantity === 0
-            ? 'Vào hàng chờ'
-            : 'Chọn mượn';
+          : 'Chọn mượn';
     return <div className="borrow-action borrow-action--catalog">
       <Button
         type={selected ? 'default' : 'primary'}
@@ -74,11 +71,11 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
 
   return <div className="borrow-action">
     <Button type="primary" disabled={!canRequest || pending} onClick={() => { setConfirmOpen(true); }}>
-      {book.availableQuantity > 0 ? 'Đặt mượn' : waitlistAvailable ? 'Vào hàng chờ' : 'Đã đủ hàng chờ'}
+      {canRequest ? 'Đặt mượn' : 'Hết sách'}
     </Button>
     <Modal
       open={confirmOpen}
-      title={waitlistAvailable ? 'Xác nhận vào hàng chờ' : 'Xác nhận yêu cầu mượn'}
+      title="Xác nhận yêu cầu mượn"
       okText={pending ? 'Đang gửi…' : 'Xác nhận đặt mượn'}
       cancelText="Xem lại"
       confirmLoading={pending}
@@ -87,9 +84,7 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
     >
       <p><strong>{book.title}</strong> · {book.author}</p>
       <p>Phí mượn đã công bố: {new Intl.NumberFormat('vi-VN').format(book.borrowFee)} ₫.</p>
-      <p>{waitlistAvailable
-        ? `Hiện có ${book.waitlistCount} người trong hàng chờ; sức chứa tối đa ${book.waitlistCap}.`
-        : 'Yêu cầu sẽ được xử lý theo tình trạng bản sách tại thời điểm máy chủ nhận.'}</p>
+      <p>Yêu cầu sẽ được xử lý theo tình trạng bản sách tại thời điểm máy chủ nhận.</p>
       <p>Chỉ xác nhận thành công khi máy chủ trả kết quả. Nếu kết nối hết thời gian chờ, hãy tải danh sách yêu cầu trước khi gửi lại.</p>
     </Modal>
   </div>;

@@ -21,8 +21,6 @@ import sparkminds.librarymanagement.book.repository.BookSimilarityRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.common.api.FieldValidationException;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
-import sparkminds.librarymanagement.loan.service.BorrowInventoryService;
-import sparkminds.librarymanagement.loan.service.LoanAggregateService;
 
 import java.util.Locale;
 import java.util.Map;
@@ -38,8 +36,6 @@ public class BookTransactionService {
     private final BookSimilarityRepository bookSimilarityRepository;
     private final LoanItemRepository loanItemRepository;
     private final ApplicationEventPublisher events;
-    private final BorrowInventoryService inventoryService;
-    private final LoanAggregateService aggregateService;
     private final EntityManager entityManager;
 
     /**
@@ -153,9 +149,6 @@ public class BookTransactionService {
         }
 
         try {
-            var affectedLoans = new TreeSet<Integer>();
-            inventoryService.allocateWaiting(book, affectedLoans);
-            aggregateService.refresh(affectedLoans);
             bookRepository.saveAndFlush(book);
         } catch (OptimisticLockingFailureException | OptimisticLockException exception) {
             throw versionConflict();

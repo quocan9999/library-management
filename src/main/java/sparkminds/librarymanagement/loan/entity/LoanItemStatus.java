@@ -1,7 +1,6 @@
 package sparkminds.librarymanagement.loan.entity;
 
 public enum LoanItemStatus {
-    WAITLISTED,
     RESERVED,
     PREPARING,
     READY_FOR_PICKUP,
@@ -12,7 +11,7 @@ public enum LoanItemStatus {
     REJECTED;
 
     public boolean isPending() {
-        return this == WAITLISTED || this == RESERVED || this == PREPARING || this == READY_FOR_PICKUP;
+        return this == RESERVED || this == PREPARING || this == READY_FOR_PICKUP;
     }
 
     public boolean isActive() {

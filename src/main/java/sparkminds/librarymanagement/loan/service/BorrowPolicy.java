@@ -13,8 +13,4 @@ public final class BorrowPolicy {
 
     private BorrowPolicy() {
     }
-
-    public static long waitlistCap(int totalQuantity) {
-        return 4L * totalQuantity;
-    }
 }

@@ -26,7 +26,6 @@ public class StaffBorrowItemService {
     private final BorrowRetryExecutor retryExecutor;
     private final StaffBorrowLockService locks;
     private final BorrowAuditService auditService;
-    private final BorrowInventoryService inventoryService;
     private final LoanAggregateService aggregateService;
     private final StaffBorrowQueryService queryService;
     private final Clock clock;
@@ -41,27 +40,28 @@ public class StaffBorrowItemService {
                 LoanItemEventReason.READY_CONFIRMED);
     }
 
-    /** Một lần chuẩn bị dùng chung transaction và một intent email, tránh gửi lẻ từng cuốn. */
+    /** Chuẩn bị theo lô để thủ thư chuyển đồng loạt nhiều sách của một yêu cầu mà không phải gọi lẻ từng item. */
     public StaffBorrowResponse readyBatch(Integer actorId, String code, List<Integer> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            throw conflict("BORROW_BATCH_EMPTY", "Phải chọn ít nhất một sách để xác nhận");
+        }
         if (new HashSet<>(itemIds).size() != itemIds.size()) {
-            throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_REQUEST_PARAMETER", "Danh sách sách bị trùng");
+            throw conflict("BORROW_BATCH_DUPLICATE", "Danh sách sách cần chuẩn bị không được trùng lặp");
         }
         return retryExecutor.execute(() -> {
             var actor = locks.actor(actorId, "borrow:prepare");
             var context = locks.lock(code, false);
-            var items = itemIds.stream().sorted().map(context::item).toList();
-            if (items.stream().anyMatch(item -> item.getStatus() != LoanItemStatus.RESERVED
-                    && item.getStatus() != LoanItemStatus.PREPARING)) {
-                throw conflict("BORROW_ITEM_NOT_READY", "Sách được chọn không còn ở trạng thái cần chuẩn bị");
-            }
+            var itemMap = context.items().stream().collect(Collectors.toMap(item -> item.getId(), item -> item));
             LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
-            String notificationKey = "ready-batch:" + items.stream().map(item -> item.getId().toString())
-                    .collect(Collectors.joining(","));
-            for (int index = 0; index < items.size(); index++) {
-                var item = items.get(index);
-                if (item.getStatus() == LoanItemStatus.RESERVED) {
-                    item.setStatus(LoanItemStatus.PREPARING);
-                    auditService.append(item, LoanItemStatus.RESERVED, LoanItemEventReason.PREPARATION_STARTED, actor, null, null);
+            String notificationKey = "batch:ready:" + code + ":" + now.toEpochSecond(ZoneOffset.UTC);
+            for (int index = 0; index < itemIds.size(); index++) {
+                Integer id = itemIds.get(index);
+                var item = itemMap.get(id);
+                if (item == null) {
+                    throw new BusinessException(HttpStatus.NOT_FOUND, "BORROW_ITEM_NOT_FOUND", "Không tìm thấy sách trong yêu cầu");
+                }
+                if (item.getStatus() != LoanItemStatus.RESERVED && item.getStatus() != LoanItemStatus.PREPARING) {
+                    throw conflict("BORROW_ITEM_NOT_READY", "Trạng thái sách không cho phép thao tác chuẩn bị");
                 }
                 item.setStatus(LoanItemStatus.READY_FOR_PICKUP);
                 item.setReadyAt(now);
@@ -94,7 +94,7 @@ public class StaffBorrowItemService {
         });
     }
 
-    /** Hủy tại quầy chỉ trước thu phí; giải phóng đúng một slot và cấp ngay cho đầu FIFO trong cùng transaction. */
+    /** Hủy tại quầy chỉ trước thu phí; giải phóng đúng một slot trong cùng transaction. */
     public StaffBorrowResponse cancel(Integer actorId, String code, Integer itemId) {
         return retryExecutor.execute(() -> {
             var actor = locks.actor(actorId, "borrow:cancel");
@@ -116,12 +116,11 @@ public class StaffBorrowItemService {
             }
             item.setStatus(LoanItemStatus.CANCELLED);
             var book = item.getBook();
-            if (previous != LoanItemStatus.WAITLISTED) book.setAvailableQuantity(book.getAvailableQuantity() + 1);
+            book.setAvailableQuantity(book.getAvailableQuantity() + 1);
             auditService.append(item, previous, LoanItemEventReason.COUNTER_CANCELLED, actor,
                     NotificationKind.CANCELLED, "item:" + itemId + ":cancelled");
             var affected = new TreeSet<Integer>();
             affected.add(context.loan().getId());
-            inventoryService.allocateWaiting(book, affected);
             aggregateService.refresh(affected);
             return queryService.detail(code);
         });
@@ -135,7 +134,7 @@ public class StaffBorrowItemService {
             var item = context.item(itemId);
             var previous = item.getStatus();
             if (previous != LoanItemStatus.RESERVED && previous != LoanItemStatus.PREPARING) {
-                throw conflict("BORROW_ITEM_NOT_READY", "Chỉ từ chối sách đang giữ hoặc chuẩn bị khi không tìm thấy bản vật lý");
+                throw conflict("BORROW_ITEM_NOT_REJECTABLE", "Không thể reject item ở trạng thái hiện tại");
             }
             item.setStatus(LoanItemStatus.REJECTED);
             auditService.append(item, previous, LoanItemEventReason.PHYSICAL_COPY_UNAVAILABLE, actor, null, null);
@@ -144,7 +143,7 @@ public class StaffBorrowItemService {
         });
     }
 
-    private BusinessException conflict(String code, String message) {
+    private static BusinessException conflict(String code, String message) {
         return new BusinessException(HttpStatus.CONFLICT, code, message);
     }
 }

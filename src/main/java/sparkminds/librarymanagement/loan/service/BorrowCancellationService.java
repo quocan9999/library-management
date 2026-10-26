@@ -17,6 +17,7 @@ import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
 import sparkminds.librarymanagement.loan.repository.LoanRepository;
 
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.math.BigDecimal;
 import java.util.TreeSet;
@@ -30,7 +31,6 @@ public class BorrowCancellationService {
     private final LoanRepository loanRepository;
     private final LoanItemRepository loanItemRepository;
     private final BookRepository bookRepository;
-    private final BorrowInventoryService inventoryService;
     private final LoanAggregateService aggregateService;
     private final BorrowAuditService auditService;
     private final BorrowQueryService queryService;
@@ -49,7 +49,6 @@ public class BorrowCancellationService {
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "BORROW_ITEM_NOT_FOUND", "Không tìm thấy sách trong yêu cầu"));
         var book = bookRepository.findByIdForUpdate(item.getBook().getId()).orElseThrow(BorrowQueryService::notFound);
         entityManager.refresh(book, LockModeType.PESSIMISTIC_WRITE);
-        // Promotion không khóa Member; sau khi chờ Book phải đọc lại status để không hủy theo snapshot WAITLISTED cũ.
         entityManager.refresh(item);
         LoanItemStatus previous = item.getStatus();
         boolean feeWasCollected = item.getPaidBorrowFee() != null && item.getPaidBorrowFee().signum() > 0;
@@ -61,13 +60,12 @@ public class BorrowCancellationService {
             throw new BusinessException(HttpStatus.CONFLICT, "BORROW_PICKUP_EXPIRED", "Sách đã hết hạn nhận tại quầy");
         }
         item.setStatus(LoanItemStatus.CANCELLED);
-        if (previous != LoanItemStatus.WAITLISTED) book.setAvailableQuantity(book.getAvailableQuantity() + 1);
+        book.setAvailableQuantity(book.getAvailableQuantity() + 1);
         refreshUnpaidPaymentAmount(loan, now());
         auditService.append(item, previous, LoanItemEventReason.USER_CANCELLED, member.getAccount(),
                 NotificationKind.CANCELLED, "item:" + item.getId() + ":cancelled");
         var affected = new TreeSet<Integer>();
         affected.add(loan.getId());
-        inventoryService.allocateWaiting(book, affected);
         aggregateService.refresh(affected);
         return queryService.getMine(accountId, loanCode);
     }
@@ -83,12 +81,11 @@ public class BorrowCancellationService {
         if (amount.signum() == 0) {
             loan.setPaymentStatus(LoanPaymentStatus.PAID);
             loan.setPaymentMethod(LoanPaymentMethod.NO_CHARGE);
-            loan.setPaymentExpiresAt(null);
             loan.setPaidAt(now);
         }
     }
 
-    private java.time.LocalDateTime now() {
+    private LocalDateTime now() {
         return java.time.LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
     }
 }

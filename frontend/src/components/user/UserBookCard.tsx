@@ -13,8 +13,6 @@ export interface UserBookCardItem {
   lateFeePerDay?: number;
   availableQuantity?: number;
   totalQuantity?: number;
-  waitlistCount?: number;
-  maxWaitlistSlots?: number;
 }
 
 export interface UserBookCardProps {
@@ -43,9 +41,6 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
   const available = book.availableQuantity ?? 0;
   const total = book.totalQuantity ?? 0;
   const isAvailable = available > 0;
-  const waitlist = book.waitlistCount ?? 0;
-  const maxWaitlist = book.maxWaitlistSlots ?? total * 4;
-  const canWaitlist = !isAvailable && total > 0 && waitlist < maxWaitlist;
 
   const formatCurrency = (val?: number) => {
     if (typeof val !== 'number') return '0 đ';
@@ -96,19 +91,6 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
       );
     }
 
-    if (canWaitlist) {
-      return (
-        <UserButton
-          variant="outline"
-          fullWidth
-          onClick={() => onAction?.(book)}
-          style={{ marginTop: 'auto' }}
-        >
-          Vào hàng chờ
-        </UserButton>
-      );
-    }
-
     return (
       <UserButton
         variant="muted"
@@ -134,74 +116,86 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
         ...style,
       }}
     >
+      {/* Khối bìa sách với theme pastel */}
       <div
-        style={{ cursor: onClickTitle ? 'pointer' : 'default' }}
+        style={{
+          width: '100%',
+          height: '240px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: onClickTitle ? 'pointer' : 'default',
+        }}
         onClick={() => onClickTitle?.(book)}
       >
         <UserBookCover
           title={book.title}
           coverImageUrl={book.coverImageUrl}
-          theme={theme}
           themeIndex={themeIndex}
-          size="catalog"
+          theme={theme}
+          style={{ width: '130px', height: '185px' }}
         />
       </div>
 
+      {/* Thông tin nội dung sách */}
       <div
         style={{
           padding: '20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px',
           flex: 1,
+          gap: '12px',
+          borderTop: '2px solid #14112B',
         }}
       >
-        <div
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {renderBadge()}
+          <span
+            style={{
+              fontWeight: 800,
+              fontSize: '15px',
+              color: '#6C4DFF',
+            }}
+          >
+            {formatCurrency(book.borrowFee)}
+          </span>
+        </div>
+
+        <h3
           onClick={() => onClickTitle?.(book)}
           style={{
             fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
-            fontWeight: 800,
-            fontSize: '20px',
-            letterSpacing: '-0.02em',
+            fontWeight: 700,
+            fontSize: '18px',
             color: '#14112B',
+            margin: 0,
+            lineHeight: 1.3,
             cursor: onClickTitle ? 'pointer' : 'default',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
-            minHeight: '48px',
+            textOverflow: 'ellipsis',
+            minHeight: '46px',
           }}
+          title={book.title}
         >
           {book.title}
-        </div>
+        </h3>
 
-        <div
+        <p
           style={{
-            fontSize: '14px',
             color: '#4B4570',
+            fontSize: '14px',
+            margin: 0,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}
+          title={book.author}
         >
           {book.author}
-        </div>
-
-        <div>
-          <span
-            style={{
-              fontWeight: 700,
-              fontSize: '20px',
-              fontFamily: 'var(--user-font-body, "Be Vietnam Pro", sans-serif)',
-              color: '#14112B',
-            }}
-          >
-            {formatCurrency(book.borrowFee)}
-          </span>{' '}
-          <span style={{ fontSize: '13px', color: '#4B4570' }}>/lượt</span>
-        </div>
-
-        <div style={{ alignSelf: 'flex-start' }}>{renderBadge()}</div>
+        </p>
 
         <div
           style={{
@@ -213,10 +207,6 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
         >
           <span>{book.bookCode || '—'}</span>
           <span>Trễ {formatCurrency(book.lateFeePerDay)}/ngày</span>
-        </div>
-
-        <div style={{ fontSize: '13px', color: '#4B4570' }}>
-          Hàng chờ: {isAvailable ? '—' : `${waitlist} / ${maxWaitlist}`}
         </div>
 
         {renderActionButton()}

@@ -73,7 +73,7 @@ function catalogBook(id: number, title = 'Lập trình Java') {
   return {
     id, bookCode: `B${String(id).padStart(6, '0')}`, isbn: '9786041234567', title, author: 'Nguyễn An',
     publisher: 'Nhà xuất bản Trẻ', publishedDate: '2024-03-10', totalQuantity: 3, availableQuantity: 1,
-    borrowFee: 0, lateFeePerDay: 2000, coverImageUrl: null, waitlistCount: 0, waitlistCap: 6,
+    borrowFee: 0, lateFeePerDay: 2000, coverImageUrl: null, 
   };
 }
 
@@ -83,16 +83,15 @@ function item(id: number, status: LoanItemStatus, title: string): BorrowItem {
     borrowFee: id === 2 ? 0 : 15000, lateFeePerDay: 2000, paidBorrowFee: 0, lateFee: 0,
     borrowedAt: null, dueDate: null, readyAt: status === 'READY_FOR_PICKUP' ? '2026-10-19T03:00:00Z' : null,
     pickupExpiresAt: status === 'READY_FOR_PICKUP' ? '2026-10-22T03:00:00Z' : null,
-    renewalCount: 0, version: 4, waitlistPosition: status === 'WAITLISTED' ? 2 : null,
-    waitlistTotal: status === 'WAITLISTED' ? 5 : null,
+    renewalCount: 0, version: 4,
   };
 }
 
 function ownRequest(): BorrowRequestSummary {
   return {
     loanCode: 'LN-2026-000041', pickupReference: 'QR-SECRET-REFERENCE', aggregateStatus: 'OPEN',
-    createdAt: '2026-10-19T03:00:00Z', version: 8, itemCount: 2, statuses: ['WAITLISTED', 'READY_FOR_PICKUP'],
-    items: [item(1, 'WAITLISTED', 'Clean Architecture'), item(2, 'READY_FOR_PICKUP', 'Nhập môn Java')],
+    createdAt: '2026-10-19T03:00:00Z', version: 8, itemCount: 2, statuses: ['RESERVED', 'READY_FOR_PICKUP'],
+    items: [item(1, 'RESERVED', 'Clean Architecture'), item(2, 'READY_FOR_PICKUP', 'Nhập môn Java')],
   };
 }
 
@@ -102,7 +101,7 @@ function staffRequest(): StaffBorrowRequest {
     loanCode: request.loanCode, pickupReference: request.pickupReference, status: 'OPEN',
     createdAt: request.createdAt, version: request.version,
     member: { id: 41, memberCode: 'MB000041', fullName: 'Nguyễn An' },
-    items: [item(1, 'READY_FOR_PICKUP', 'Clean Architecture'), item(2, 'READY_FOR_PICKUP', 'Nhập môn Java'), item(3, 'WAITLISTED', 'Sách xếp hàng')],
+    items: [item(1, 'READY_FOR_PICKUP', 'Clean Architecture'), item(2, 'READY_FOR_PICKUP', 'Nhập môn Java'), item(3, 'RESERVED', 'Sách xếp hàng')],
     preparingOverdueItemIds: [],
   };
 }
@@ -240,9 +239,9 @@ describe('Borrow Book routes and pages', () => {
     const books = [
       { ...catalogBook(5, 'Sách còn nhiều'), availableQuantity: 3, totalQuantity: 4, borrowFee: 12000, lateFeePerDay: 2500 },
       { ...catalogBook(6, 'Sách sắp hết'), availableQuantity: 1, totalQuantity: 4 },
-      { ...catalogBook(7, 'Sách đang có hàng chờ'), availableQuantity: 0, waitlistCount: 2, waitlistCap: 6 },
+      { ...catalogBook(7, 'Sách đang có hàng chờ'), availableQuantity: 0,  },
       { ...catalogBook(8, 'Sách còn bản khác'), availableQuantity: 2, totalQuantity: 3 },
-      { ...catalogBook(9, 'Sách hết hàng chờ'), availableQuantity: 0, waitlistCount: 6, waitlistCap: 6 },
+      { ...catalogBook(9, 'Sách hết hàng chờ'), availableQuantity: 0,  },
     ];
     apiClient.defaults.adapter = (async (config) => {
       if (config.url === '/api/v1/catalog/books') return response(config, success('BOOK_CATALOG_LIST_SUCCESS', page(books)));
@@ -402,7 +401,7 @@ describe('Borrow Book routes and pages', () => {
         const request = ownRequest();
         if (reads > 1) {
           request.items[1] = { ...request.items[1], status: 'CANCELLED', pickupExpiresAt: null };
-          request.statuses = ['WAITLISTED', 'CANCELLED'];
+          request.statuses = ['RESERVED', 'CANCELLED'];
         }
         return response(config, success('BORROW_REQUEST_LIST_SUCCESS', page([request])));
       }
@@ -684,20 +683,20 @@ describe('Borrow Book routes and pages', () => {
         ? [
           item(1, 'CANCELLED', 'Clean Architecture'),
           item(2, 'READY_FOR_PICKUP', 'Nhập môn Java'),
-          item(3, 'WAITLISTED', 'Sách xếp hàng'),
+          item(3, 'RESERVED', 'Sách xếp hàng'),
           item(4, 'READY_FOR_PICKUP', 'Thiết kế phần mềm'),
         ]
         : [
           item(1, 'READY_FOR_PICKUP', 'Clean Architecture'),
           item(2, 'READY_FOR_PICKUP', 'Nhập môn Java'),
-          item(3, 'WAITLISTED', 'Sách xếp hàng'),
+          item(3, 'RESERVED', 'Sách xếp hàng'),
           item(4, 'READY_FOR_PICKUP', 'Thiết kế phần mềm'),
         ];
       return request;
     };
     apiClient.defaults.adapter = (async (config) => {
       if (config.url === '/api/v1/librarian/borrow-requests') {
-        const countResponse = staffCountResponse(config, { ALL: 1, PENDING: 1, READY_FOR_PICKUP: 1, WAITLISTED: 1 });
+        const countResponse = staffCountResponse(config, { ALL: 1, PENDING: 1, READY_FOR_PICKUP: 1, RESERVED: 1 });
         if (countResponse) return countResponse;
         return response(config, success('BORROW_REQUEST_LIST_SUCCESS', page([counterRequest()])));
       }
@@ -757,7 +756,7 @@ describe('Borrow Book routes and pages', () => {
     let handoverCalls = 0;
     apiClient.defaults.adapter = (async (config) => {
       if (config.url === '/api/v1/librarian/borrow-requests') {
-        const countResponse = staffCountResponse(config, { ALL: 1, READY_FOR_PICKUP: 1, WAITLISTED: 1 });
+        const countResponse = staffCountResponse(config, { ALL: 1, READY_FOR_PICKUP: 1, RESERVED: 1 });
         if (countResponse) return countResponse;
         return response(config, success('BORROW_REQUEST_LIST_SUCCESS', page([staffRequest()])));
       }
@@ -870,12 +869,12 @@ describe('Borrow Book routes and pages', () => {
     const request = staffRequest();
     request.items = [
       item(1, 'READY_FOR_PICKUP', 'Clean Architecture'),
-      item(2, 'WAITLISTED', 'Sách đang chờ'),
+      item(2, 'RESERVED', 'Sách đang chờ'),
       item(3, 'PREPARING', 'Sách đang chuẩn bị'),
     ];
     const queries: Array<Record<string, unknown>> = [];
     const counts: Record<string, number> = {
-      ALL: 5, PENDING: 2, READY_FOR_PICKUP: 1, WAITLISTED: 2, BORROWED: 1, HISTORY: 3,
+      ALL: 5, PENDING: 2, READY_FOR_PICKUP: 1, RESERVED: 2, BORROWED: 1, HISTORY: 3,
     };
     apiClient.defaults.adapter = (async (config) => {
       if (config.url === '/api/v1/librarian/borrow-requests') {

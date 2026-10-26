@@ -19,7 +19,6 @@ public class BorrowExpirationService {
     private final LoanItemRepository itemRepository;
     private final BorrowRetryExecutor retryExecutor;
     private final BorrowSystemItemLockService systemLocks;
-    private final BorrowInventoryService inventoryService;
     private final LoanAggregateService aggregateService;
     private final BorrowAuditService auditService;
     private final Clock clock;
@@ -46,7 +45,6 @@ public class BorrowExpirationService {
                 NotificationKind.EXPIRED, "item:" + id + ":expired");
         var affected = new TreeSet<Integer>();
         affected.add(item.getLoan().getId());
-        inventoryService.allocateWaiting(book, affected);
         aggregateService.refresh(affected);
         return true;
     }

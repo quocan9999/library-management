@@ -26,7 +26,7 @@ import java.util.EnumSet;
 @RequiredArgsConstructor
 public class BorrowMockPaymentService {
     private static final EnumSet<LoanItemStatus> UNPAID_ACTIVE_STATUSES = EnumSet.of(
-            LoanItemStatus.WAITLISTED, LoanItemStatus.RESERVED, LoanItemStatus.PREPARING,
+            LoanItemStatus.RESERVED, LoanItemStatus.PREPARING,
             LoanItemStatus.READY_FOR_PICKUP);
 
     private final BorrowRetryExecutor retryExecutor;

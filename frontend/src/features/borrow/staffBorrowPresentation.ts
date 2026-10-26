@@ -6,7 +6,6 @@ export const STAFF_DESK_FILTERS: Array<{ key: StaffDeskFilter; label: string }> 
   { key: 'ALL', label: 'Tất cả' },
   { key: 'PENDING', label: 'Cần chuẩn bị' },
   { key: 'READY_FOR_PICKUP', label: 'Sẵn sàng nhận' },
-  { key: 'WAITLISTED', label: 'Hàng chờ' },
   { key: 'BORROWED', label: 'Đang mượn' },
   { key: 'RETURNED', label: 'Đã trả' },
   { key: 'CANCELLED', label: 'Đã hủy' },
@@ -15,7 +14,6 @@ export const STAFF_DESK_FILTERS: Array<{ key: StaffDeskFilter; label: string }> 
 ];
 
 export const ITEM_STATUS_LABELS: Record<LoanItemStatus, string> = {
-  WAITLISTED: 'Trong hàng chờ',
   RESERVED: 'Cần chuẩn bị',
   PREPARING: 'Đang chuẩn bị',
   READY_FOR_PICKUP: 'Sẵn sàng nhận',
@@ -35,7 +33,7 @@ export const LOAN_STATUS_LABELS: Record<StaffBorrowRequest['status'], string> = 
 };
 
 const ITEM_STATUS_PRIORITY: LoanItemStatus[] = [
-  'READY_FOR_PICKUP', 'PREPARING', 'RESERVED', 'WAITLISTED', 'BORROWED',
+  'READY_FOR_PICKUP', 'PREPARING', 'RESERVED', 'BORROWED',
   'RETURNED', 'CANCELLED', 'EXPIRED', 'REJECTED',
 ];
 
@@ -62,7 +60,7 @@ export function requestNeedsStaffAction(request: StaffBorrowRequest): boolean {
 
 export function statusTagColor(status: LoanItemStatus): string {
   if (status === 'READY_FOR_PICKUP' || status === 'RETURNED') return 'success';
-  if (status === 'RESERVED' || status === 'PREPARING' || status === 'WAITLISTED') return 'warning';
+  if (status === 'RESERVED' || status === 'PREPARING') return 'warning';
   if (status === 'REJECTED' || status === 'EXPIRED') return 'error';
   if (status === 'BORROWED') return 'processing';
   return 'default';

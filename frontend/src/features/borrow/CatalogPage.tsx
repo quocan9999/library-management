@@ -1,10 +1,9 @@
-import { Alert, Button, Modal, Pagination, Skeleton } from 'antd';
+import { Alert, Button, Pagination, Skeleton } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { BORROW_PAGE_SIZE, borrowApi } from './api';
 import { BorrowBookAction } from './BorrowBookAction';
-import { useAppNotification } from '../../components/AppNotificationProvider';
-import { borrowErrorMessage, borrowErrorNotificationType } from './errors';
+import { borrowErrorMessage } from './errors';
 import { formatVnd } from '../books/formatting';
 import type { BorrowListQuery, CatalogBook, PageResponse } from './types';
 import {
@@ -24,7 +23,6 @@ const AVAILABILITY_CHIPS = [
 
 export function CatalogPage() {
   const navigate = useNavigate();
-  const { notify } = useAppNotification();
   const { cartItems, addToCart, openCart } = useUserCart();
 
   const [searchDraft, setSearchDraft] = useState('');
@@ -35,11 +33,6 @@ export function CatalogPage() {
 
   const [loaded, setLoaded] = useState<{ key: string; data: PageResponse<CatalogBook> } | null>(null);
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
-
-  // Waitlist confirmation modal
-  const [waitlistBook, setWaitlistBook] = useState<CatalogBook | null>(null);
-  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
-  const waitlistLockRef = useRef(false);
 
   // Debounce timer for search
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -158,81 +151,71 @@ export function CatalogPage() {
         bookCode: book.bookCode,
       };
       addToCart(cartItem);
-    } else {
-      setWaitlistBook(book);
-    }
-  };
-
-  // Submit waitlist request
-  const submitWaitlist = async (book: CatalogBook) => {
-    if (waitlistLockRef.current) return;
-    waitlistLockRef.current = true;
-    setWaitlistSubmitting(true);
-    try {
-      const created = await borrowApi.createRequest([book.id]);
-      setWaitlistBook(null);
-      navigate(`/borrow-payment/${encodeURIComponent(created.loanCode)}`);
-    } catch (error: unknown) {
-      notify(borrowErrorNotificationType(error), {
-        title: 'Không thể vào hàng chờ',
-        description: borrowErrorMessage(error, 'create'),
-      });
-    } finally {
-      waitlistLockRef.current = false;
-      setWaitlistSubmitting(false);
     }
   };
 
   return (
-    <div className="user-catalog-page">
+    <div className="user-catalog-page" style={{ padding: '0 40px', maxWidth: '1440px', margin: '0 auto' }}>
       {/* 1. Tiêu đề trang */}
-      <div className="user-catalog-header">
-        <h1 className="user-title-display-64">Khám phá sách</h1>
-        <p className="user-subtitle">
-          Tra cứu tình trạng bản sách, phí mượn và hàng chờ hiện tại.
+      <div style={{ paddingTop: '48px', paddingBottom: '24px' }}>
+        <h1 className="user-title-display-64" style={{ margin: 0, color: 'var(--user-ink)' }}>
+          Khám phá sách
+        </h1>
+        <p className="user-subtitle" style={{ marginTop: '8px', marginBottom: 0 }}>
+          Tra cứu tình trạng bản sách và phí mượn hiện tại.
         </p>
       </div>
 
       {/* 2. Thanh công cụ */}
-      <div className="user-catalog-toolbar">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
         {/* Hàng 1: Ô tìm kiếm pill với nút xóa tròn */}
-        <div className="user-catalog-search-wrapper">
+        <div style={{ position: 'relative', width: '100%' }}>
           <input
             type="search"
-            aria-label="Tìm sách"
             className="user-search-input"
-            placeholder="Tên sách, tác giả hoặc mã sách"
+            placeholder="Tên sách, tác giả hoặc mã sách..."
+            aria-label="Tìm sách"
             value={searchDraft}
             onChange={handleSearchChange}
             onKeyDown={handleSearchKeyDown}
+            style={{
+              paddingRight: searchDraft ? '48px' : '20px',
+            }}
           />
-          {searchDraft.length > 0 && (
+          {searchDraft && (
             <button
               type="button"
-              className="user-search-clear-btn user-pressable"
               aria-label="Xóa từ khóa"
               onClick={handleClearSearch}
+              className="user-pressable"
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--user-lilac)',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'var(--user-ink)',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                padding: 0,
+              }}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M2 2L10 10M10 2L2 10" />
               </svg>
             </button>
           )}
         </div>
 
-        {/* Hàng 2: Bộ lọc tình trạng bằng chip */}
+        {/* Hàng 2: Bộ lọc chip tình trạng sách */}
         <UserFilterChips
           ariaLabel="Lọc sách theo tình trạng"
           options={AVAILABILITY_CHIPS}
@@ -328,8 +311,6 @@ export function CatalogPage() {
                 lateFeePerDay: book.lateFeePerDay,
                 availableQuantity: book.availableQuantity,
                 totalQuantity: book.totalQuantity,
-                waitlistCount: book.waitlistCount,
-                maxWaitlistSlots: book.waitlistCap,
               };
 
               return (
@@ -360,41 +341,6 @@ export function CatalogPage() {
           )}
         </>
       )}
-
-      {/* Modal xác nhận vào hàng chờ */}
-      <Modal
-        open={Boolean(waitlistBook)}
-        centered
-        title="Xác nhận vào hàng chờ"
-        okText={waitlistSubmitting ? 'Đang gửi…' : 'Xác nhận vào hàng chờ'}
-        cancelText="Hủy"
-        confirmLoading={waitlistSubmitting}
-        onCancel={() => {
-          if (!waitlistSubmitting) setWaitlistBook(null);
-        }}
-        onOk={() => {
-          if (waitlistBook) {
-            void submitWaitlist(waitlistBook);
-          }
-        }}
-      >
-        {waitlistBook && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <p style={{ margin: 0 }}>
-              <strong>{waitlistBook.title}</strong> · {waitlistBook.author}
-            </p>
-            <p style={{ margin: 0 }}>
-              Phí mượn: {formatVnd(waitlistBook.borrowFee)}
-            </p>
-            <p style={{ margin: 0 }}>
-              Hiện có {waitlistBook.waitlistCount} người trong hàng chờ; sức chứa tối đa {waitlistBook.waitlistCap}.
-            </p>
-            <p style={{ margin: 0, color: 'var(--user-text-muted)', fontSize: '13px' }}>
-              Chỉ xác nhận thành công khi máy chủ trả kết quả. Khi có sách, bạn sẽ nhận được thông báo để tới nhận sách.
-            </p>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
@@ -438,7 +384,6 @@ export function CatalogDetailPage() {
           <div><dt>Bản sẵn có / tổng số</dt><dd>{book.availableQuantity} / {book.totalQuantity}</dd></div>
           <div><dt>Phí mượn</dt><dd>{formatVnd(book.borrowFee)}</dd></div>
           <div><dt>Phí trễ mỗi ngày</dt><dd>{formatVnd(book.lateFeePerDay)}</dd></div>
-          <div><dt>Hàng chờ</dt><dd>{book.waitlistCount} / {book.waitlistCap}</dd></div>
         </dl>
         <BorrowBookAction book={book} />
       </div>

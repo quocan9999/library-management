@@ -17,14 +17,13 @@ import { borrowErrorMessage, borrowErrorNotificationType, borrowErrorStatus } fr
 import { formatVnd } from '../books/formatting';
 import type { BorrowItem, BorrowRequestFilter, BorrowRequestSummary, LoanItemStatus, PageResponse } from './types';
 
-type LoanFilter = 'ALL' | 'PENDING' | 'WAITLISTED' | 'READY' | 'BORROWED' | 'HISTORY';
+type LoanFilter = 'ALL' | 'PENDING' | 'READY' | 'BORROWED' | 'HISTORY';
 type LoanAction = { type: 'cancel' | 'renew'; loanCode: string; item: BorrowItem };
 
 const HISTORY_STATUSES: LoanItemStatus[] = ['RETURNED', 'CANCELLED', 'REJECTED', 'EXPIRED'];
 const LOAN_FILTERS: FilterChipOption[] = [
   { value: 'ALL', label: 'Tất cả' },
   { value: 'PENDING', label: 'Chờ xử lý' },
-  { value: 'WAITLISTED', label: 'Waitlist' },
   { value: 'READY', label: 'Sẵn sàng nhận' },
   { value: 'BORROWED', label: 'Đang mượn' },
   { value: 'HISTORY', label: 'Lịch sử' },
@@ -40,7 +39,6 @@ function filterItem(item: BorrowItem, filter: LoanFilter): boolean {
 
 function statusLabel(status: LoanItemStatus): string {
   const labels: Record<LoanItemStatus, string> = {
-    WAITLISTED: 'Trong hàng chờ',
     RESERVED: 'Đang giữ sách',
     PREPARING: 'Đang chuẩn bị',
     READY_FOR_PICKUP: 'Sẵn sàng nhận',
@@ -54,10 +52,7 @@ function statusLabel(status: LoanItemStatus): string {
 }
 
 function getItemBadgeVariant(status: LoanItemStatus): UserBadgeVariant {
-  switch (status) {
-    case 'WAITLISTED':
-      return 'waitlist';
-    case 'RESERVED':
+  switch (status) {    case 'RESERVED':
       return 'subtle';
     case 'PREPARING':
       return 'preparing';
@@ -102,8 +97,7 @@ function getVisibleItems(requests: BorrowRequestSummary[], filter: LoanFilter) {
       ...request,
       items: request.items.filter(
         (item) =>
-          filterItem(item, filter) ||
-          (filter === 'PENDING' && request.paymentStatus === 'PENDING' && item.status === 'WAITLISTED')
+          filterItem(item, filter)
       ),
     }))
     .filter((request) => request.items.length > 0);
@@ -355,12 +349,6 @@ export function MyLoansPage() {
                           {loanItem.bookCode} · {loanItem.author}
                         </div>
 
-                        {loanItem.status === 'WAITLISTED' && (
-                          <p style={{ margin: 0, fontSize: '14px', color: 'var(--user-ink)' }}>
-                            Vị trí {loanItem.waitlistPosition ?? '—'} trong {loanItem.waitlistTotal ?? '—'} người chờ. Hệ thống tự tính lại vị trí khi tải mới.
-                          </p>
-                        )}
-
                         {loanItem.status === 'READY_FOR_PICKUP' && (
                           <p
                             style={{
@@ -402,7 +390,7 @@ export function MyLoansPage() {
                         <div className="user-loan-item__actions">
                           {canCancel &&
                             !(request.paymentStatus === 'PAID' && loanItem.paidBorrowFee > 0) &&
-                            ['WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP'].includes(
+                            ['RESERVED', 'PREPARING', 'READY_FOR_PICKUP'].includes(
                               loanItem.status
                             ) && (
                               <UserButton

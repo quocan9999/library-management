@@ -54,9 +54,6 @@ public class BorrowRenewalService {
                 || today.isAfter(item.getDueDate()) || today.isBefore(item.getDueDate().minusDays(3))) {
             throw conflict("BORROW_RENEWAL_NOT_ALLOWED", "Chỉ gia hạn một lần trong ba ngày trước hạn đến hết ngày đến hạn");
         }
-        if (itemRepository.countByBookIdAndStatus(book.getId(), LoanItemStatus.WAITLISTED) > 0) {
-            throw conflict("BORROW_WAITLIST_EXISTS", "Đầu sách đang có người chờ, không thể gia hạn");
-        }
         item.setDueDate(item.getDueDate().plusDays(7));
         item.setRenewalCount((byte) 1);
         notificationRepository.supersedeOldReminders(itemId, item.getDueDate());

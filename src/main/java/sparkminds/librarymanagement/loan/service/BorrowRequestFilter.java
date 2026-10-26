@@ -9,13 +9,12 @@ import java.util.Locale;
 
 /** Nhóm tab là filter, không phải trạng thái được lưu vào LoanItem. */
 public enum BorrowRequestFilter {
-    ALL, PENDING, HISTORY, WAITLISTED, RESERVED, PREPARING, READY_FOR_PICKUP,
+    ALL, PENDING, HISTORY, RESERVED, PREPARING, READY_FOR_PICKUP,
     BORROWED, RETURNED, CANCELLED, EXPIRED, REJECTED;
 
     public List<LoanItemStatus> statuses() {
         return switch (this) {
             case ALL -> List.of(LoanItemStatus.values());
-            // Chờ xử lý trên UI tách riêng Waitlist và sẵn sàng nhận.
             case PENDING -> List.of(LoanItemStatus.RESERVED, LoanItemStatus.PREPARING);
             case HISTORY -> List.of(LoanItemStatus.RETURNED, LoanItemStatus.CANCELLED,
                     LoanItemStatus.EXPIRED, LoanItemStatus.REJECTED);
@@ -28,7 +27,8 @@ public enum BorrowRequestFilter {
         try {
             return valueOf(input.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_PARAMETER", "Bộ lọc trạng thái không hợp lệ");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_PARAMETER",
+                    "Bộ lọc trạng thái không hợp lệ");
         }
     }
 }
