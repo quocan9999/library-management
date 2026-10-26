@@ -121,7 +121,7 @@ const UserLayoutContent: React.FC = () => {
     }
   };
 
-  const displayName = currentUser?.username || currentUser?.email || 'Độc giả';
+  const displayName = currentUser?.fullName?.trim() || currentUser?.username?.trim() || currentUser?.email?.trim() || 'Độc giả';
   const userInitial = displayName.trim().charAt(0).toUpperCase() || 'Đ';
 
   return (

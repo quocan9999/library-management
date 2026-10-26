@@ -123,7 +123,8 @@ export function AdminLayout() {
     }
   };
 
-  const displayName = currentUser?.username?.trim()
+  const displayName = currentUser?.fullName?.trim()
+    || currentUser?.username?.trim()
     || currentUser?.email?.trim()
     || (currentUser ? `Tài khoản ${currentUser.id}` : 'Đang đồng bộ hồ sơ');
   const email = currentUser?.email ?? 'Thông tin phiên đăng nhập';

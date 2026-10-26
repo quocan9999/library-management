@@ -25,6 +25,7 @@ export interface AuthMeData {
   email: string | null;
   role: string;
   permissions: string[];
+  fullName?: string | null;
 }
 
 export interface RegisterCredentials {
