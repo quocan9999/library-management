@@ -17,7 +17,7 @@ import { borrowErrorMessage, borrowErrorNotificationType, borrowErrorStatus } fr
 import { formatVnd } from '../books/formatting';
 import type { BorrowItem, BorrowRequestFilter, BorrowRequestSummary, LoanItemStatus, PageResponse } from './types';
 
-type LoanFilter = 'ALL' | 'PENDING' | 'READY' | 'BORROWED' | 'HISTORY';
+type LoanFilter = 'ALL' | 'PENDING' | 'READY' | 'BORROWED' | 'CANCELLED' | 'HISTORY';
 type LoanAction = { type: 'cancel' | 'renew'; loanCode: string; item: BorrowItem };
 
 const HISTORY_STATUSES: LoanItemStatus[] = ['RETURNED', 'CANCELLED', 'REJECTED', 'EXPIRED'];
@@ -26,6 +26,7 @@ const LOAN_FILTERS: FilterChipOption[] = [
   { value: 'PENDING', label: 'Chờ xử lý' },
   { value: 'READY', label: 'Sẵn sàng nhận' },
   { value: 'BORROWED', label: 'Đang mượn' },
+  { value: 'CANCELLED', label: 'Đã hủy' },
   { value: 'HISTORY', label: 'Lịch sử' },
 ];
 
@@ -34,6 +35,7 @@ function filterItem(item: BorrowItem, filter: LoanFilter): boolean {
   if (filter === 'HISTORY') return HISTORY_STATUSES.includes(item.status);
   if (filter === 'PENDING') return ['RESERVED', 'PREPARING'].includes(item.status);
   if (filter === 'READY') return item.status === 'READY_FOR_PICKUP';
+  if (filter === 'CANCELLED') return item.status === 'CANCELLED';
   return item.status === filter;
 }
 
