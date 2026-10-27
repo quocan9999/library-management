@@ -314,7 +314,7 @@ export function SystemConfigPage() {
         <div className="config-modal-form">
           {pendingMode ? (
             <div className="config-modal-alert config-modal-alert--danger">
-              <strong>Lưu ý quan trọng:</strong> Khi bật chế độ bảo trì, toàn bộ API của độc giả và luồng nghiệp vụ công khai sẽ bị chặn (HTTP 503). Chỉ tài khoản có vai trò Quản trị viên mới có thể truy cập hệ thống.
+              <strong>Lưu ý quan trọng:</strong> Khi bật chế độ bảo trì, toàn bộ API và luồng nghiệp vụ công khai sẽ bị chặn.
             </div>
           ) : (
             <div className="config-modal-alert config-modal-alert--info">

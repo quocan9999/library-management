@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 public class SystemConfigService {
 
     private static final Byte DEFAULT_CONFIG_ID = (byte) 1;
+    private static final String DEFAULT_MAINTENANCE_MESSAGE = "Hệ thống đang trong chế độ bảo trì. Vui lòng quay lại sau.";
 
     private final SystemConfigRepository systemConfigRepository;
     private final SystemConfigHistoryRepository systemConfigHistoryRepository;
@@ -43,6 +44,7 @@ public class SystemConfigService {
 
     /** Cờ bộ nhớ đệm phục vụ kiểm tra tức thời tại AOP mà không gây tải cho Database. */
     private volatile boolean cachedMaintenanceMode = false;
+    private volatile String cachedMaintenanceMessage = DEFAULT_MAINTENANCE_MESSAGE;
     private final Set<String> cachedBypassRoles = ConcurrentHashMap.newKeySet();
 
     @PostConstruct
@@ -50,6 +52,11 @@ public class SystemConfigService {
         try {
             systemConfigRepository.findByIdWithDetails(DEFAULT_CONFIG_ID).ifPresent(config -> {
                 this.cachedMaintenanceMode = config.isMaintenanceMode();
+                if (config.getMaintenanceDetail() != null && config.getMaintenanceDetail().getBannerMessage() != null) {
+                    this.cachedMaintenanceMessage = config.getMaintenanceDetail().getBannerMessage();
+                } else {
+                    this.cachedMaintenanceMessage = DEFAULT_MAINTENANCE_MESSAGE;
+                }
                 this.cachedBypassRoles.clear();
                 if (config.getBypassRoles() != null) {
                     this.cachedBypassRoles.addAll(
@@ -69,6 +76,15 @@ public class SystemConfigService {
      */
     public boolean isMaintenanceActive() {
         return cachedMaintenanceMode;
+    }
+
+    /**
+     * Lấy thông điệp bảo trì hiện tại từ bộ nhớ đệm.
+     */
+    public String getMaintenanceMessage() {
+        return cachedMaintenanceMessage != null && !cachedMaintenanceMessage.isBlank()
+                ? cachedMaintenanceMessage
+                : DEFAULT_MAINTENANCE_MESSAGE;
     }
 
     /**
@@ -153,6 +169,11 @@ public class SystemConfigService {
 
         // Đồng bộ cache bộ nhớ đệm
         this.cachedMaintenanceMode = newMode;
+        if (detail.getBannerMessage() != null && !detail.getBannerMessage().isBlank()) {
+            this.cachedMaintenanceMessage = detail.getBannerMessage();
+        } else {
+            this.cachedMaintenanceMessage = DEFAULT_MAINTENANCE_MESSAGE;
+        }
         if (config.getBypassRoles() != null) {
             this.cachedBypassRoles.clear();
             this.cachedBypassRoles.addAll(

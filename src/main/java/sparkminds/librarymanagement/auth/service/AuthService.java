@@ -22,6 +22,8 @@ import sparkminds.librarymanagement.auth.security.jwt.IssuedJwtToken;
 import sparkminds.librarymanagement.auth.security.jwt.JwtTokenService;
 import sparkminds.librarymanagement.auth.security.jwt.JwtTokenType;
 import sparkminds.librarymanagement.common.api.BusinessException;
+import sparkminds.librarymanagement.config.exception.MaintenanceModeException;
+import sparkminds.librarymanagement.config.service.SystemConfigService;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -36,6 +38,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenService jwtTokenService;
     private final EntityManager entityManager;
+    private final SystemConfigService systemConfigService;
 
     @Transactional
     public LoginResult login(LoginRequest request) {
@@ -75,6 +78,11 @@ public class AuthService {
                     "EMAIL_NOT_VERIFIED",
                     "Email chưa được xác thực. Vui lòng xác thực email trước khi đăng nhập."
             );
+        }
+
+        if (systemConfigService.isMaintenanceActive()
+                && (account.getRole() == null || !systemConfigService.isBypassedRole(account.getRole().getCode()))) {
+            throw new MaintenanceModeException(systemConfigService.getMaintenanceMessage());
         }
 
         IssuedJwtToken accessToken = jwtTokenService.issue(
