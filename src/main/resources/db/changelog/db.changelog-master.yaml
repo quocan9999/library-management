@@ -154,3 +154,7 @@ databaseChangeLog:
   - include:
       file: changes/039-borrow-return-permission.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/040-system-config-relationships-and-details.yaml
+      relativeToChangelogFile: true

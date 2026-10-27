@@ -6,6 +6,7 @@ import {
 } from 'axios';
 import { describe, expect, it } from 'vitest';
 import {
+  getForgotPasswordError,
   getLoginError,
   getLogoutErrorMessage,
   getRegisterError,
@@ -61,6 +62,31 @@ describe('authentication error messages', () => {
   it.each([500, 503])('maps HTTP %i to a temporary system error', (status) => {
     expect(getLoginError(apiError(status, 'INTERNAL_ERROR')).description).toBe(
       'Hệ thống đang gặp sự cố tạm thời. Vui lòng thử lại sau ít phút.',
+    );
+  });
+
+  it('maps HTTP 503 with MAINTENANCE_MODE_ACTIVE to maintenance message', () => {
+    const error = apiError(503, 'MAINTENANCE_MODE_ACTIVE');
+    expect(getLoginError(error)).toEqual({
+      title: 'Hệ thống đang bảo trì',
+      description: 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.',
+      code: 'MAINTENANCE_MODE_ACTIVE',
+    });
+    expect(getRegisterError(error)).toEqual({
+      title: 'Hệ thống đang bảo trì',
+      description: 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.',
+      code: 'MAINTENANCE_MODE_ACTIVE',
+    });
+    expect(getForgotPasswordError(error)).toEqual({
+      title: 'Hệ thống đang bảo trì',
+      description: 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.',
+    });
+    expect(getResendError(error)).toEqual({
+      title: 'Hệ thống đang bảo trì',
+      description: 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.',
+    });
+    expect(getLogoutErrorMessage(error)).toBe(
+      'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.',
     );
   });
 

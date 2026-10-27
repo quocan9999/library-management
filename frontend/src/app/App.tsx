@@ -32,6 +32,7 @@ import { CatalogDetailPage, CatalogPage } from '../features/borrow/CatalogPage';
 import { LibrarianBorrowRequestsPage } from '../features/borrow/LibrarianBorrowRequestsPage';
 import { MyLoansPage } from '../features/borrow/MyLoansPage';
 import { BorrowPaymentPage } from '../features/borrow/BorrowPaymentPage';
+import { SystemConfigPage } from '../features/systemConfig/SystemConfigPage';
 
 function SessionBootstrap() {
   return (
@@ -237,6 +238,13 @@ export function App() {
             <RequireRole role="ADMIN">
               <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
                 <AdminAccountAssignmentPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
+          <Route path="admin/system-config" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="config:read" allowedRoles={['ADMIN']}>
+                <SystemConfigPage />
               </RequirePermission>
             </RequireRole>
           } />

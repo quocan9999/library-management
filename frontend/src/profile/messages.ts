@@ -29,6 +29,9 @@ export function getChangePasswordError(error: unknown): string {
     return 'Không thể đổi mật khẩu lúc này. Vui lòng thử lại.';
   }
   if (!error.response) return 'Không thể kết nối đến hệ thống. Vui lòng thử lại sau.';
+  if (error.response.status === 503 && error.response.data?.code === 'MAINTENANCE_MODE_ACTIVE') {
+    return 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+  }
   if (error.response.data?.code === 'CURRENT_PASSWORD_INVALID') {
     return 'Mật khẩu hiện tại không chính xác.';
   }
@@ -62,6 +65,9 @@ export function getProfileUpdateError(error: unknown): string {
     return 'Không thể cập nhật hồ sơ lúc này. Vui lòng thử lại.';
   }
   if (!error.response) return 'Không thể kết nối đến hệ thống. Vui lòng thử lại sau.';
+  if (error.response.status === 503 && error.response.data?.code === 'MAINTENANCE_MODE_ACTIVE') {
+    return 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+  }
   const code = error.response.data?.code;
   if (code === 'MEMBER_VERSION_CONFLICT') {
     return 'Dữ liệu hồ sơ đã được thay đổi từ một phiên làm việc khác. Vui lòng tải lại trang để xem thông tin mới nhất.';

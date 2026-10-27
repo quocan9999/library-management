@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 039-borrow-return-permission
-      author: antigravity
+      author: quocan9999
       comment: "Cập nhật mô tả cho permission borrow:return"
       changes:
         - update:

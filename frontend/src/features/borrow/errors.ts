@@ -29,6 +29,9 @@ export function borrowErrorMessage(error: unknown, action: 'read' | 'create' | '
 
   const status = error.response?.status;
   const code = error.response?.data?.code;
+  if (status === 503 && code === 'MAINTENANCE_MODE_ACTIVE') {
+    return 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+  }
   if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || !error.response) {
     return action === 'create'
       ? 'Chưa xác nhận được kết quả. Hãy tải danh sách yêu cầu trước khi gửi lại để tránh tạo trùng.'

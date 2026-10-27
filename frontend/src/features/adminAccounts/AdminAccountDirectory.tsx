@@ -44,6 +44,9 @@ function formatCreatedAt(value: string): string {
 function getMessageForWriteError(error: unknown, operation: 'create' | 'role' | 'status'): string {
   const status = statusOf(error);
   const code = codeOf(error);
+  if (status === 503 && code === 'MAINTENANCE_MODE_ACTIVE') {
+    return 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+  }
   if (status === 403) {
     if (code === 'ACCOUNT_SYSTEM_PROTECTED') return 'Tài khoản hệ thống được bảo vệ và không thể thay đổi.';
     if (code === 'ACCOUNT_SELF_ROLE_CHANGE_FORBIDDEN' || code === 'ACCOUNT_SELF_DISABLE_FORBIDDEN') {

@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 038-remove-borrow-waitlist
-      author: antigravity
+      author: quocan9999
       comment: "Loại bỏ hàng đợi mượn sách, xóa trạng thái WAITLISTED và cột waitlisted_at."
       changes:
         - sql:
