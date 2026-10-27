@@ -2,7 +2,9 @@ import { Alert, Button, Checkbox, Input, Modal, Select, Spin, Table, Tag, Toolti
 import type { TableColumnsType } from 'antd';
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../auth/messages';
 import { useAppNotification } from '../components/AppNotificationProvider';
 import { roleApi } from './api';
 import {
@@ -58,9 +60,14 @@ export function RoleGroupDirectory({
   onSelectPermissions,
   onRolesChanged,
 }: {
-  onSelectPermissions: (roleCode: string) => void;
-  onRolesChanged: () => void;
-}) {
+  onSelectPermissions?: (roleCode: string) => void;
+  onRolesChanged?: () => void;
+} = {}) {
+  const navigate = useNavigate();
+  const handleOpenPermissions = (roleCode: string) => {
+    onSelectPermissions?.(roleCode);
+    navigate(`/admin/authorization/groups/${encodeURIComponent(roleCode)}`);
+  };
   const { currentUser, refreshCapabilities } = useAuth();
   const { notify } = useAppNotification();
   const canManage = currentUser?.role === 'ADMIN' && currentUser.permissions.includes('role:update');
@@ -70,12 +77,12 @@ export function RoleGroupDirectory({
   const [rows, setRows] = useState<RoleSearchItem[]>([]);
   const [totalElements, setTotalElements] = useState(0);
   const [listLoading, setListLoading] = useState(true);
-  const [listError, setListError] = useState(false);
+  const [listError, setListError] = useState<{ failed: boolean; isMaintenance?: boolean }>({ failed: false });
   const [reloadVersion, setReloadVersion] = useState(0);
 
   const [permissionCatalog, setPermissionCatalog] = useState<PermissionCatalogEntry[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
-  const [catalogError, setCatalogError] = useState(false);
+  const [catalogError, setCatalogError] = useState<{ failed: boolean; isMaintenance?: boolean }>({ failed: false });
   const [catalogReloadVersion, setCatalogReloadVersion] = useState(0);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -104,7 +111,7 @@ export function RoleGroupDirectory({
     let current = true;
     const timer = window.setTimeout(() => {
       setListLoading(true);
-      setListError(false);
+      setListError({ failed: false });
       void roleApi.searchRoles({
         q: searchText.trim() || undefined,
         status: statusFilter === 'ALL' ? undefined : statusFilter,
@@ -119,8 +126,8 @@ export function RoleGroupDirectory({
           setTotalElements(result.totalElements);
           if (result.totalPages > 0 && page >= result.totalPages) setPage(result.totalPages - 1);
         })
-        .catch(() => {
-          if (current) setListError(true);
+        .catch((err: unknown) => {
+          if (current) setListError({ failed: true, isMaintenance: isMaintenanceError(err) });
         })
         .finally(() => {
           if (current) setListLoading(false);
@@ -140,8 +147,8 @@ export function RoleGroupDirectory({
       .then((catalog) => {
         if (current) setPermissionCatalog(catalog);
       })
-      .catch(() => {
-        if (current) setCatalogError(true);
+      .catch((err: unknown) => {
+        if (current) setCatalogError({ failed: true, isMaintenance: isMaintenanceError(err) });
       })
       .finally(() => {
         if (current) setCatalogLoading(false);
@@ -184,19 +191,19 @@ export function RoleGroupDirectory({
     && !['ADMIN', 'USER', 'SUPER_ADMIN'].includes(createCode);
   const validCreateName = createName.trim().length > 0 && createName.trim().length <= 100;
   const validCreateDescription = createDescription.length <= 255;
-  const canSubmitCreate = canManage && !catalogLoading && !catalogError && !dependencyCatalogError
+  const canSubmitCreate = canManage && !catalogLoading && !catalogError.failed && !dependencyCatalogError
     && validCreateCode && validCreateName && validCreateDescription
     && createPermissions.size > 0 && createDependencyIssues.length === 0 && !createSaving;
 
   const refreshList = () => setReloadVersion((value) => value + 1);
   const retryCatalog = () => {
     setCatalogLoading(true);
-    setCatalogError(false);
+    setCatalogError({ failed: false });
     setCatalogReloadVersion((value) => value + 1);
   };
   const afterRolesChanged = () => {
     refreshList();
-    onRolesChanged();
+    onRolesChanged?.();
   };
 
   const resetCreateForm = () => {
@@ -313,7 +320,7 @@ export function RoleGroupDirectory({
       setCreateOpen(false);
       notify('success', { title: 'Tạo nhóm thành công', description: `Đã tạo nhóm ${result.displayName}.` });
       afterRolesChanged();
-      onSelectPermissions(result.code);
+      handleOpenPermissions(result.code);
     } catch (error) {
       if (statusOf(error) === 403) {
         setCreateValidation('Quyền quản trị đã thay đổi. Chưa tạo nhóm; phiên quyền đang được đồng bộ lại.');
@@ -419,14 +426,14 @@ export function RoleGroupDirectory({
       key: 'actions',
       width: 260,
       render: (_value, role) => {
-        if (role.code === 'ADMIN') return <Button type="link" onClick={() => onSelectPermissions(role.code)}>Xem quyền</Button>;
+        if (role.code === 'ADMIN') return <Button type="link" onClick={() => handleOpenPermissions(role.code)}>Xem quyền</Button>;
         if (!role.enabled) {
           return role.code !== 'USER'
             ? <Button type="link" disabled={!canManage} onClick={() => { setStatusTarget(role); setStatusError(null); }}>Kích hoạt</Button>
-            : <Button type="link" onClick={() => onSelectPermissions(role.code)}>Xem quyền</Button>;
+            : <Button type="link" onClick={() => handleOpenPermissions(role.code)}>Xem quyền</Button>;
         }
         return <div className="role-directory-actions">
-          <Button type="link" onClick={() => onSelectPermissions(role.code)}>
+          <Button type="link" onClick={() => handleOpenPermissions(role.code)}>
             {canManage && role.canEdit ? 'Phân quyền' : 'Xem quyền'}
           </Button>
           {canManage && role.canEdit && <Button type="link" onClick={() => openMetadata(role)}>Sửa thông tin</Button>}
@@ -443,7 +450,7 @@ export function RoleGroupDirectory({
           <h2 id="role-directory-title">Nhóm quyền</h2>
           <p>Tra cứu nhóm, số tài khoản đang sử dụng và quyền được gán.</p>
         </div>
-        {canManage && <Button type="primary" onClick={openCreate} disabled={catalogError}>
+        {canManage && <Button type="primary" onClick={openCreate} disabled={catalogError.failed}>
           Tạo nhóm quyền
         </Button>}
       </div>
@@ -466,22 +473,22 @@ export function RoleGroupDirectory({
           ]}
         />
       </div>
-      {catalogError && <Alert
+      {catalogError.failed && <Alert
         className="role-directory__error"
         type="error"
         showIcon
         role="alert"
-        title="Không thể tải danh mục quyền"
-        description="Chưa thể tạo nhóm quyền cho đến khi danh mục được tải."
+        title={catalogError.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải danh mục quyền'}
+        description={catalogError.isMaintenance ? MAINTENANCE_MESSAGE : 'Chưa thể tạo nhóm quyền cho đến khi danh mục được tải.'}
         action={<Button onClick={retryCatalog}>Thử lại</Button>}
       />}
-      {listError && <Alert
+      {listError.failed && <Alert
         className="role-directory__error"
         type="error"
         showIcon
         role="alert"
-        title="Không thể tải danh sách nhóm quyền"
-        description="Kiểm tra kết nối rồi thử lại."
+        title={listError.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải danh sách nhóm quyền'}
+        description={listError.isMaintenance ? MAINTENANCE_MESSAGE : 'Kiểm tra kết nối rồi thử lại.'}
         action={<Button onClick={refreshList}>Thử lại</Button>}
       />}
       <Table<RoleSearchItem>
@@ -490,7 +497,7 @@ export function RoleGroupDirectory({
         columns={columns}
         dataSource={rows}
         loading={listLoading}
-        locale={{ emptyText: listError ? 'Không có dữ liệu mới để hiển thị' : 'Chưa có nhóm quyền phù hợp' }}
+        locale={{ emptyText: listError.isMaintenance ? MAINTENANCE_MESSAGE : (listError.failed ? 'Không có dữ liệu mới để hiển thị' : 'Chưa có nhóm quyền phù hợp') }}
         pagination={{
           current: page + 1,
           pageSize: PAGE_SIZE,
@@ -570,12 +577,13 @@ export function RoleGroupDirectory({
             onChange={(event) => setCreatePermissionSearch(event.target.value)}
             allowClear
           />
-          {catalogLoading ? <div className="role-loading" role="status"><Spin /> Đang tải danh mục quyền…</div> : catalogError ? (
+          {catalogLoading ? <div className="role-loading" role="status"><Spin /> Đang tải danh mục quyền…</div> : catalogError.failed ? (
             <Alert
               type="error"
               showIcon
               role="alert"
-              title="Không thể tải danh mục quyền"
+              title={catalogError.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải danh mục quyền'}
+              description={catalogError.isMaintenance ? MAINTENANCE_MESSAGE : undefined}
               action={<Button onClick={retryCatalog}>Thử lại</Button>}
             />
           ) : dependencyCatalogError ? <Alert type="error" showIcon role="alert" title={dependencyCatalogError} /> : (

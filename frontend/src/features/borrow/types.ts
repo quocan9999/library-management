@@ -12,7 +12,6 @@ export type BorrowRequestFilter =
   | 'ALL'
   | 'PENDING'
   | 'HISTORY'
-  | 'WAITLISTED'
   | 'RESERVED'
   | 'PREPARING'
   | 'READY_FOR_PICKUP'
@@ -35,12 +34,9 @@ export interface CatalogBook {
   borrowFee: number;
   lateFeePerDay: number;
   coverImageUrl: string | null;
-  waitlistCount: number;
-  waitlistCap: number;
 }
 
 export type LoanItemStatus =
-  | 'WAITLISTED'
   | 'RESERVED'
   | 'PREPARING'
   | 'READY_FOR_PICKUP'
@@ -66,10 +62,9 @@ export interface BorrowItem {
   dueDate: string | null;
   readyAt: string | null;
   pickupExpiresAt: string | null;
+  returnedAt?: string | null;
   renewalCount: number;
   version: number;
-  waitlistPosition: number | null;
-  waitlistTotal: number | null;
 }
 
 export interface BorrowRequestSummary {
@@ -132,6 +127,12 @@ export interface HandoverRequest {
   identityVerified: true;
   expectedLoanVersion: number;
   items: Array<{ loanItemId: number; collectedBorrowFee: number }>;
+}
+
+export interface ReturnBorrowItemsRequest {
+  itemIds: number[];
+  physicalBookReceived: boolean;
+  lateFeeCollected?: boolean;
 }
 
 export interface BorrowListQuery {

@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 039-borrow-return-permission
+      author: quocan9999
+      comment: "Cập nhật mô tả cho permission borrow:return"
+      changes:
+        - update:
+            tableName: permissions
+            columns:
+              - column:
+                  name: description
+                  value: "Tiếp nhận trả sách và xác nhận phí trễ tại quầy"
+            where: "code = 'borrow:return'"

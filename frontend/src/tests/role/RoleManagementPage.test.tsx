@@ -9,11 +9,11 @@ import {
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { apiClient } from '../../auth/api';
 import type { ApiEnvelope } from '../../auth/types';
 import { AppNotificationProvider } from '../../components/AppNotificationProvider';
-import { RoleManagementPage } from '../../role/RoleManagementPage';
+import { RoleManagementPage, RolePermissionDetailPage } from '../../role/RoleManagementPage';
 import type { RolePermissions } from '../../role/types';
 
 const mocks = vi.hoisted(() => ({
@@ -295,11 +295,38 @@ afterEach(() => {
   mocks.refreshCapabilities.mockReset();
 });
 
+function renderDetailPage(roleCode = 'USER') {
+  return render(
+    <MemoryRouter initialEntries={[`/admin/authorization/groups/${roleCode}`]}>
+      <Routes>
+        <Route path="/admin/authorization/groups/:roleCode" element={<RolePermissionDetailPage />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+function renderDetailPageWithNotifications(roleCode = 'USER') {
+  return render(
+    <AppNotificationProvider>
+      <MemoryRouter initialEntries={[`/admin/authorization/groups/${roleCode}`]}>
+        <Routes>
+          <Route path="/admin/authorization/groups/:roleCode" element={<RolePermissionDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </AppNotificationProvider>
+  );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="current path">{location.pathname}</output>;
+}
+
 describe('RoleManagementPage', () => {
   it('adds permission dependencies when an operation is selected and previews the complete delta', async () => {
     const user = userEvent.setup();
     configureRoleApi();
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     await user.click(await screen.findByRole('checkbox', { name: /member:create/ }));
 
@@ -314,7 +341,7 @@ describe('RoleManagementPage', () => {
   it('applies dependencies when the permission-group checkbox is selected', async () => {
     const user = userEvent.setup();
     configureRoleApi();
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     await user.click(await screen.findByRole('checkbox', { name: /Chọn tất cả quyền nhóm Thành viên/ }));
 
@@ -327,7 +354,7 @@ describe('RoleManagementPage', () => {
   it('does not select an operation when the actor cannot grant its missing dependency', async () => {
     const user = userEvent.setup();
     configureRoleApi({ unmanageableMemberRead: true });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     await user.click(await screen.findByRole('checkbox', { name: /member:create/ }));
 
@@ -338,7 +365,7 @@ describe('RoleManagementPage', () => {
   it('keeps base permission when an operation is removed', async () => {
     const user = userEvent.setup();
     configureRoleApi({ assignedPermissions: ['book:read', 'book:delete', 'member:read', 'member:create'] });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     await user.click(await screen.findByRole('checkbox', { name: /member:create/ }));
 
@@ -353,7 +380,7 @@ describe('RoleManagementPage', () => {
   it('blocks saving a base permission removal until all dependent permissions are also removed', async () => {
     const user = userEvent.setup();
     configureRoleApi({ assignedPermissions: ['book:read', 'book:delete', 'member:read', 'member:create'] });
-    render(<AppNotificationProvider><MemoryRouter><RoleManagementPage /></MemoryRouter></AppNotificationProvider>);
+    renderDetailPageWithNotifications();
 
     await user.click(await screen.findByRole('checkbox', { name: /member:read/ }));
     expect(await screen.findByText(/Không thể gỡ quyền cơ sở member:read/)).toBeTruthy();
@@ -372,7 +399,7 @@ describe('RoleManagementPage', () => {
       patchCode: 'ROLE_PERMISSION_DEPENDENCY_CONFLICT',
       patchMessage: 'Không thể thu hồi member:read khi còn member:create.',
     });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
@@ -385,7 +412,7 @@ describe('RoleManagementPage', () => {
   it('selects only editable permissions in a group and preserves assigned locked rights', async () => {
     const user = userEvent.setup();
     configureRoleApi();
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     const locked = await screen.findByRole('checkbox', { name: /book:delete/ });
     const group = screen.getByRole('checkbox', { name: /Chọn tất cả quyền nhóm Sách/ });
@@ -405,7 +432,7 @@ describe('RoleManagementPage', () => {
   it('keeps edits and does not retry a denied PATCH while syncing current capabilities', async () => {
     const user = userEvent.setup();
     const api = configureRoleApi({ patchStatus: 403, patchCode: 'PERMISSION_DENIED' });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
@@ -420,7 +447,7 @@ describe('RoleManagementPage', () => {
   it('canceling the preview retains the draft and sends no PATCH', async () => {
     const user = userEvent.setup();
     const api = configureRoleApi();
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
@@ -432,28 +459,20 @@ describe('RoleManagementPage', () => {
   });
 
   it('lets an Admin view both permitted targets and keeps its own role read-only', async () => {
-    const user = userEvent.setup();
     configureRoleApi();
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
-
-    await screen.findByRole('checkbox', { name: /book:read/ });
-    const selector = await screen.findByRole('combobox', { name: 'Vai trò' });
-    await user.click(selector);
-    expect(screen.queryByRole('option', { name: 'Siêu quản trị viên' })).toBeNull();
-    expect(screen.getByRole('option', { name: 'Quản trị viên' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Người dùng' })).toBeTruthy();
-    await user.click(screen.getByRole('option', { name: 'Quản trị viên' }));
+    renderDetailPage('ADMIN');
 
     const ownPermission = await screen.findByRole('checkbox', { name: /role:read/ });
     expect((ownPermission as HTMLInputElement).checked).toBe(true);
     expect((ownPermission as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText('Vai trò này chỉ được xem trong phiên quản trị hiện tại.')).toBeTruthy();
+    expect(screen.getAllByText('Chỉ xem').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }).hasAttribute('disabled')).toBe(true);
   });
 
   it('keeps USER read-only when an Admin has role:read but lacks role:update', async () => {
     Object.assign(mocks.currentUser, { permissions: ['role:read'] });
     configureRoleApi({ userCanEdit: false });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     const assignment = await screen.findByRole('checkbox', { name: /book:create/ });
     expect((assignment as HTMLInputElement).disabled).toBe(true);
@@ -463,7 +482,7 @@ describe('RoleManagementPage', () => {
   it('preserves pending edits after 409 until the user confirms a refresh', async () => {
     const user = userEvent.setup();
     const api = configureRoleApi({ patchStatus: 409, patchCode: 'ROLE_VERSION_CONFLICT' });
-    render(<MemoryRouter><RoleManagementPage /></MemoryRouter>);
+    renderDetailPage();
 
     await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
@@ -490,14 +509,14 @@ describe('RoleManagementPage', () => {
       permissions: ['role:read', 'role:update'],
     });
     const api = configureRoleApi({ deferPatch: true });
-    render(<AppNotificationProvider><MemoryRouter><RoleManagementPage /></MemoryRouter></AppNotificationProvider>);
+    renderDetailPageWithNotifications();
 
     await user.click(await screen.findByRole('checkbox', { name: /book:create/ }));
     await user.click(screen.getByRole('button', { name: 'Xem thay đổi và lưu' }));
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
     await waitFor(() => expect(api.requests.filter(({ method }) => method === 'patch')).toHaveLength(1));
 
-    expect((document.getElementById('role-target-select') as HTMLInputElement).disabled).toBe(true);
+    // role-target-select combobox was removed in favor of dedicated route
     await user.keyboard('{Escape}');
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
@@ -514,6 +533,46 @@ describe('RoleManagementPage', () => {
     expect(await screen.findByText('Đã cập nhật quyền cho vai trò.')).toBeTruthy();
     expect(screen.getByText('Đã cập nhật quyền cho vai trò.')).toBeTruthy();
     expect((screen.getByRole('checkbox', { name: /book:create/ }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('navigates to permission detail page when clicking Phân quyền in the group list', async () => {
+    const user = userEvent.setup();
+    configureRoleApi();
+    render(
+      <MemoryRouter initialEntries={['/admin/authorization/groups']}>
+        <Routes>
+          <Route path="/admin/authorization/groups" element={<RoleManagementPage />} />
+          <Route path="/admin/authorization/groups/:roleCode" element={<RolePermissionDetailPage />} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    const editBtn = await screen.findByRole('button', { name: 'Phân quyền' });
+    await user.click(editBtn);
+
+    await waitFor(() => expect(screen.getByLabelText('current path').textContent).toBe('/admin/authorization/groups/USER'));
+    expect(await screen.findByRole('heading', { name: /Phân quyền:/ })).toBeTruthy();
+  });
+
+  it('renders both Quyền quản trị and Quyền độc giả tabs in detail page', async () => {
+    const user = userEvent.setup();
+    configureRoleApi();
+    renderDetailPage('USER');
+
+    expect(await screen.findByRole('tab', { name: 'Quyền quản trị' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Quyền độc giả' })).toBeTruthy();
+
+    await user.click(screen.getByRole('tab', { name: 'Quyền độc giả' }));
+    expect(await screen.findByRole('heading', { name: 'Sách' })).toBeTruthy();
+  });
+
+  it('links back to the group list from the permission detail page', async () => {
+    configureRoleApi();
+    renderDetailPage('USER');
+
+    const backLink = await screen.findByRole('link', { name: /Quay lại danh sách nhóm/ });
+    expect(backLink.getAttribute('href')).toBe('/admin/authorization/groups');
   });
 
   it('creates a dynamic group with auto-added dependencies and never submits protected permissions', async () => {

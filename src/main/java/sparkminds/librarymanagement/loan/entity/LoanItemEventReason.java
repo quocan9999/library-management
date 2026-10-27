@@ -2,6 +2,8 @@ package sparkminds.librarymanagement.loan.entity;
 
 public enum LoanItemEventReason {
     REQUEST_CREATED,
+    /** @deprecated Legacy reason from waitlist queue; retained for historical audit trail. */
+    @Deprecated
     QUEUE_PROMOTED,
     PREPARATION_STARTED,
     READY_CONFIRMED,

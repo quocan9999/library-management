@@ -14,6 +14,9 @@ const RESEND_COOLDOWN_SECONDS = 60;
 function getErrorMessage(error: unknown, step: 'request' | 'verify'): string {
   if (!axios.isAxiosError<ApiEnvelope<unknown>>(error)) return 'Không thể xử lý yêu cầu lúc này. Vui lòng thử lại.';
   const code = error.response?.data?.code;
+  if (error.response?.status === 503 && code === 'MAINTENANCE_MODE_ACTIVE') {
+    return 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+  }
   if (code === 'CURRENT_PASSWORD_INVALID') return 'Mật khẩu hiện tại không chính xác.';
   if (code === 'EMAIL_ALREADY_REGISTERED') return 'Email này đã được sử dụng bởi tài khoản khác.';
   if (code === 'EMAIL_CHANGE_CODE_INVALID') return 'Mã xác thực không hợp lệ hoặc đã hết hạn. Vui lòng gửi lại mã và dùng mã mới nhất.';
@@ -110,6 +113,9 @@ export function ChangeEmailPage() {
             <div className="form-field">
               <label htmlFor="profile-current-email">Email hiện tại</label>
               <Input id="profile-current-email" value={currentEmail} readOnly size="large" />
+              <span className="profile-current-email-text" style={{ fontSize: '13px', color: '#4B4570', marginTop: '4px', display: 'block' }}>
+                {currentEmail}
+              </span>
             </div>
             <div className="form-field">
               <label htmlFor="profile-new-email">Email mới</label>

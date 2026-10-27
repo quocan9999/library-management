@@ -7,6 +7,10 @@ public record AuthMeResponse(
         String username,
         String email,
         String role,
-        List<String> permissions
+        List<String> permissions,
+        String fullName
 ) {
+    public AuthMeResponse(Integer id, String username, String email, String role, List<String> permissions) {
+        this(id, username, email, role, permissions, null);
+    }
 }

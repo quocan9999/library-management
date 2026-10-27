@@ -48,7 +48,6 @@ public class BorrowReservationService {
     private final BookRepository bookRepository;
     private final LoanRepository loanRepository;
     private final LoanItemRepository loanItemRepository;
-    private final BorrowInventoryService inventoryService;
     private final LoanAggregateService aggregateService;
     private final BorrowAuditService auditService;
     private final BorrowQueryService queryService;
@@ -70,29 +69,24 @@ public class BorrowReservationService {
     /** Account → Member → Book ID tăng dần; mọi attempt đọc lại điều kiện và snapshot trong transaction mới. */
     private BorrowRequestResponse createAttempt(Integer accountId, List<Integer> bookIds) {
         Member member = memberLockService.lock(accountId, true);
-        Loan loan = createRequest(member, member.getAccount(), bookIds, LoanOrigin.ONLINE, false);
+        Loan loan = createRequest(member, member.getAccount(), bookIds, LoanOrigin.ONLINE);
         return queryService.getMine(accountId, loan.getLoanCode());
     }
 
     private StaffBorrowResponse createCounterAttempt(Integer actorId, Integer memberId, List<Integer> bookIds) {
         Account actor = staffLocks.actor(actorId, "borrow:prepare");
         Member member = memberLockService.lockMember(memberId, true);
-        Loan loan = createRequest(member, actor, bookIds, LoanOrigin.COUNTER, true);
+        Loan loan = createRequest(member, actor, bookIds, LoanOrigin.COUNTER);
         return staffQueryService.detail(loan.getLoanCode());
     }
 
-    private Loan createRequest(Member member, Account eventActor, List<Integer> bookIds,
-                               LoanOrigin origin, boolean requireAvailableAtCounter) {
+    private Loan createRequest(Member member, Account eventActor, List<Integer> bookIds, LoanOrigin origin) {
         validateEligibility(member.getId(), bookIds);
         var books = lockBooks(bookIds);
         var affectedLoans = new TreeSet<Integer>();
         var statuses = new ArrayList<LoanItemStatus>();
         for (Book book : books) {
-            inventoryService.allocateWaiting(book, affectedLoans);
             LoanItemStatus status = allocateNewItem(book);
-            if (requireAvailableAtCounter && status != LoanItemStatus.RESERVED) {
-                throw conflict("BORROW_BOOK_UNAVAILABLE_AT_COUNTER", "Sách không còn bản sẵn để mượn trực tiếp tại quầy");
-            }
             statuses.add(status);
         }
 
@@ -164,15 +158,11 @@ public class BorrowReservationService {
     }
 
     private LoanItemStatus allocateNewItem(Book book) {
-        if (book.getAvailableQuantity() > 0) {
-            book.setAvailableQuantity(book.getAvailableQuantity() - 1);
-            return LoanItemStatus.RESERVED;
+        if (book.getAvailableQuantity() <= 0) {
+            throw conflict("BORROW_BOOK_OUT_OF_STOCK", "Sách '" + book.getTitle() + "' đã hết bản sẵn có để mượn");
         }
-        if (loanItemRepository.countByBookIdAndStatus(book.getId(), LoanItemStatus.WAITLISTED)
-                >= BorrowPolicy.waitlistCap(book.getTotalQuantity())) {
-            throw conflict("BORROW_WAITLIST_FULL", "Hàng chờ của đầu sách đã đầy");
-        }
-        return LoanItemStatus.WAITLISTED;
+        book.setAvailableQuantity(book.getAvailableQuantity() - 1);
+        return LoanItemStatus.RESERVED;
     }
 
     private LoanItem createItem(Loan loan, Book book, LoanItemStatus status) {
@@ -182,9 +172,6 @@ public class BorrowReservationService {
         item.setStatus(status);
         item.setBorrowFee(book.getBorrowFee());
         item.setLateFeePerDay(book.getLateFeePerDay());
-        if (status == LoanItemStatus.WAITLISTED) {
-            item.setWaitlistedAt(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC));
-        }
         return loanItemRepository.save(item);
     }
 

@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import sparkminds.librarymanagement.config.exception.MaintenanceModeException;
 import sparkminds.librarymanagement.member.exception.MemberProfilePatchException;
 
 import java.util.LinkedHashMap;
@@ -86,6 +87,16 @@ public class GlobalExceptionHandler {
             errors.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
         }
         return error(HttpStatus.UNPROCESSABLE_ENTITY, "VALIDATION_ERROR", "Dữ liệu không hợp lệ", errors);
+    }
+
+    @ExceptionHandler(MaintenanceModeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaintenanceMode(MaintenanceModeException exception) {
+        return error(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "MAINTENANCE_MODE_ACTIVE",
+                exception.getMessage() != null ? exception.getMessage() : "Hệ thống đang trong chế độ bảo trì, vui lòng quay lại sau",
+                null
+        );
     }
 
     @ExceptionHandler(AccessDeniedException.class)

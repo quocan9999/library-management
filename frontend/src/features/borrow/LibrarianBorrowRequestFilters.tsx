@@ -31,7 +31,6 @@ export function LibrarianBorrowRequestFilters({
           onChange={onChange}
           options={STAFF_DESK_FILTERS.map(({ key, label }) => ({ value: key, label }))}
         />
-        <span className="librarian-borrow-filter-hint">Lọc yêu cầu có sách thuộc trạng thái đã chọn.</span>
       </div>
     </div>
     <div className="member-filter-actions">

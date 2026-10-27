@@ -13,12 +13,13 @@ export function DefaultAccountRoute() {
   if (capabilityStatus === 'error') {
     return <CapabilityRetry onRetry={() => { void refreshCapabilities().catch(() => undefined); }} />;
   }
-  if (role === 'USER') return <Navigate to="/profile" replace />;
-  if (role && role !== 'USER' && permissions.includes('member:read')) return <Navigate to="/admin/members" replace />;
-  if (permissions.includes('role:read') && role === 'ADMIN') {
-    return <Navigate to="/admin/authorization" replace />;
+  if (role === 'USER') return <Navigate to="/books" replace />;
+  if (role && role !== 'USER') {
+    if (permissions.includes('borrow:read')) return <Navigate to="/librarian/borrow-requests" replace />;
+    if (permissions.includes('member:read')) return <Navigate to="/admin/members" replace />;
+    if (permissions.includes('role:read') && role === 'ADMIN') return <Navigate to="/admin/authorization" replace />;
+    return null;
   }
-  if (role && role !== 'USER') return null;
   return <Navigate to="/403" replace />;
 }
 

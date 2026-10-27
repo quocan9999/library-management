@@ -12,7 +12,6 @@ import sparkminds.librarymanagement.loan.entity.Loan;
 import sparkminds.librarymanagement.loan.entity.LoanItem;
 import sparkminds.librarymanagement.loan.entity.LoanItemStatus;
 import sparkminds.librarymanagement.loan.entity.LoanPaymentStatus;
-import sparkminds.librarymanagement.loan.repository.BorrowReadRepository;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
 import sparkminds.librarymanagement.loan.repository.LoanRepository;
 import sparkminds.librarymanagement.loan.repository.LoanItemStatusHistoryRepository;
@@ -34,7 +33,6 @@ import java.util.stream.Collectors;
 public class StaffBorrowQueryService {
     private final LoanRepository loanRepository;
     private final LoanItemRepository itemRepository;
-    private final BorrowReadRepository readRepository;
     private final LoanItemStatusHistoryRepository historyRepository;
     private final Clock clock;
 
@@ -105,17 +103,11 @@ public class StaffBorrowQueryService {
     private List<StaffBorrowResponse> responses(List<Loan> loans) {
         if (loans.isEmpty()) return List.of();
         var items = itemRepository.findWithBookByLoanIdIn(loans.stream().map(Loan::getId).toList());
-        var positions = readRepository.queuePositions(items.stream().filter(item -> item.getStatus() == LoanItemStatus.WAITLISTED)
-                .map(LoanItem::getId).toList());
         var byLoan = items.stream().collect(Collectors.groupingBy(item -> item.getLoan().getId()));
         LocalDateTime cutoff = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC).minusHours(24);
         return loans.stream().map(loan -> {
             var ownedItems = byLoan.getOrDefault(loan.getId(), List.of());
-            var responses = ownedItems.stream().map(item -> {
-                var position = positions.get(item.getId());
-                return BorrowItemResponse.from(item, position == null ? null : position.position(),
-                        position == null ? null : position.total());
-            }).toList();
+            var responses = ownedItems.stream().map(BorrowItemResponse::from).toList();
             // PREPARING chỉ đổi updatedAt khi bắt đầu chuẩn bị; đây là cảnh báo, không tự hủy hoặc thay đổi deadline.
             var warnings = ownedItems.stream().filter(item -> item.getStatus() == LoanItemStatus.PREPARING
                     && item.getUpdatedAt().isBefore(cutoff)).map(LoanItem::getId).toList();

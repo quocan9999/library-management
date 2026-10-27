@@ -146,3 +146,19 @@ databaseChangeLog:
   - include:
       file: changes/037-borrow-counter-and-mock-payment.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/038-remove-borrow-waitlist.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/039-borrow-return-permission.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/040-system-config-relationships-and-details.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/041-simplify-system-config.yaml
+      relativeToChangelogFile: true

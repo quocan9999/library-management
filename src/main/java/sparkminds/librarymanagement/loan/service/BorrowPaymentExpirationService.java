@@ -16,10 +16,10 @@ import java.util.TreeSet;
 @Service
 @RequiredArgsConstructor
 public class BorrowPaymentExpirationService {
+
     private final LoanRepository loanRepository;
     private final BorrowRetryExecutor retryExecutor;
     private final BorrowSystemLoanLockService systemLocks;
-    private final BorrowInventoryService inventoryService;
     private final LoanAggregateService aggregateService;
     private final BorrowAuditService auditService;
     private final Clock clock;
@@ -44,11 +44,8 @@ public class BorrowPaymentExpirationService {
             LoanItemStatus previous = item.getStatus();
             if (!previous.isPending()) continue;
             item.setStatus(LoanItemStatus.EXPIRED);
-            if (previous != LoanItemStatus.WAITLISTED) {
-                var book = item.getBook();
-                book.setAvailableQuantity(book.getAvailableQuantity() + 1);
-                inventoryService.allocateWaiting(book, affected);
-            }
+            var book = item.getBook();
+            book.setAvailableQuantity(book.getAvailableQuantity() + 1);
             auditService.append(item, previous, LoanItemEventReason.PAYMENT_EXPIRED, null, null, null);
         }
         context.loan().setPaymentStatus(LoanPaymentStatus.EXPIRED);

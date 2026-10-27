@@ -22,7 +22,8 @@ public interface LoanRepository extends JpaRepository<Loan, Integer> {
              and (:search = '' or loan.pickupReference = :search
                or lower(loan.loanCode) like :pattern escape '!'
                or lower(member.memberCode) like :pattern escape '!'
-               or lower(member.fullName) like :pattern escape '!')
+               or lower(member.fullName) like :pattern escape '!'
+               or exists (select li.id from LoanItem li where li.loan.id = loan.id and lower(li.book.bookCode) like :pattern escape '!'))
             """;
 
     /** Lọc trước phân trang; đếm toàn bộ sách của yêu cầu, không chỉ sách khớp trạng thái. */

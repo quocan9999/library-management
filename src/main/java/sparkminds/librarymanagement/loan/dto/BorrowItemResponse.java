@@ -13,14 +13,15 @@ public record BorrowItemResponse(
         Integer id, Integer bookId, String bookCode, String title, String author, String coverImageUrl,
         LoanItemStatus status, BigDecimal borrowFee, BigDecimal lateFeePerDay, BigDecimal paidBorrowFee,
         BigDecimal lateFee, Instant borrowedAt, LocalDate dueDate, Instant readyAt, Instant pickupExpiresAt,
-        int renewalCount, long version, Long waitlistPosition, Long waitlistTotal
+        Instant returnedAt, int renewalCount, long version
 ) {
-    public static BorrowItemResponse from(LoanItem item, Long position, Long total) {
+    public static BorrowItemResponse from(LoanItem item) {
         var book = item.getBook();
         return new BorrowItemResponse(item.getId(), book.getId(), book.getBookCode(), book.getTitle(), book.getAuthor(),
                 book.getCoverImageUrl(), item.getStatus(), item.getBorrowFee(), item.getLateFeePerDay(),
                 item.getPaidBorrowFee(), item.getLateFee(), utc(item.getBorrowedAt()), item.getDueDate(),
-                utc(item.getReadyAt()), utc(item.getPickupExpiresAt()), item.getRenewalCount(), item.getVersion(), position, total);
+                utc(item.getReadyAt()), utc(item.getPickupExpiresAt()), utc(item.getReturnedAt()),
+                item.getRenewalCount(), item.getVersion());
     }
 
     private static Instant utc(LocalDateTime value) {

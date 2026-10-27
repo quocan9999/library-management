@@ -88,7 +88,7 @@ export function LibrarianCounterBorrowRequestModal({ open, onClose, onCreated }:
   }, [memberQuery, notify, open]);
 
   const addBook = (book: CatalogBook) => {
-    if (book.availableQuantity < 1 || book.waitlistCount > 0
+    if (book.availableQuantity < 1
       || selectedBooks.length >= MAX_BORROW_BOOKS || selectedBooks.some((item) => item.id === book.id)) return;
     setSelectedBooks((current) => {
       if (current.length >= MAX_BORROW_BOOKS || current.some((item) => item.id === book.id)) return current;
@@ -140,7 +140,6 @@ export function LibrarianCounterBorrowRequestModal({ open, onClose, onCreated }:
     onOk={() => { void submit(); }}
   >
     <div className="librarian-counter-create">
-      <Alert showIcon type="info" title="Yêu cầu được lưu ngay khi tạo. Có thể đóng chi tiết và tìm lại trong danh sách để tiếp tục chuẩn bị, thu phí tại quầy và bàn giao." />
       <label htmlFor="counter-member-search">Thành viên</label>
       <Select
         id="counter-member-search"
@@ -195,7 +194,6 @@ export function LibrarianCounterBorrowRequestModal({ open, onClose, onCreated }:
           locale={{ emptyText: <Empty description="Không tìm thấy sách phù hợp với từ khóa." /> }}
           renderItem={(book) => {
             const selected = selectedBooks.some((item) => item.id === book.id);
-            const waiting = book.waitlistCount > 0;
             return <List.Item key={book.id}>
               <span className="librarian-counter-create__book">
                 <Typography.Text strong>{book.title}</Typography.Text>
@@ -203,13 +201,12 @@ export function LibrarianCounterBorrowRequestModal({ open, onClose, onCreated }:
               </span>
               <span className="librarian-counter-create__book-meta">
                 {book.availableQuantity < 1 ? <Typography.Text type="danger">Hết bản sẵn</Typography.Text>
-                  : waiting ? <Typography.Text type="warning">Có hàng chờ FIFO</Typography.Text>
-                    : <Typography.Text type="secondary">Còn {book.availableQuantity} bản</Typography.Text>}
+                  : <Typography.Text type="secondary">Còn {book.availableQuantity} bản</Typography.Text>}
                 <Typography.Text strong>{formatVnd(book.borrowFee)}/cuốn</Typography.Text>
               </span>
               <Button
                 type={selected ? 'default' : 'primary'}
-                disabled={selected || waiting || book.availableQuantity < 1 || selectedBooks.length >= MAX_BORROW_BOOKS}
+                disabled={selected || book.availableQuantity < 1 || selectedBooks.length >= MAX_BORROW_BOOKS}
                 onClick={() => addBook(book)}
               >{selected ? 'Đã chọn' : 'Chọn'}</Button>
             </List.Item>;

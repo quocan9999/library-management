@@ -40,7 +40,6 @@ public interface LoanItemRepository extends JpaRepository<LoanItem, Integer> {
     List<Integer> findExpiredPickupIds(@Param("status") LoanItemStatus status,
                                        @Param("now") java.time.LocalDateTime now, Pageable page);
 
-
     @Query("select item from LoanItem item join fetch item.book where item.loan.id = :loanId order by item.id")
     List<LoanItem> findWithBookByLoanId(@Param("loanId") Integer loanId);
 
@@ -50,19 +49,4 @@ public interface LoanItemRepository extends JpaRepository<LoanItem, Integer> {
     boolean existsByIdAndLoanId(Integer itemId, Integer loanId);
 
     List<LoanItem> findByLoanIdIn(Collection<Integer> loanIds);
-
-    List<LoanItem> findByBookIdAndStatusOrderByWaitlistedAtAscIdAsc(Integer bookId, LoanItemStatus status, Pageable page);
-
-    /** Đếm cả trang sách trong một query để catalog không truy vấn queue riêng cho từng hàng. */
-    @Query("""
-            select item.book.id as bookId, count(item) as waitingCount from LoanItem item
-            where item.book.id in :bookIds and item.status = :status group by item.book.id
-            """)
-    List<BookStatusCount> countByBooksAndStatus(@Param("bookIds") Collection<Integer> bookIds,
-                                               @Param("status") LoanItemStatus status);
-
-    interface BookStatusCount {
-        Integer getBookId();
-        long getWaitingCount();
-    }
 }

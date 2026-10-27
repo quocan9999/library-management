@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 038-remove-borrow-waitlist
+      author: quocan9999
+      comment: "Loại bỏ hàng đợi mượn sách, xóa trạng thái WAITLISTED và cột waitlisted_at."
+      changes:
+        - sql:
+            dbms: mysql
+            sql: |
+              UPDATE loan_items SET status = 'CANCELLED' WHERE status = 'WAITLISTED';
+              ALTER TABLE loan_items DROP CHECK chk_loan_items_waitlisted_at;
+              ALTER TABLE loan_items DROP INDEX idx_loan_items_fifo;
+              ALTER TABLE loan_items DROP COLUMN waitlisted_at;
+              ALTER TABLE loan_items DROP CHECK chk_loan_items_status;
+              ALTER TABLE loan_items ADD CONSTRAINT chk_loan_items_status CHECK (status IN (
+                'RESERVED', 'PREPARING', 'READY_FOR_PICKUP', 'BORROWED', 'RETURNED', 'CANCELLED', 'EXPIRED', 'REJECTED'));

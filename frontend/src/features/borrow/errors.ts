@@ -29,6 +29,9 @@ export function borrowErrorMessage(error: unknown, action: 'read' | 'create' | '
 
   const status = error.response?.status;
   const code = error.response?.data?.code;
+  if (status === 503 && code === 'MAINTENANCE_MODE_ACTIVE') {
+    return 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+  }
   if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || !error.response) {
     return action === 'create'
       ? 'Chưa xác nhận được kết quả. Hãy tải danh sách yêu cầu trước khi gửi lại để tránh tạo trùng.'
@@ -41,7 +44,7 @@ export function borrowErrorMessage(error: unknown, action: 'read' | 'create' | '
   if (code === 'BORROW_ACTIVE_LIMIT_EXCEEDED') return 'Mỗi thành viên chỉ được có tối đa 3 đầu sách đang hoạt động.';
   if (code === 'BORROW_OUTSTANDING_OBLIGATION') return 'Bạn đang có sách quá hạn chưa giải quyết nên chưa thể đặt mượn.';
   if (code === 'BORROW_DUPLICATE_ACTIVE_BOOK') return 'Đầu sách này đã có trong một yêu cầu đang hoạt động.';
-  if (code === 'BORROW_WAITLIST_FULL') return 'Hàng chờ của đầu sách đã đầy. Hãy tải lại danh mục để xem tình trạng mới.';
+  if (code === 'BORROW_BOOK_OUT_OF_STOCK') return error.response?.data?.message || 'Sách đã hết bản sẵn có để mượn.';
   if (status === 404) return 'Không tìm thấy sách hoặc yêu cầu bằng mã đã nhập.';
   if (code === 'BORROW_PICKUP_EXPIRED') return 'Thời hạn nhận sách đã hết. Hãy tải lại để xem trạng thái mới.';
   if (status === 409 || code === 'BORROW_VERSION_CONFLICT' || code === 'BORROW_INVALID_HANDOVER_SET') {

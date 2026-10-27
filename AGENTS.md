@@ -30,3 +30,8 @@ Do not invoke `superpowers:brainstorming` or `superpowers:writing-plans` unless 
 - **Chấp nhận viết thủ công khi cần thiết**: constructor có `@Qualifier`, `@Value`, logic khởi tạo, kiểm tra invariant hoặc xử lý đặc biệt mà Lombok không giữ đúng; getter/setter có logic; cần kiểm soát signature, visibility, annotation hoặc semantics; hay khi Lombok không phù hợp/không áp dụng được (ví dụ `record`, `interface`, trường hợp framework yêu cầu riêng). Không cố ép dùng Lombok nếu gây lỗi hoặc thay đổi hành vi.
 - Với JPA Entity, tránh dùng tùy tiện `@Data`, `@ToString`, `@EqualsAndHashCode` vì quan hệ LAZY, vòng tham chiếu và identity; chỉ sử dụng annotation phù hợp với Entity/schema thực tế.
 - Khi thêm/sửa code, tuân thủ quy định trên nhưng không refactor hàng loạt file ngoài phạm vi task. Kiểm tra compile và tests thực chất sau thay đổi.
+
+## Quy định thiết kế UI/UX
+
+- Tuyệt đối không tự ý thêm các card/box/banner thông tin nổi bật, mẹo vặt, gợi ý "thú vị" ngoài lề (như "Mẹo bảo mật", "Bạn có biết", tips, fun facts) vào giao diện nếu người dùng không yêu cầu rõ ràng.
+- Giao diện phải tinh gọn, tập trung vào chức năng chính và dữ liệu nghiệp vụ cần thiết.

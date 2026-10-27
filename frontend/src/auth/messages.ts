@@ -3,6 +3,15 @@ import type { ApiEnvelope } from './types';
 
 const SERVICE_NOT_READY = 'Hệ thống hiện chưa sẵn sàng. Vui lòng thử lại sau ít phút.';
 const TEMPORARY_SYSTEM_FAILURE = 'Hệ thống đang gặp sự cố tạm thời. Vui lòng thử lại sau ít phút.';
+export const MAINTENANCE_TITLE = 'Hệ thống đang bảo trì';
+export const MAINTENANCE_MESSAGE = 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+
+export function isMaintenanceError(error: unknown): boolean {
+  if (!axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
+    return false;
+  }
+  return error.response?.status === 503 && error.response?.data?.code === 'MAINTENANCE_MODE_ACTIVE';
+}
 
 export interface LoginErrorCopy {
   title: string;
@@ -43,6 +52,14 @@ export function getLoginError(error: unknown): LoginErrorCopy {
     return {
       title: 'Không thể kết nối đến hệ thống',
       description: SERVICE_NOT_READY,
+    };
+  }
+
+  if (response.status === 503 && response.data?.code === 'MAINTENANCE_MODE_ACTIVE') {
+    return {
+      title: 'Hệ thống đang bảo trì',
+      description: MAINTENANCE_MESSAGE,
+      code: 'MAINTENANCE_MODE_ACTIVE',
     };
   }
 
@@ -111,6 +128,9 @@ export function getRegisterError(error: unknown): LoginErrorCopy {
   const response = error.response;
   if (!response) {
     return { title: 'Không thể kết nối đến hệ thống', description: SERVICE_NOT_READY };
+  }
+  if (response.status === 503 && response.data?.code === 'MAINTENANCE_MODE_ACTIVE') {
+    return { title: 'Hệ thống đang bảo trì', description: MAINTENANCE_MESSAGE, code: 'MAINTENANCE_MODE_ACTIVE' };
   }
   if (response.status === 500 || response.status === 503) {
     return { title: 'Không thể đăng ký', description: TEMPORARY_SYSTEM_FAILURE };
@@ -184,6 +204,9 @@ export function getForgotPasswordError(error: unknown): ForgotPasswordErrorCopy 
       retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? Math.max(1, retryAfterSeconds) : 60,
     };
   }
+  if (response.status === 503 && response.data?.code === 'MAINTENANCE_MODE_ACTIVE') {
+    return { title: 'Hệ thống đang bảo trì', description: MAINTENANCE_MESSAGE };
+  }
   if (response.status === 500 || response.status === 503) {
     return { title: 'Không thể gửi yêu cầu', description: TEMPORARY_SYSTEM_FAILURE };
   }
@@ -229,6 +252,9 @@ export function getResendError(error: unknown): ResendErrorCopy {
       retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? Math.max(1, retryAfterSeconds) : 60,
     };
   }
+  if (response.status === 503 && response.data?.code === 'MAINTENANCE_MODE_ACTIVE') {
+    return { title: 'Hệ thống đang bảo trì', description: MAINTENANCE_MESSAGE };
+  }
   if (response.status === 500 || response.status === 503) {
     return { title: 'Không thể gửi yêu cầu', description: TEMPORARY_SYSTEM_FAILURE };
   }
@@ -252,6 +278,9 @@ export function getVerificationError(error: unknown): VerificationErrorState {
 export function getLogoutErrorMessage(error: unknown): string {
   if (axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
     if (!error.response) return SERVICE_NOT_READY;
+    if (error.response.status === 503 && error.response.data?.code === 'MAINTENANCE_MODE_ACTIVE') {
+      return MAINTENANCE_MESSAGE;
+    }
     if (error.response.status === 500 || error.response.status === 503) {
       return TEMPORARY_SYSTEM_FAILURE;
     }

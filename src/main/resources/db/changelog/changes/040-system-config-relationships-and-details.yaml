@@ -1,0 +1,160 @@
+databaseChangeLog:
+  - changeSet:
+      id: 040-system-config-relationships-and-details
+      author: quocan9999
+
+      changes:
+        # 1. Bảng system_maintenance_details (@OneToOne với system_configs)
+        - createTable:
+            tableName: system_maintenance_details
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: system_config_id
+                  type: TINYINT
+                  constraints:
+                    nullable: false
+                    unique: true
+                    foreignKeyName: fk_maintenance_detail_system_config
+                    references: system_configs(id)
+              - column:
+                  name: banner_message
+                  type: VARCHAR(500)
+              - column:
+                  name: contact_email
+                  type: VARCHAR(255)
+              - column:
+                  name: expected_end_time
+                  type: DATETIME
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        # 2. Bảng system_config_histories (@OneToMany từ system_configs, @ManyToOne từ accounts)
+        - createTable:
+            tableName: system_config_histories
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: system_config_id
+                  type: TINYINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_config_history_system_config
+                    references: system_configs(id)
+              - column:
+                  name: account_id
+                  type: INT
+                  constraints:
+                    foreignKeyName: fk_config_history_account
+                    references: accounts(id)
+              - column:
+                  name: action
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reason
+                  type: VARCHAR(255)
+              - column:
+                  name: detail
+                  type: VARCHAR(1000)
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        # 3. Bảng system_config_bypass_roles (@ManyToMany giữa system_configs và roles)
+        - createTable:
+            tableName: system_config_bypass_roles
+            columns:
+              - column:
+                  name: system_config_id
+                  type: TINYINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_bypass_roles_system_config
+                    references: system_configs(id)
+              - column:
+                  name: role_id
+                  type: SMALLINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_bypass_roles_role
+                    references: roles(id)
+
+        - addPrimaryKey:
+            tableName: system_config_bypass_roles
+            columnNames: system_config_id, role_id
+            constraintName: pk_system_config_bypass_roles
+
+        # 4. Seed dữ liệu khởi tạo
+        - insert:
+            tableName: system_maintenance_details
+            columns:
+              - column:
+                  name: system_config_id
+                  valueNumeric: 1
+              - column:
+                  name: banner_message
+                  value: "Hệ thống đang được bảo trì để nâng cấp định kỳ. Vui lòng quay lại sau."
+              - column:
+                  name: contact_email
+                  value: "admin@library.sparkminds.com"
+
+        - insert:
+            tableName: system_config_bypass_roles
+            columns:
+              - column:
+                  name: system_config_id
+                  valueNumeric: 1
+              - column:
+                  name: role_id
+                  valueNumeric: 1
+
+        - insert:
+            tableName: system_config_histories
+            columns:
+              - column:
+                  name: system_config_id
+                  valueNumeric: 1
+              - column:
+                  name: action
+                  value: "SYSTEM_INIT"
+              - column:
+                  name: reason
+                  value: "Khởi tạo hệ thống ban đầu"
+              - column:
+                  name: detail
+                  value: "Chế độ bảo trì khởi tạo mặc định: TẮT"
+
+      rollback:
+        - dropTable:
+            tableName: system_config_bypass_roles
+        - dropTable:
+            tableName: system_config_histories
+        - dropTable:
+            tableName: system_maintenance_details

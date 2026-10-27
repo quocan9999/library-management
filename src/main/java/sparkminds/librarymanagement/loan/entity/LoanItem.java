@@ -52,9 +52,6 @@ public class LoanItem {
     @Column(name = "late_fee", nullable = false, precision = 12, scale = 2)
     private BigDecimal lateFee = BigDecimal.ZERO;
 
-    @Column(name = "waitlisted_at")
-    private LocalDateTime waitlistedAt;
-
     @Column(name = "ready_at")
     private LocalDateTime readyAt;
 

@@ -1,0 +1,175 @@
+import React, { useState } from 'react';
+
+export type UserBookCoverTheme = 'ink' | 'violet' | 'lime' | 'lilac';
+
+export type UserBookCoverSize = 'sm' | 'md' | 'lg' | 'catalog';
+
+export const DEFAULT_BOOK_COVER_URL =
+  'https://res.cloudinary.com/dcz9x5e9/image/upload/v1792744188/defbookcover-min_lbjfkz.jpg';
+
+export interface UserBookCoverProps {
+  title: string;
+  coverImageUrl?: string | null;
+  theme?: UserBookCoverTheme;
+  themeIndex?: number;
+  size?: UserBookCoverSize;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+const COLOR_PAIRS: Array<{ bg: string; color: string; theme: UserBookCoverTheme }> = [
+  { theme: 'ink', bg: '#14112B', color: '#C8FF3D' },
+  { theme: 'violet', bg: '#6C4DFF', color: '#FFFFFF' },
+  { theme: 'lime', bg: '#C8FF3D', color: '#14112B' },
+  { theme: 'lilac', bg: '#EFEBFF', color: '#14112B' },
+];
+
+export const UserBookCover: React.FC<UserBookCoverProps> = ({
+  title,
+  coverImageUrl,
+  theme,
+  themeIndex = 0,
+  size = 'catalog',
+  className = '',
+  style = {},
+}) => {
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
+
+  const effectiveCoverUrl = (() => {
+    if (coverImageUrl && !failedUrls.has(coverImageUrl)) {
+      return coverImageUrl;
+    }
+    if (!failedUrls.has(DEFAULT_BOOK_COVER_URL)) {
+      return DEFAULT_BOOK_COVER_URL;
+    }
+    return null;
+  })();
+
+  const handleImageError = () => {
+    if (effectiveCoverUrl) {
+      setFailedUrls((prev) => new Set(prev).add(effectiveCoverUrl));
+    }
+  };
+
+  const activePair = theme
+    ? COLOR_PAIRS.find((p) => p.theme === theme) || COLOR_PAIRS[0]
+    : COLOR_PAIRS[Math.abs(themeIndex) % COLOR_PAIRS.length];
+
+  const getSizeStyles = (): {
+    width?: string;
+    height: string;
+    borderRadius: string;
+    fontSize: string;
+    padding: string;
+  } => {
+    switch (size) {
+      case 'sm':
+        return {
+          width: '56px',
+          height: '76px',
+          borderRadius: '12px',
+          fontSize: '11px',
+          padding: '6px',
+        };
+      case 'md':
+        return {
+          width: '72px',
+          height: '100px',
+          borderRadius: '14px',
+          fontSize: '13px',
+          padding: '8px',
+        };
+      case 'lg':
+        return {
+          width: '96px',
+          height: '132px',
+          borderRadius: '16px',
+          fontSize: '15px',
+          padding: '12px',
+        };
+      case 'catalog':
+      default:
+        return {
+          width: '100%',
+          height: '170px',
+          borderRadius: '0px',
+          fontSize: '26px',
+          padding: '20px',
+        };
+    }
+  };
+
+  const dim = getSizeStyles();
+  const isSmall = size !== 'catalog';
+
+  if (effectiveCoverUrl) {
+    return (
+      <div
+        className={`user-book-cover user-no-select ${className}`}
+        style={{
+          width: dim.width,
+          height: dim.height,
+          borderRadius: dim.borderRadius,
+          border: isSmall ? '2px solid #14112B' : 'none',
+          boxSizing: 'border-box',
+          backgroundColor: activePair.bg,
+          overflow: 'hidden',
+          position: 'relative',
+          flexShrink: 0,
+          ...style,
+        }}
+      >
+        <img
+          src={effectiveCoverUrl}
+          alt={title}
+          onError={handleImageError}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+            borderRadius: 'inherit',
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`user-book-cover user-no-select ${className}`}
+      style={{
+        width: dim.width,
+        height: dim.height,
+        borderRadius: dim.borderRadius,
+        border: isSmall ? '2px solid #14112B' : 'none',
+        backgroundColor: activePair.bg,
+        color: activePair.color,
+        padding: dim.padding,
+        boxSizing: 'border-box',
+        display: 'flex',
+        alignItems: 'flex-end',
+        overflow: 'hidden',
+        flexShrink: 0,
+        fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
+        fontWeight: 800,
+        fontSize: dim.fontSize,
+        lineHeight: 1,
+        letterSpacing: '-0.03em',
+        wordBreak: 'break-word',
+        ...style,
+      }}
+    >
+      <span
+        style={{
+          display: '-webkit-box',
+          WebkitLineClamp: size === 'catalog' ? 2 : 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}
+      >
+        {title}
+      </span>
+    </div>
+  );
+};

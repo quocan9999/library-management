@@ -29,7 +29,7 @@ class PermissionDependencyRegistryTests {
         assertThat(registry.requiredPermissionsFor(List.of("borrow:cancel-own", "borrow:renew")))
                 .containsExactly("borrow:read-own");
         assertThat(registry.requiredPermissionsFor(List.of(
-                "borrow:prepare", "borrow:cancel", "borrow:fee-confirm")))
+                "borrow:prepare", "borrow:cancel", "borrow:fee-confirm", "borrow:return")))
                 .containsExactly("borrow:read");
     }
 

@@ -10,11 +10,13 @@ import { SessionTabSync } from '../auth/SessionTabSync';
 import { readRegistrationEmail } from '../auth/registrationStorage';
 import { DefaultAccountRoute, RequirePermission, RequireRole } from '../auth/permissions';
 import { AdminLayout } from '../components/AdminLayout';
+import { UserLayout } from '../components/user';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { RoleManagementPage } from '../role/RoleManagementPage';
+import { RolePermissionDetailPage } from '../role/RolePermissionDetailPage';
 import { AuthorizationLandingPage } from '../role/AuthorizationPages';
 import { AdminAccountAssignmentPage, AdminAccountManagementPage } from '../features/adminAccounts/AdminAccountDirectory';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
@@ -31,6 +33,7 @@ import { CatalogDetailPage, CatalogPage } from '../features/borrow/CatalogPage';
 import { LibrarianBorrowRequestsPage } from '../features/borrow/LibrarianBorrowRequestsPage';
 import { MyLoansPage } from '../features/borrow/MyLoansPage';
 import { BorrowPaymentPage } from '../features/borrow/BorrowPaymentPage';
+import { SystemConfigPage } from '../features/systemConfig/SystemConfigPage';
 
 function SessionBootstrap() {
   return (
@@ -64,6 +67,11 @@ function RequireAuthFlow({ children, registration = false }: { children: React.R
       || (location.pathname === '/verify-email' && typeof state?.verificationRequestKey === 'string');
   if (isBootstrapping) return <SessionBootstrap />;
   return hasFlow ? children : <Navigate to={accessToken ? '/' : '/login'} replace />;
+}
+
+function ProfileShellLayout() {
+  const { role } = useAuth();
+  return role === 'USER' ? <UserLayout /> : <AdminLayout />;
 }
 
 function CapabilityRouteSync() {
@@ -166,14 +174,50 @@ export function App() {
         <Route path="/verify-email" element={<RequireAuthFlow><VerifyEmailPage /></RequireAuthFlow>} />
         <Route path="/403" element={<ForbiddenPage />} />
         <Route
+          element={
+            <RequireAuthentication>
+              <UserLayout />
+            </RequireAuthentication>
+          }
+        >
+          <Route
+            path="books"
+            element={
+              <RequirePermission permission="book:read" allowedRoles={['USER']}>
+                <CatalogPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="books/:id"
+            element={
+              <RequirePermission permission="book:read" allowedRoles={['USER']}>
+                <CatalogDetailPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="my-loans"
+            element={
+              <RequirePermission permission="borrow:read-own" allowedRoles={['USER']}>
+                <MyLoansPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="borrow-payment/:loanCode"
+            element={
+              <RequirePermission permission="borrow:read-own" allowedRoles={['USER']}>
+                <BorrowPaymentPage />
+              </RequirePermission>
+            }
+          />
+        </Route>
+        <Route
           path="/"
           element={<RequireAuthentication><AdminLayout /></RequireAuthentication>}
         >
           <Route index element={<DefaultAccountRoute />} />
-          <Route path="books" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogPage /></RequirePermission>} />
-          <Route path="books/:id" element={<RequirePermission permission="book:read" allowedRoles={['USER']}><CatalogDetailPage /></RequirePermission>} />
-          <Route path="my-loans" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><MyLoansPage /></RequirePermission>} />
-          <Route path="borrow-payment/:loanCode" element={<RequirePermission permission="borrow:read-own" allowedRoles={['USER']}><BorrowPaymentPage /></RequirePermission>} />
           <Route path="librarian/borrow-requests" element={<RequirePermission permission="borrow:read" deniedRoles={['USER']}><LibrarianBorrowRequestsPage /></RequirePermission>} />
           <Route path="admin/roles" element={<RequireRole role="ADMIN"><Navigate to="/admin/authorization/groups" replace /></RequireRole>} />
           <Route path="admin/authorization" element={<RequireRole role="ADMIN"><AuthorizationLandingPage /></RequireRole>} />
@@ -181,6 +225,13 @@ export function App() {
             <RequireRole role="ADMIN">
               <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
                 <RoleManagementPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
+          <Route path="admin/authorization/groups/:roleCode" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
+                <RolePermissionDetailPage />
               </RequirePermission>
             </RequireRole>
           } />
@@ -195,6 +246,13 @@ export function App() {
             <RequireRole role="ADMIN">
               <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
                 <AdminAccountAssignmentPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
+          <Route path="admin/system-config" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="config:read" allowedRoles={['ADMIN']}>
+                <SystemConfigPage />
               </RequirePermission>
             </RequireRole>
           } />
@@ -230,6 +288,14 @@ export function App() {
               </RequirePermission>
             }
           />
+        </Route>
+        <Route
+          element={
+            <RequireAuthentication>
+              <ProfileShellLayout />
+            </RequireAuthentication>
+          }
+        >
           <Route
             path="profile"
             element={<ProfilePage />}
