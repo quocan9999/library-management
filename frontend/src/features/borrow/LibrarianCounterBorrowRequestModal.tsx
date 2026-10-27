@@ -140,7 +140,6 @@ export function LibrarianCounterBorrowRequestModal({ open, onClose, onCreated }:
     onOk={() => { void submit(); }}
   >
     <div className="librarian-counter-create">
-      <Alert showIcon type="info" title="Yêu cầu được lưu ngay khi tạo. Có thể đóng chi tiết và tìm lại trong danh sách để tiếp tục chuẩn bị, thu phí tại quầy và bàn giao." />
       <label htmlFor="counter-member-search">Thành viên</label>
       <Select
         id="counter-member-search"

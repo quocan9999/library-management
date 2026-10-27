@@ -4,7 +4,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import { formatVnd } from '../books/formatting';
 import type { BorrowItem, StaffBorrowRequest } from './types';
 import {
-  getRequestDisplayStatuses,
   formatDeskDate,
   getReadyItems,
   getRequestFeeTotal,
@@ -131,13 +130,7 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
     onCancel={props.onClose}
     afterOpenChange={(open) => { if (open) closeButtonRef.current?.focus(); }}
     title={<div className="librarian-borrow-modal__title">
-      <div>
-        <Typography.Title level={4} id="librarian-borrow-request-title">
-          {request?.loanCode ?? 'Chi tiết yêu cầu mượn'}
-        </Typography.Title>
-        {request && getRequestDisplayStatuses(request).map((status) =>
-          <Tag key={status} color={statusTagColor(status)}>{ITEM_STATUS_LABELS[status]}</Tag>)}
-      </div>
+      <span className="sr-only">{request?.loanCode ?? 'Chi tiết yêu cầu mượn'}</span>
       <Button ref={closeButtonRef} aria-label="Đóng chi tiết yêu cầu" onClick={props.onClose}>Đóng</Button>
     </div>}
     footer={request ? <div className="librarian-borrow-modal__footer">
@@ -155,7 +148,7 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
             checked={physicalBookReceived}
             onChange={(e) => setPhysicalBookReceived(e.target.checked)}
           >
-            <strong>Xác nhận đã nhận sách vật lý tại quầy từ độc giả (Bắt buộc)</strong>
+            <strong>Xác nhận đã nhận sách vật lý tại quầy từ độc giả</strong>
           </Checkbox>
           {hasSelectedOverdue && (
             <Checkbox
@@ -307,7 +300,7 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
                         Quá hạn {returnItemsOverdueMap.get(item.id)!.overdueDays} ngày · Phạt: {formatVnd(returnItemsOverdueMap.get(item.id)!.calculatedLateFee)}
                       </Tag>
                     ) : (
-                      <Tag color="success" style={{ marginLeft: '8px' }}>Đúng hạn</Tag>
+                      <Tag color="success" style={{ marginLeft: '8px' }}>Còn hạn</Tag>
                     )}
                   </div>
                 )}

@@ -3682,6 +3682,8 @@ input:focus-visible,
 .librarian-borrow-modal .ant-modal-header {
   flex: 0 0 auto;
   border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+  margin-bottom: 0;
 }
 
 .librarian-borrow-modal .ant-modal-body {
@@ -3689,25 +3691,23 @@ input:focus-visible,
   overflow-y: auto;
 }
 
-.librarian-borrow-modal__title,
-.librarian-borrow-modal__title > div:first-child {
+.librarian-borrow-modal__title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
+  width: 100%;
 }
 
-.librarian-borrow-modal__title > div:first-child {
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.librarian-borrow-modal__title {
-  justify-content: space-between;
-}
-
-.librarian-borrow-modal__title h4 {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .librarian-borrow-modal__body {

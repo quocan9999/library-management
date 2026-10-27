@@ -32,6 +32,5 @@ export function LibrarianBorrowLookup({ value, loading, onChange, onSearch }: Li
     />
     <Button type="primary" loading={loading} onClick={onSearch}>Tra cứu</Button>
     </div>
-    <p>Tra cứu bằng QR hoặc tìm theo mã yêu cầu, mã/họ tên thành viên. QR không thay thế xác minh danh tính tại quầy.</p>
   </div>;
 }
