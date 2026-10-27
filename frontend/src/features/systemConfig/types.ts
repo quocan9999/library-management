@@ -10,18 +10,13 @@ export interface SystemConfigHistoryItem {
 export interface SystemConfigData {
   id: number;
   maintenanceMode: boolean;
-  bannerMessage: string | null;
-  contactEmail: string | null;
   expectedEndTime: string | null;
   updatedAt: string;
-  bypassRoles: string[];
   recentHistories: SystemConfigHistoryItem[];
 }
 
 export interface UpdateMaintenancePayload {
   maintenanceMode: boolean;
   reason?: string;
-  bannerMessage?: string;
-  contactEmail?: string;
   expectedEndTime?: string | null;
 }

@@ -28,12 +28,6 @@ public class SystemMaintenanceDetail {
     @JoinColumn(name = "system_config_id", nullable = false, unique = true)
     private SystemConfig systemConfig;
 
-    @Column(name = "banner_message", length = 500)
-    private String bannerMessage;
-
-    @Column(name = "contact_email", length = 255)
-    private String contactEmail;
-
     @Column(name = "expected_end_time")
     private LocalDateTime expectedEndTime;
 

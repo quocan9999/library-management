@@ -15,6 +15,16 @@ function formatTimestamp(value?: string | null): string {
   }).format(date);
 }
 
+function getMinLocalDateTime(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export function SystemConfigPage() {
   const { notify } = useAppNotification();
   const [config, setConfig] = useState<SystemConfigData | null>(null);
@@ -25,8 +35,6 @@ export function SystemConfigPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [pendingMode, setPendingMode] = useState(false);
   const [reason, setReason] = useState('');
-  const [bannerMessage, setBannerMessage] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
   const [expectedEndTime, setExpectedEndTime] = useState('');
 
   const fetchConfig = useCallback(async (signal?: AbortSignal) => {
@@ -34,8 +42,6 @@ export function SystemConfigPage() {
     try {
       const data = await systemConfigApi.getSystemConfig(signal);
       setConfig(data);
-      setBannerMessage(data.bannerMessage ?? '');
-      setContactEmail(data.contactEmail ?? '');
       setExpectedEndTime(data.expectedEndTime ? data.expectedEndTime.slice(0, 16) : '');
     } catch (error) {
       if (!signal?.aborted) {
@@ -61,20 +67,44 @@ export function SystemConfigPage() {
   const handleToggleSwitch = (checked: boolean) => {
     setPendingMode(checked);
     setReason('');
+    if (!checked) {
+      setExpectedEndTime('');
+    } else {
+      if (config?.expectedEndTime && new Date(config.expectedEndTime).getTime() > Date.now()) {
+        setExpectedEndTime(config.expectedEndTime.slice(0, 16));
+      } else {
+        setExpectedEndTime('');
+      }
+    }
     setModalOpen(true);
   };
 
   const handleConfirmUpdate = async () => {
+    if (pendingMode && expectedEndTime) {
+      const selectedTime = new Date(expectedEndTime).getTime();
+      if (Number.isNaN(selectedTime) || selectedTime <= Date.now()) {
+        notify('error', {
+          key: 'config-invalid-end-time',
+          title: 'Thời gian không hợp lệ',
+          description: 'Thời gian dự kiến hoàn thành phải ở tương lai.',
+        });
+        return;
+      }
+    }
+
     setUpdating(true);
     try {
+      const payloadExpectedEndTime = pendingMode && expectedEndTime
+        ? (expectedEndTime.length === 16 ? `${expectedEndTime}:00` : expectedEndTime)
+        : null;
+
       const updated = await systemConfigApi.updateMaintenanceMode({
         maintenanceMode: pendingMode,
         reason: reason.trim() || (pendingMode ? 'Bật chế độ bảo trì hệ thống' : 'Tắt chế độ bảo trì hệ thống'),
-        bannerMessage: bannerMessage.trim() || undefined,
-        contactEmail: contactEmail.trim() || undefined,
-        expectedEndTime: expectedEndTime ? new Date(expectedEndTime).toISOString() : null,
+        expectedEndTime: payloadExpectedEndTime,
       });
       setConfig(updated);
+      setExpectedEndTime(updated.expectedEndTime ? updated.expectedEndTime.slice(0, 16) : '');
       setModalOpen(false);
       notify('success', {
         key: 'config-update-success',
@@ -164,10 +194,10 @@ export function SystemConfigPage() {
         </div>
       </header>
 
+      {/* Main Content */}
       {loading ? (
         <div className="system-config-loading">
-          <Spin size="large" />
-          <span>Đang đồng bộ cấu hình hệ thống…</span>
+          <Spin size="large" description="Đang tải dữ liệu cấu hình..." />
         </div>
       ) : (
         <div className="system-config-content">
@@ -179,15 +209,15 @@ export function SystemConfigPage() {
                   Chế độ bảo trì (Maintenance Mode)
                 </h2>
                 <p className="config-panel__desc">
-                  Khi kích hoạt, hệ thống sẽ chặn tất cả các yêu cầu gọi API từ độc giả để đảm bảo an toàn dữ liệu khi nâng cấp.
+                  Khi kích hoạt, hệ thống sẽ tạm khóa các luồng nghiệp vụ công khai để đảm bảo an toàn dữ liệu khi nâng cấp.
                 </p>
               </div>
               <div className="config-panel__action">
                 <Switch
                   id="maintenance-toggle-switch"
-                  checked={config?.maintenanceMode}
-                  onChange={handleToggleSwitch}
+                  checked={config?.maintenanceMode ?? false}
                   loading={updating}
+                  onChange={handleToggleSwitch}
                   aria-label="Bật hoặc tắt chế độ bảo trì"
                 />
               </div>
@@ -216,55 +246,10 @@ export function SystemConfigPage() {
                   {formatTimestamp(config?.expectedEndTime)}
                 </span>
               </div>
-              <div className="config-meta-item">
-                <span className="config-meta-item__label">Email liên hệ hỗ trợ</span>
-                <span className="config-meta-item__value">
-                  {config?.contactEmail || 'Chưa thiết lập'}
-                </span>
-              </div>
             </div>
           </section>
 
-          {/* Card 2: Thông báo và Vai trò miễn trừ */}
-          <div className="config-two-columns">
-            <section className="config-panel" aria-labelledby="banner-panel-title">
-              <h2 id="banner-panel-title" className="config-panel__title">
-                Thông điệp thông báo bảo trì
-              </h2>
-              <p className="config-panel__desc">
-                Nội dung hiển thị cho độc giả khi hệ thống đang trong thời gian bảo trì.
-              </p>
-              <div className="config-banner-preview">
-                {config?.bannerMessage ? (
-                  <p>{config.bannerMessage}</p>
-                ) : (
-                  <p className="text-muted italic">Chưa có thông điệp cụ thể (hiển thị thông báo mặc định)</p>
-                )}
-              </div>
-            </section>
-
-            <section className="config-panel" aria-labelledby="bypass-panel-title">
-              <h2 id="bypass-panel-title" className="config-panel__title">
-                Vai trò được miễn trừ (Bypass Roles)
-              </h2>
-              <p className="config-panel__desc">
-                Các tài khoản thuộc nhóm vai trò này vẫn được phép truy cập và quản trị hệ thống khi đang bảo trì.
-              </p>
-              <div className="config-roles-list">
-                {config?.bypassRoles && config.bypassRoles.length > 0 ? (
-                  config.bypassRoles.map((role) => (
-                    <Tag key={role} color="blue" className="config-pill-tag">
-                      {role}
-                    </Tag>
-                  ))
-                ) : (
-                  <Tag color="blue" className="config-pill-tag">ROLE_ADMIN</Tag>
-                )}
-              </div>
-            </section>
-          </div>
-
-          {/* Card 3: Lịch sử thao tác cấu hình */}
+          {/* Card 2: Lịch sử thao tác cấu hình */}
           <section className="config-panel" aria-labelledby="history-panel-title">
             <div className="config-panel__header">
               <div>
@@ -328,52 +313,27 @@ export function SystemConfigPage() {
             </label>
             <Input
               id="config-reason"
-              placeholder="Ví dụ: Nâng cấp máy chủ cơ sở dữ liệu định kỳ"
+              placeholder={pendingMode ? 'Ví dụ: Nâng cấp máy chủ cơ sở dữ liệu định kỳ' : 'Ví dụ: Hoàn tất bảo trì hệ thống'}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               maxLength={255}
             />
           </div>
 
-          <div className="config-form-item">
-            <label htmlFor="config-banner" className="config-form-label">
-              Thông điệp gửi độc giả
-            </label>
-            <Input.TextArea
-              id="config-banner"
-              placeholder="Thông báo hiển thị khi độc giả truy cập"
-              value={bannerMessage}
-              onChange={(e) => setBannerMessage(e.target.value)}
-              rows={3}
-              maxLength={500}
-            />
-          </div>
-
-          <div className="config-form-item">
-            <label htmlFor="config-contact" className="config-form-label">
-              Email hỗ trợ kỹ thuật
-            </label>
-            <Input
-              id="config-contact"
-              type="email"
-              placeholder="admin@library.sparkminds.com"
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              maxLength={255}
-            />
-          </div>
-
-          <div className="config-form-item">
-            <label htmlFor="config-expected-end" className="config-form-label">
-              Thời gian dự kiến hoàn thành
-            </label>
-            <Input
-              id="config-expected-end"
-              type="datetime-local"
-              value={expectedEndTime}
-              onChange={(e) => setExpectedEndTime(e.target.value)}
-            />
-          </div>
+          {pendingMode && (
+            <div className="config-form-item">
+              <label htmlFor="config-expected-end" className="config-form-label">
+                Thời gian dự kiến hoàn thành
+              </label>
+              <Input
+                id="config-expected-end"
+                type="datetime-local"
+                min={getMinLocalDateTime()}
+                value={expectedEndTime}
+                onChange={(e) => setExpectedEndTime(e.target.value)}
+              />
+            </div>
+          )}
         </div>
       </Modal>
     </div>

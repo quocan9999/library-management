@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 041-simplify-system-config
+      author: quocan9999
+
+      changes:
+        # 1. Xóa bảng liên kết vai trò miễn trừ dư thừa (không cần thiết vì chỉ có ADMIN được bypass)
+        - dropTable:
+            tableName: system_config_bypass_roles
+
+        # 2. Bỏ cột banner_message vì không còn cơ chế thông điệp bảo trì cho độc giả
+        - dropColumn:
+            tableName: system_maintenance_details
+            columnName: banner_message
+
+        # 3. Bỏ cột contact_email
+        - dropColumn:
+            tableName: system_maintenance_details
+            columnName: contact_email
+
+      rollback:
+        - addColumn:
+            tableName: system_maintenance_details
+            columns:
+              - column:
+                  name: banner_message
+                  type: VARCHAR(500)
+              - column:
+                  name: contact_email
+                  type: VARCHAR(255)

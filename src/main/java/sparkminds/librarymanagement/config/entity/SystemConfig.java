@@ -6,20 +6,14 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import sparkminds.librarymanagement.auth.entity.Role;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Thực thể cấu hình chung của hệ thống.
- * Áp dụng đầy đủ các quan hệ Hibernate:
- * - @OneToOne: SystemMaintenanceDetail (thông tin chi tiết bảo trì)
- * - @OneToMany: SystemConfigHistory (danh sách lịch sử cập nhật cấu hình)
- * - @ManyToMany: Role (danh sách các vai trò được miễn trừ chặn khi bảo trì)
+ * Quan hệ 1-1 (@OneToOne) với SystemMaintenanceDetail.
  */
 @Getter
 @Setter
@@ -39,14 +33,6 @@ public class SystemConfig {
 
     @OneToMany(mappedBy = "systemConfig", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SystemConfigHistory> histories = new ArrayList<>();
-
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "system_config_bypass_roles",
-            joinColumns = @JoinColumn(name = "system_config_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
-    private Set<Role> bypassRoles = new HashSet<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

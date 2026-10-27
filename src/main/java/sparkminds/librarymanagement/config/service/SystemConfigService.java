@@ -8,7 +8,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.auth.entity.Account;
-import sparkminds.librarymanagement.auth.entity.Role;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.config.dto.SystemConfigHistoryResponse;
@@ -19,12 +18,10 @@ import sparkminds.librarymanagement.config.entity.SystemConfigHistory;
 import sparkminds.librarymanagement.config.entity.SystemMaintenanceDetail;
 import sparkminds.librarymanagement.config.repository.SystemConfigHistoryRepository;
 import sparkminds.librarymanagement.config.repository.SystemConfigRepository;
+import sparkminds.librarymanagement.config.repository.SystemMaintenanceDetailRepository;
 
-import java.util.Collections;
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Service quản lý cấu hình hệ thống và chế độ bảo trì.
@@ -36,35 +33,22 @@ import java.util.stream.Collectors;
 public class SystemConfigService {
 
     private static final Byte DEFAULT_CONFIG_ID = (byte) 1;
-    private static final String DEFAULT_MAINTENANCE_MESSAGE = "Hệ thống đang trong chế độ bảo trì. Vui lòng quay lại sau.";
+    private static final String DEFAULT_MAINTENANCE_MESSAGE = "Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.";
 
     private final SystemConfigRepository systemConfigRepository;
     private final SystemConfigHistoryRepository systemConfigHistoryRepository;
     private final AccountRepository accountRepository;
+    private final SystemMaintenanceDetailRepository systemMaintenanceDetailRepository;
 
     /** Cờ bộ nhớ đệm phục vụ kiểm tra tức thời tại AOP mà không gây tải cho Database. */
     private volatile boolean cachedMaintenanceMode = false;
-    private volatile String cachedMaintenanceMessage = DEFAULT_MAINTENANCE_MESSAGE;
-    private final Set<String> cachedBypassRoles = ConcurrentHashMap.newKeySet();
 
     @PostConstruct
     public void initCache() {
         try {
-            systemConfigRepository.findByIdWithDetails(DEFAULT_CONFIG_ID).ifPresent(config -> {
+            systemConfigRepository.findById(DEFAULT_CONFIG_ID).ifPresent(config -> {
                 this.cachedMaintenanceMode = config.isMaintenanceMode();
-                if (config.getMaintenanceDetail() != null && config.getMaintenanceDetail().getBannerMessage() != null) {
-                    this.cachedMaintenanceMessage = config.getMaintenanceDetail().getBannerMessage();
-                } else {
-                    this.cachedMaintenanceMessage = DEFAULT_MAINTENANCE_MESSAGE;
-                }
-                this.cachedBypassRoles.clear();
-                if (config.getBypassRoles() != null) {
-                    this.cachedBypassRoles.addAll(
-                            config.getBypassRoles().stream().map(Role::getCode).collect(Collectors.toSet())
-                    );
-                }
-                log.info("SystemConfig initialized: maintenanceMode={}, bypassRoles={}",
-                        cachedMaintenanceMode, cachedBypassRoles);
+                log.info("SystemConfig initialized: maintenanceMode={}", cachedMaintenanceMode);
             });
         } catch (Exception ex) {
             log.error("Failed to load initial system config into memory cache", ex);
@@ -79,28 +63,23 @@ public class SystemConfigService {
     }
 
     /**
-     * Lấy thông điệp bảo trì hiện tại từ bộ nhớ đệm.
+     * Lấy thông điệp bảo trì hệ thống.
      */
     public String getMaintenanceMessage() {
-        return cachedMaintenanceMessage != null && !cachedMaintenanceMessage.isBlank()
-                ? cachedMaintenanceMessage
-                : DEFAULT_MAINTENANCE_MESSAGE;
+        return DEFAULT_MAINTENANCE_MESSAGE;
     }
 
     /**
      * Kiểm tra vai trò có thuộc danh sách miễn trừ (bypass) hay không.
+     * Chỉ vai trò ADMIN được phép quản trị và truy cập khi bảo trì.
      */
     public boolean isBypassedRole(String roleCode) {
         if (roleCode == null) return false;
-        // ROLE_ADMIN luôn luôn được bypass
-        if ("ROLE_ADMIN".equalsIgnoreCase(roleCode) || "ADMIN".equalsIgnoreCase(roleCode)) {
-            return true;
-        }
-        return cachedBypassRoles.contains(roleCode);
+        return "ROLE_ADMIN".equalsIgnoreCase(roleCode) || "ADMIN".equalsIgnoreCase(roleCode);
     }
 
     /**
-     * Lấy cấu hình hệ thống hiện tại kèm chi tiết và lịch sử mới nhất.
+     * Lấy cấu hình hệ thống hiện tại kèm lịch sử mới nhất.
      */
     @Transactional(readOnly = true)
     public SystemConfigResponse getSystemConfig() {
@@ -133,7 +112,6 @@ public class SystemConfigService {
         boolean newMode = Boolean.TRUE.equals(request.maintenanceMode());
         config.setMaintenanceMode(newMode);
 
-        // Cập nhật thông tin @OneToOne SystemMaintenanceDetail
         SystemMaintenanceDetail detail = config.getMaintenanceDetail();
         if (detail == null) {
             detail = new SystemMaintenanceDetail();
@@ -141,17 +119,22 @@ public class SystemConfigService {
             config.setMaintenanceDetail(detail);
         }
 
-        if (request.bannerMessage() != null) {
-            detail.setBannerMessage(request.bannerMessage());
-        }
-        if (request.contactEmail() != null) {
-            detail.setContactEmail(request.contactEmail());
-        }
-        if (request.expectedEndTime() != null) {
-            detail.setExpectedEndTime(request.expectedEndTime());
+        if (newMode) {
+            if (request.expectedEndTime() != null) {
+                if (!request.expectedEndTime().isAfter(LocalDateTime.now())) {
+                    throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_EXPECTED_END_TIME", "Thời gian dự kiến hoàn thành phải ở tương lai");
+                }
+                detail.setExpectedEndTime(request.expectedEndTime());
+            } else {
+                detail.setExpectedEndTime(null);
+            }
+        } else {
+            // Khi tắt chế độ bảo trì, thời gian dự kiến kết thúc được xóa (reset về null)
+            detail.setExpectedEndTime(null);
         }
 
         systemConfigRepository.save(config);
+        systemMaintenanceDetailRepository.save(detail);
 
         // Ghi lại lịch sử @ManyToOne SystemConfigHistory
         Account actor = actorAccountId != null ? accountRepository.findById(actorAccountId).orElse(null) : null;
@@ -160,26 +143,14 @@ public class SystemConfigService {
         history.setAccount(actor);
         history.setAction(newMode ? "MAINTENANCE_ENABLED" : "MAINTENANCE_DISABLED");
         history.setReason(request.reason() != null && !request.reason().isBlank() ? request.reason() : "Không ghi rõ lý do");
-        history.setDetail(String.format("Chuyển trạng thái từ %s sang %s. Thông báo: %s",
+        history.setDetail(String.format("Chuyển trạng thái từ %s sang %s",
                 previousMode ? "BẬT" : "TẮT",
-                newMode ? "BẬT" : "TẮT",
-                detail.getBannerMessage() != null ? detail.getBannerMessage() : "Mặc định"));
+                newMode ? "BẬT" : "TẮT"));
 
         systemConfigHistoryRepository.save(history);
 
         // Đồng bộ cache bộ nhớ đệm
         this.cachedMaintenanceMode = newMode;
-        if (detail.getBannerMessage() != null && !detail.getBannerMessage().isBlank()) {
-            this.cachedMaintenanceMessage = detail.getBannerMessage();
-        } else {
-            this.cachedMaintenanceMessage = DEFAULT_MAINTENANCE_MESSAGE;
-        }
-        if (config.getBypassRoles() != null) {
-            this.cachedBypassRoles.clear();
-            this.cachedBypassRoles.addAll(
-                    config.getBypassRoles().stream().map(Role::getCode).collect(Collectors.toSet())
-            );
-        }
 
         log.info("Maintenance mode updated successfully: maintenanceMode={}, updatedBy={}",
                 newMode, actor != null ? actor.getUsername() : "SYSTEM");
@@ -196,18 +167,11 @@ public class SystemConfigService {
 
     private SystemConfigResponse toConfigResponse(SystemConfig config, List<SystemConfigHistoryResponse> recentHistories) {
         SystemMaintenanceDetail detail = config.getMaintenanceDetail();
-        Set<String> bypassRoleCodes = config.getBypassRoles() != null
-                ? config.getBypassRoles().stream().map(Role::getCode).collect(Collectors.toSet())
-                : Collections.emptySet();
-
         return new SystemConfigResponse(
-                config.getId(),
+                (int) config.getId(),
                 config.isMaintenanceMode(),
-                detail != null ? detail.getBannerMessage() : null,
-                detail != null ? detail.getContactEmail() : null,
                 detail != null ? detail.getExpectedEndTime() : null,
                 config.getUpdatedAt(),
-                bypassRoleCodes,
                 recentHistories
         );
     }
