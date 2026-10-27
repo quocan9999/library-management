@@ -1430,6 +1430,37 @@ input:focus-visible,
   color: var(--navy);
 }
 
+.role-detail-nav {
+  margin-bottom: 16px;
+}
+
+.role-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.role-detail-meta .role-version {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.role-workspace .role-readonly-note {
+  border-top: 1px solid var(--line);
+  border-radius: 6px;
+  margin-top: 16px;
+}
+
+.role-permission-tabs {
+  margin-top: 20px;
+}
+
+.role-permission-tabs .ant-tabs-nav {
+  margin-bottom: 20px;
+}
+
 .permission-groups {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

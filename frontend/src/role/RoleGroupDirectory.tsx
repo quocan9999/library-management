@@ -2,6 +2,7 @@ import { Alert, Button, Checkbox, Input, Modal, Select, Spin, Table, Tag, Toolti
 import type { TableColumnsType } from 'antd';
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../auth/messages';
 import { useAppNotification } from '../components/AppNotificationProvider';
@@ -59,9 +60,14 @@ export function RoleGroupDirectory({
   onSelectPermissions,
   onRolesChanged,
 }: {
-  onSelectPermissions: (roleCode: string) => void;
-  onRolesChanged: () => void;
-}) {
+  onSelectPermissions?: (roleCode: string) => void;
+  onRolesChanged?: () => void;
+} = {}) {
+  const navigate = useNavigate();
+  const handleOpenPermissions = (roleCode: string) => {
+    onSelectPermissions?.(roleCode);
+    navigate(`/admin/authorization/groups/${encodeURIComponent(roleCode)}`);
+  };
   const { currentUser, refreshCapabilities } = useAuth();
   const { notify } = useAppNotification();
   const canManage = currentUser?.role === 'ADMIN' && currentUser.permissions.includes('role:update');
@@ -197,7 +203,7 @@ export function RoleGroupDirectory({
   };
   const afterRolesChanged = () => {
     refreshList();
-    onRolesChanged();
+    onRolesChanged?.();
   };
 
   const resetCreateForm = () => {
@@ -314,7 +320,7 @@ export function RoleGroupDirectory({
       setCreateOpen(false);
       notify('success', { title: 'Tạo nhóm thành công', description: `Đã tạo nhóm ${result.displayName}.` });
       afterRolesChanged();
-      onSelectPermissions(result.code);
+      handleOpenPermissions(result.code);
     } catch (error) {
       if (statusOf(error) === 403) {
         setCreateValidation('Quyền quản trị đã thay đổi. Chưa tạo nhóm; phiên quyền đang được đồng bộ lại.');
@@ -420,14 +426,14 @@ export function RoleGroupDirectory({
       key: 'actions',
       width: 260,
       render: (_value, role) => {
-        if (role.code === 'ADMIN') return <Button type="link" onClick={() => onSelectPermissions(role.code)}>Xem quyền</Button>;
+        if (role.code === 'ADMIN') return <Button type="link" onClick={() => handleOpenPermissions(role.code)}>Xem quyền</Button>;
         if (!role.enabled) {
           return role.code !== 'USER'
             ? <Button type="link" disabled={!canManage} onClick={() => { setStatusTarget(role); setStatusError(null); }}>Kích hoạt</Button>
-            : <Button type="link" onClick={() => onSelectPermissions(role.code)}>Xem quyền</Button>;
+            : <Button type="link" onClick={() => handleOpenPermissions(role.code)}>Xem quyền</Button>;
         }
         return <div className="role-directory-actions">
-          <Button type="link" onClick={() => onSelectPermissions(role.code)}>
+          <Button type="link" onClick={() => handleOpenPermissions(role.code)}>
             {canManage && role.canEdit ? 'Phân quyền' : 'Xem quyền'}
           </Button>
           {canManage && role.canEdit && <Button type="link" onClick={() => openMetadata(role)}>Sửa thông tin</Button>}

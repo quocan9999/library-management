@@ -16,6 +16,7 @@ import { RegisterPage } from '../pages/RegisterPage';
 import { CheckEmailPage } from '../pages/CheckEmailPage';
 import { VerifyEmailPage } from '../pages/VerifyEmailPage';
 import { RoleManagementPage } from '../role/RoleManagementPage';
+import { RolePermissionDetailPage } from '../role/RolePermissionDetailPage';
 import { AuthorizationLandingPage } from '../role/AuthorizationPages';
 import { AdminAccountAssignmentPage, AdminAccountManagementPage } from '../features/adminAccounts/AdminAccountDirectory';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
@@ -224,6 +225,13 @@ export function App() {
             <RequireRole role="ADMIN">
               <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
                 <RoleManagementPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
+          <Route path="admin/authorization/groups/:roleCode" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
+                <RolePermissionDetailPage />
               </RequirePermission>
             </RequireRole>
           } />
