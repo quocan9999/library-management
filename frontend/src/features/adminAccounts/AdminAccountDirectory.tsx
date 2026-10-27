@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../../auth/messages';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { roleApi } from '../../role/api';
 import type { RoleSummary } from '../../role/types';
@@ -95,7 +96,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
   const canManage = role === 'ADMIN' && currentUser?.permissions.includes('role:update');
   const [roles, setRoles] = useState<RoleSummary[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
-  const [rolesError, setRolesError] = useState(false);
+  const [rolesError, setRolesError] = useState<{ failed: boolean; isMaintenance?: boolean }>({ failed: false });
   const [rolesReloadKey, setRolesReloadKey] = useState(0);
   const [filters, setFilters] = useState<FilterState>({
     username: '', email: '', roleCode: '', enabled: 'all', emailVerified: 'all',
@@ -105,7 +106,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
   const [sort, setSort] = useState<SortState>({ field: 'createdAt', direction: 'desc' });
   const [reloadKey, setReloadKey] = useState(0);
   const [result, setResult] = useState<{ key: string; page: AdminAccountPage } | null>(null);
-  const [request, setRequest] = useState<{ key: string; state: 'success' | 'error' } | null>(null);
+  const [request, setRequest] = useState<{ key: string; state: 'success' | 'error'; isMaintenance?: boolean } | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
@@ -169,7 +170,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     let current = true;
     void roleApi.getRoles()
       .then((items) => { if (current) setRoles(items); })
-      .catch(() => { if (current) setRolesError(true); })
+      .catch((err: unknown) => { if (current) setRolesError({ failed: true, isMaintenance: isMaintenanceError(err) }); })
       .finally(() => { if (current) setRolesLoading(false); });
     return () => { current = false; };
   }, [rolesReloadKey]);
@@ -187,7 +188,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
           setPageNumber(filteredPage.totalPages - 1);
         }
       })
-      .catch(() => { if (current) setRequest({ key: requestKey, state: 'error' }); })
+      .catch((err: unknown) => { if (current) setRequest({ key: requestKey, state: 'error', isMaintenance: isMaintenanceError(err) }); })
       .finally(() => undefined);
     return () => {
       current = false;
@@ -197,7 +198,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
 
   const refresh = useCallback(() => setReloadKey((value) => value + 1), []);
   const refreshRoles = useCallback(() => {
-    setRolesError(false);
+    setRolesError({ failed: false });
     setRolesLoading(true);
     setRolesReloadKey((value) => value + 1);
   }, []);
@@ -308,11 +309,13 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     try {
       setDetailTarget(await adminAccountApi.get(account.id));
     } catch (detailFailure) {
-      const message = statusOf(detailFailure) === 404
-        ? 'Tài khoản không còn tồn tại. Danh sách đang được tải lại.'
-        : statusOf(detailFailure) === 403
-          ? 'Phiên quản trị không còn quyền xem tài khoản này.'
-          : 'Không thể tải chi tiết tài khoản. Vui lòng thử lại.';
+      const message = isMaintenanceError(detailFailure)
+        ? MAINTENANCE_MESSAGE
+        : statusOf(detailFailure) === 404
+          ? 'Tài khoản không còn tồn tại. Danh sách đang được tải lại.'
+          : statusOf(detailFailure) === 403
+            ? 'Phiên quản trị không còn quyền xem tài khoản này.'
+            : 'Không thể tải chi tiết tài khoản. Vui lòng thử lại.';
       setDetailError(message);
       if (statusOf(detailFailure) === 404 || statusOf(detailFailure) === 403) refresh();
     } finally {
@@ -547,18 +550,18 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
               ? 'Tìm và quản lý tài khoản có quyền quản trị thư viện.'
               : 'Chọn tài khoản quản trị và chuyển sang nhóm đang hoạt động.'}</p>
           </div>
-          {mode === 'management' && canManage && <Button type="primary" onClick={() => setCreateOpen(true)} disabled={rolesLoading || rolesError}>
+          {mode === 'management' && canManage && <Button type="primary" onClick={() => setCreateOpen(true)} disabled={rolesLoading || rolesError.failed}>
             Tạo tài khoản quản trị
           </Button>}
         </div>
 
-        {rolesError && <Alert
+        {rolesError.failed && <Alert
           className="admin-account-alert"
           type="error"
           showIcon
           role="alert"
-          title="Không thể tải danh sách nhóm quyền"
-          description="Danh sách tài khoản vẫn được tải; các thao tác cần chọn nhóm quyền sẽ tạm thời bị khóa."
+          title={rolesError.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải danh sách nhóm quyền'}
+          description={rolesError.isMaintenance ? MAINTENANCE_MESSAGE : 'Danh sách tài khoản vẫn được tải; các thao tác cần chọn nhóm quyền sẽ tạm thời bị khóa.'}
           action={<Button onClick={refreshRoles}>Thử lại</Button>}
         />}
 
@@ -626,8 +629,8 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
           type="error"
           showIcon
           role="alert"
-          title="Không thể tải danh sách tài khoản quản trị"
-          description="Hãy kiểm tra kết nối rồi thử tải lại."
+          title={request?.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải danh sách tài khoản quản trị'}
+          description={request?.isMaintenance ? MAINTENANCE_MESSAGE : 'Hãy kiểm tra kết nối rồi thử tải lại.'}
           action={<Button onClick={refresh}>Thử lại</Button>}
         />}
 
@@ -639,7 +642,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
             pagination={false}
             loading={loading ? { indicator: <Spin aria-label="Đang tải tài khoản quản trị" /> } : false}
             onChange={onTableChange}
-            locale={{ emptyText: error ? 'Không thể tải dữ liệu. Hãy thử lại.' : 'Không có tài khoản quản trị phù hợp.' }}
+            locale={{ emptyText: request?.isMaintenance ? MAINTENANCE_MESSAGE : (error ? 'Không thể tải dữ liệu. Hãy thử lại.' : 'Không có tài khoản quản trị phù hợp.') }}
             sortDirections={['ascend', 'descend', 'ascend']}
             showSorterTooltip={false}
             scroll={{ x: 1200 }}

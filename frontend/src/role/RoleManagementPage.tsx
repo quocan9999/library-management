@@ -2,6 +2,7 @@ import { Alert, Button, Checkbox, Modal, Select, Spin, Tooltip } from 'antd';
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../auth/messages';
 import { useAppNotification } from '../components/AppNotificationProvider';
 import { RoleGroupDirectory } from './RoleGroupDirectory';
 import { roleApi } from './api';
@@ -98,10 +99,10 @@ function RolePermissionEditor({
         setRolePermissions(details);
         setDraft(new Set(initialRole.code === 'ADMIN' ? details.effectivePermissions : details.assignedPermissions));
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (mounted && detailsGeneration.current === generation) {
           setRolePermissions(null);
-          setErrorMessage('Không thể tải danh sách vai trò và quyền. Vui lòng thử lại.');
+          setErrorMessage(isMaintenanceError(err) ? MAINTENANCE_MESSAGE : 'Không thể tải danh sách vai trò và quyền. Vui lòng thử lại.');
         }
       })
       .finally(() => {
@@ -121,7 +122,7 @@ function RolePermissionEditor({
     let current = true;
     void roleApi.getRoles()
       .then((roleList) => { if (current) setRoles(roleList); })
-      .catch(() => { if (current) setErrorMessage('Không thể làm mới danh sách nhóm quyền. Vui lòng thử lại.'); });
+      .catch((err: unknown) => { if (current) setErrorMessage(isMaintenanceError(err) ? MAINTENANCE_MESSAGE : 'Không thể làm mới danh sách nhóm quyền. Vui lòng thử lại.'); });
     return () => { current = false; };
   }, [rolesRefreshVersion]);
 
@@ -138,10 +139,10 @@ function RolePermissionEditor({
       setRolePermissions(result);
       setDraft(new Set(targetRoleCode === 'ADMIN' ? result.effectivePermissions : result.assignedPermissions));
       setHasConflict(false);
-    } catch {
+    } catch (err: unknown) {
       if (detailsGeneration.current === generation) {
         setRolePermissions(null);
-        setErrorMessage('Không thể tải quyền của vai trò này. Vui lòng thử lại.');
+        setErrorMessage(isMaintenanceError(err) ? MAINTENANCE_MESSAGE : 'Không thể tải quyền của vai trò này. Vui lòng thử lại.');
       }
     } finally {
       if (detailsGeneration.current === generation) setIsLoadingDetails(false);
@@ -349,7 +350,7 @@ function RolePermissionEditor({
           </div>
         </div>
 
-        {errorMessage && <Alert type="error" showIcon role="alert" title={errorMessage} />}
+        {errorMessage && <Alert type="error" showIcon role="alert" title={errorMessage === MAINTENANCE_MESSAGE ? MAINTENANCE_TITLE : errorMessage} description={errorMessage === MAINTENANCE_MESSAGE ? MAINTENANCE_MESSAGE : undefined} />}
         {selectionErrorMessage && <Alert type="error" showIcon role="alert" title={selectionErrorMessage} />}
         {dependencyConfigurationError && <Alert type="error" showIcon role="alert" title={dependencyConfigurationError} />}
 

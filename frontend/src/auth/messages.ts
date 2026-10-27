@@ -3,7 +3,15 @@ import type { ApiEnvelope } from './types';
 
 const SERVICE_NOT_READY = 'Hệ thống hiện chưa sẵn sàng. Vui lòng thử lại sau ít phút.';
 const TEMPORARY_SYSTEM_FAILURE = 'Hệ thống đang gặp sự cố tạm thời. Vui lòng thử lại sau ít phút.';
-const MAINTENANCE_MESSAGE = 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+export const MAINTENANCE_TITLE = 'Hệ thống đang bảo trì';
+export const MAINTENANCE_MESSAGE = 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+
+export function isMaintenanceError(error: unknown): boolean {
+  if (!axios.isAxiosError<ApiEnvelope<unknown>>(error)) {
+    return false;
+  }
+  return error.response?.status === 503 && error.response?.data?.code === 'MAINTENANCE_MODE_ACTIVE';
+}
 
 export interface LoginErrorCopy {
   title: string;

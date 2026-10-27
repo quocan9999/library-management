@@ -3,6 +3,7 @@ import type { TableColumnsType, TableProps } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../../auth/messages';
 import { usePermission } from '../../auth/permissions';
 import { memberApi } from './api';
 import { MemberCreateModal } from './MemberCreateModal';
@@ -61,6 +62,7 @@ export function MemberListPage() {
   const [requestState, setRequestState] = useState<{
     key: string;
     status: 'success' | 'error';
+    isMaintenance?: boolean;
   } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const debounceTimers = useRef<Partial<Record<'fullName' | 'memberCode' | 'email' | 'phone' | 'book', number>>>({});
@@ -95,8 +97,8 @@ export function MemberListPage() {
           setRequestState({ key: requestKey, status: 'success' });
         }
       })
-      .catch(() => {
-        if (current) setRequestState({ key: requestKey, status: 'error' });
+      .catch((err: unknown) => {
+        if (current) setRequestState({ key: requestKey, status: 'error', isMaintenance: isMaintenanceError(err) });
       });
     return () => {
       current = false;
@@ -255,7 +257,8 @@ export function MemberListPage() {
           type="error"
           showIcon
           role="alert"
-          title="Không thể tải danh sách thành viên."
+          title={requestState?.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải danh sách thành viên.'}
+          description={requestState?.isMaintenance ? MAINTENANCE_MESSAGE : undefined}
           action={<Button onClick={() => setReloadKey((previous) => previous + 1)}>Thử lại</Button>}
         />}
 
@@ -267,7 +270,7 @@ export function MemberListPage() {
             pagination={false}
             loading={loading ? { indicator: <Spin aria-label="Đang tải danh sách thành viên" /> } : false}
             onChange={onTableChange}
-            locale={{ emptyText: error ? 'Không thể tải dữ liệu. Hãy thử lại.' : 'Không có thành viên phù hợp.' }}
+            locale={{ emptyText: requestState?.isMaintenance ? MAINTENANCE_MESSAGE : (error ? 'Không thể tải dữ liệu. Hãy thử lại.' : 'Không có thành viên phù hợp.') }}
             sortDirections={['ascend', 'descend', 'ascend']}
             showSorterTooltip={false}
           />

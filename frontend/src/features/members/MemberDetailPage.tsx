@@ -4,6 +4,7 @@ import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../../auth/messages';
 import { usePermission } from '../../auth/permissions';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { memberApi } from './api';
@@ -70,12 +71,12 @@ export function MemberDetailPage() {
     key: string;
     status: 'success';
     data: MemberDetail;
-  } | { key: string; status: 'error' } | null>(null);
+  } | { key: string; status: 'error'; isMaintenance?: boolean } | null>(null);
   const [historyRequest, setHistoryRequest] = useState<{
     key: string;
     status: 'success';
     data: PageResponse<LoanHistoryItem>;
-  } | { key: string; status: 'error' } | null>(null);
+  } | { key: string; status: 'error'; isMaintenance?: boolean } | null>(null);
 
   const validMemberId = Number.isSafeInteger(memberId) && memberId > 0;
   const memberRequestKey = `${memberId}:${memberReload}`;
@@ -157,8 +158,8 @@ export function MemberDetailPage() {
       .then((data) => {
         if (current) setMemberRequest({ key: memberRequestKey, status: 'success', data });
       })
-      .catch(() => {
-        if (current) setMemberRequest({ key: memberRequestKey, status: 'error' });
+      .catch((err: unknown) => {
+        if (current) setMemberRequest({ key: memberRequestKey, status: 'error', isMaintenance: isMaintenanceError(err) });
       });
     return () => {
       current = false;
@@ -178,8 +179,8 @@ export function MemberDetailPage() {
       .then((data) => {
         if (current) setHistoryRequest({ key: historyRequestKey, status: 'success', data });
       })
-      .catch(() => {
-        if (current) setHistoryRequest({ key: historyRequestKey, status: 'error' });
+      .catch((err: unknown) => {
+        if (current) setHistoryRequest({ key: historyRequestKey, status: 'error', isMaintenance: isMaintenanceError(err) });
       });
     return () => {
       current = false;
@@ -256,7 +257,8 @@ export function MemberDetailPage() {
           type="error"
           showIcon
           role="alert"
-          title="Không thể tải thông tin thành viên."
+          title={currentMemberRequest && 'isMaintenance' in currentMemberRequest && currentMemberRequest.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải thông tin thành viên.'}
+          description={currentMemberRequest && 'isMaintenance' in currentMemberRequest && currentMemberRequest.isMaintenance ? MAINTENANCE_MESSAGE : undefined}
           action={<Button onClick={() => setMemberReload((previous) => previous + 1)}>Thử lại</Button>}
         />}
         {member && <section className="member-detail-card" aria-label="Hồ sơ thành viên">
@@ -365,7 +367,8 @@ export function MemberDetailPage() {
             type="error"
             showIcon
             role="alert"
-            title="Không thể tải lịch sử mượn/trả sách."
+            title={currentHistoryRequest && 'isMaintenance' in currentHistoryRequest && currentHistoryRequest.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải lịch sử mượn/trả sách.'}
+            description={currentHistoryRequest && 'isMaintenance' in currentHistoryRequest && currentHistoryRequest.isMaintenance ? MAINTENANCE_MESSAGE : undefined}
             action={<Button onClick={() => setHistoryReload((previous) => previous + 1)}>Thử lại</Button>}
           />}
           <div className="member-table-wrap" aria-busy={historyLoading}>
@@ -375,7 +378,7 @@ export function MemberDetailPage() {
               dataSource={history?.content ?? []}
               pagination={false}
               loading={historyLoading ? { indicator: <Spin aria-label="Đang tải lịch sử" /> } : false}
-              locale={{ emptyText: historyError ? 'Không thể tải lịch sử. Hãy thử lại.' : 'Chưa có lịch sử mượn/trả sách' }}
+              locale={{ emptyText: currentHistoryRequest && 'isMaintenance' in currentHistoryRequest && currentHistoryRequest.isMaintenance ? MAINTENANCE_MESSAGE : (historyError ? 'Không thể tải lịch sử. Hãy thử lại.' : 'Chưa có lịch sử mượn/trả sách') }}
             />
           </div>
           {history && history.totalElements > 0 && <div className="member-pagination-row">

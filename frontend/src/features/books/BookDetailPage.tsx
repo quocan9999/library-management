@@ -3,6 +3,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../../auth/messages';
 import { usePermission } from '../../auth/permissions';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { BookFormModal } from './BookFormModal';
@@ -31,7 +32,7 @@ export function BookDetailPage() {
   const canDelete = usePermission('book:delete');
   const navigate = useNavigate();
   const { notify } = useAppNotification();
-  const [request, setRequest] = useState<{ key: number; state: 'loading' | 'success' | 'error'; data?: BookDetail }>({ key: 0, state: 'loading' });
+  const [request, setRequest] = useState<{ key: number; state: 'loading' | 'success' | 'error'; data?: BookDetail; isMaintenance?: boolean }>({ key: 0, state: 'loading' });
   const [reloadKey, setReloadKey] = useState(0);
   const [editing, setEditing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -47,8 +48,8 @@ export function BookDetailPage() {
       .then((book) => {
         if (current) setRequest({ key: reloadKey, state: 'success', data: book });
       })
-      .catch(() => {
-        if (current) setRequest({ key: reloadKey, state: 'error' });
+      .catch((err: unknown) => {
+        if (current) setRequest({ key: reloadKey, state: 'error', isMaintenance: isMaintenanceError(err) });
       });
     return () => {
       current = false;
@@ -107,7 +108,8 @@ export function BookDetailPage() {
           type="error"
           showIcon
           role="alert"
-          title={validBookId ? 'Không thể tải thông tin sách.' : 'Mã sách không hợp lệ.'}
+          title={request.isMaintenance ? MAINTENANCE_TITLE : (validBookId ? 'Không thể tải thông tin sách.' : 'Mã sách không hợp lệ.')}
+          description={request.isMaintenance ? MAINTENANCE_MESSAGE : undefined}
           action={validBookId ? <Button onClick={() => setReloadKey((key) => key + 1)}>Thử lại</Button> : undefined}
         />}
         {book && <section className="member-detail-card" aria-label="Thông tin sách">

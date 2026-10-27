@@ -12,6 +12,7 @@ import {
   getRegisterError,
   getResendError,
   getVerificationError,
+  isMaintenanceError,
   mapLoginValidationErrors,
   mapRegisterValidationErrors,
 } from '../../auth/messages';
@@ -88,6 +89,10 @@ describe('authentication error messages', () => {
     expect(getLogoutErrorMessage(error)).toBe(
       'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.',
     );
+    expect(isMaintenanceError(error)).toBe(true);
+    expect(isMaintenanceError(apiError(503, 'OTHER_CODE'))).toBe(false);
+    expect(isMaintenanceError(apiError(500, 'MAINTENANCE_MODE_ACTIVE'))).toBe(false);
+    expect(isMaintenanceError(new Error('network error'))).toBe(false);
   });
 
   it('maps invalid credentials to the Vietnamese sign-in message', () => {

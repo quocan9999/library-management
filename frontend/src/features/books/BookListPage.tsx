@@ -3,6 +3,7 @@ import type { TableColumnsType, TableProps } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../../auth/messages';
 import { usePermission } from '../../auth/permissions';
 import { bookApi } from './api';
 import { BookFormModal } from './BookFormModal';
@@ -67,7 +68,7 @@ export function BookListPage() {
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [dateError, setDateError] = useState<string | null>(null);
   const [resultState, setResultState] = useState<{ key: string; data: PageResponse<BookListItem> } | null>(null);
-  const [requestState, setRequestState] = useState<{ key: string; failed: boolean } | null>(null);
+  const [requestState, setRequestState] = useState<{ key: string; failed: boolean; isMaintenance?: boolean } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const debounceTimer = useRef<number | undefined>(undefined);
   const publisherTimer = useRef<number | undefined>(undefined);
@@ -93,8 +94,8 @@ export function BookListPage() {
           setRequestState({ key: requestKey, failed: false });
         }
       })
-      .catch(() => {
-        if (current) setRequestState({ key: requestKey, failed: true });
+      .catch((err: unknown) => {
+        if (current) setRequestState({ key: requestKey, failed: true, isMaintenance: isMaintenanceError(err) });
       });
     return () => {
       current = false;
@@ -246,7 +247,8 @@ export function BookListPage() {
           type="error"
           showIcon
           role="alert"
-          title="Không thể tải danh sách sách."
+          title={requestState?.isMaintenance ? MAINTENANCE_TITLE : 'Không thể tải danh sách sách.'}
+          description={requestState?.isMaintenance ? MAINTENANCE_MESSAGE : undefined}
           action={<Button onClick={() => setReloadKey((key) => key + 1)}>Thử lại</Button>}
         />}
         <div className="member-table-wrap" aria-busy={loading}>
@@ -257,7 +259,7 @@ export function BookListPage() {
             pagination={false}
             loading={loading ? { indicator: <Spin aria-label="Đang tải danh sách sách" /> } : false}
             onChange={onTableChange}
-            locale={{ emptyText: failed ? 'Không thể tải dữ liệu. Hãy thử lại.' : 'Không có sách phù hợp.' }}
+            locale={{ emptyText: requestState?.isMaintenance ? MAINTENANCE_MESSAGE : (failed ? 'Không thể tải dữ liệu. Hãy thử lại.' : 'Không có sách phù hợp.') }}
             sortDirections={['ascend', 'descend', 'ascend']}
             showSorterTooltip={false}
           />
