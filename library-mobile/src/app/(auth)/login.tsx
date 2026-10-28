@@ -50,8 +50,8 @@ export default function LoginScreen() {
       setIsLoading(true);
       setErrorMessage(null);
       await login(identifier.trim(), password);
-      // Chuyển hướng về trang chủ độc giả sau khi đăng nhập thành công
-      router.replace('/');
+      // Chuyển hướng trực tiếp về trang chủ sau đăng nhập
+      router.replace('/(tabs)');
     } catch (error) {
       const msg = extractErrorMessage(
         error,

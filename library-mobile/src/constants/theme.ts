@@ -68,6 +68,8 @@ export const LibbyColors = {
   primaryDark: '#5537DB',
   ink: '#14112B',
   lime: '#C8FF3D',
+  accentLime: '#C8FF3D',
+  accentViolet: '#6C4DFF',
   lilac: '#EFEBFF',
   subtleBg: '#F7F5FF',
   muted: '#4B4570',
@@ -85,6 +87,9 @@ export const LibbyColors = {
   cardNavy: '#14112B',
   cardWhite: '#FFFFFF',
 } as const;
+
+export const DEFAULT_BOOK_COVER_URL =
+  'https://res.cloudinary.com/dcz9x5e9/image/upload/v1792744188/defbookcover-min_lbjfkz.jpg';
 
 /**
  * Libby Typography Font Families

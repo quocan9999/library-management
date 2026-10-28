@@ -12,6 +12,7 @@ import React, { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AuthProvider } from '@/contexts/AuthContext';
+import { CartProvider } from '@/contexts/CartContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -38,13 +39,15 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="explore" />
-        </Stack>
-      </ThemeProvider>
+      <CartProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="explore" />
+          </Stack>
+        </ThemeProvider>
+      </CartProvider>
     </AuthProvider>
   );
 }
