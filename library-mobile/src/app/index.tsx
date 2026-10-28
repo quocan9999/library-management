@@ -2,11 +2,11 @@ import { Redirect } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LibbyButton, LibbyLogo, LibbySheetCard } from '@/components/ui';
 import { LibbyColors, LibbyFonts } from '@/constants/theme';

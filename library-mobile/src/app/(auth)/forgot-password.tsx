@@ -22,19 +22,21 @@ import {
 import { LibbyColors, LibbyFonts } from '@/constants/theme';
 import { extractErrorMessage } from '@/services/api';
 import { authService } from '@/services/authService';
+import { validateEmail } from '@/utils/validation';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
 
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [isSent, setIsSent] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [isCounting, setIsCounting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Email format check helper
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  // Email format check helper chuẩn web
+  const isEmailValid = validateEmail(email) === null;
 
   // Countdown timer for resend
   useEffect(() => {
@@ -50,8 +52,9 @@ export default function ForgotPasswordScreen() {
   }, [isCounting, countdown]);
 
   const handleSendEmail = async () => {
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMessage('Vui lòng nhập địa chỉ email hợp lệ');
+    const validationError = validateEmail(email);
+    if (validationError) {
+      setEmailError(validationError);
       return;
     }
 
@@ -132,14 +135,23 @@ export default function ForgotPasswordScreen() {
                   <LibbyInput
                     autoCapitalize="none"
                     autoCorrect={false}
-                    error={!!errorMessage}
+                    error={!!emailError || !!errorMessage}
+                    errorMessage={emailError || undefined}
                     keyboardType="email-address"
                     label="Email"
                     leftIcon={<MailIcon color={LibbyColors.textMuted} size={20} strokeWidth={2} />}
                     placeholder="email@vidu.com"
                     value={email}
+                    onBlur={() => {
+                      if (email.trim().length > 0) {
+                        setEmailError(validateEmail(email));
+                      }
+                    }}
                     onChangeText={(text) => {
                       setEmail(text);
+                      if (emailError) {
+                        setEmailError(validateEmail(text));
+                      }
                       if (errorMessage) setErrorMessage(null);
                     }}
                   />

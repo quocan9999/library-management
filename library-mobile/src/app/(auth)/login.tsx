@@ -20,12 +20,14 @@ import {
 import { LibbyColors, LibbyFonts } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { extractErrorMessage } from '@/services/api';
+import { validateEmail } from '@/utils/validation';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
 
   const [identifier, setIdentifier] = useState('');
+  const [identifierError, setIdentifierError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -34,6 +36,14 @@ export default function LoginScreen() {
     if (!identifier.trim() || !password) {
       setErrorMessage('Vui lòng nhập đầy đủ email và mật khẩu');
       return;
+    }
+
+    if (identifier.includes('@')) {
+      const emailValidation = validateEmail(identifier);
+      if (emailValidation) {
+        setIdentifierError(emailValidation);
+        return;
+      }
     }
 
     try {
@@ -87,14 +97,23 @@ export default function LoginScreen() {
               <LibbyInput
                 autoCapitalize="none"
                 autoCorrect={false}
-                error={!!errorMessage}
+                error={!!identifierError || !!errorMessage}
+                errorMessage={identifierError || undefined}
                 keyboardType="email-address"
                 label="Email"
                 leftIcon={<MailIcon color={LibbyColors.textMuted} size={20} strokeWidth={2} />}
                 placeholder="email@vidu.com"
                 value={identifier}
+                onBlur={() => {
+                  if (identifier.includes('@')) {
+                    setIdentifierError(validateEmail(identifier));
+                  }
+                }}
                 onChangeText={(text) => {
                   setIdentifier(text);
+                  if (identifierError) {
+                    setIdentifierError(text.includes('@') ? validateEmail(text) : null);
+                  }
                   if (errorMessage) setErrorMessage(null);
                 }}
               />
