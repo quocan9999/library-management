@@ -59,7 +59,7 @@ export const LibbyBottomTabBar: React.FC<BottomTabBarProps> = ({ state, descript
   const currentRouteName = state.routes[state.index]?.name;
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       <View style={styles.tabContainer}>
         {TABS.map((tab) => {
           const isFocused = currentRouteName === tab.name;
@@ -82,7 +82,7 @@ export const LibbyBottomTabBar: React.FC<BottomTabBarProps> = ({ state, descript
             <Pressable
               key={tab.key}
               onPress={onPress}
-              style={styles.tabButton}
+              style={({ pressed }) => [styles.tabButton, pressed && { opacity: 0.7 }]}
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={tab.label}
@@ -95,7 +95,6 @@ export const LibbyBottomTabBar: React.FC<BottomTabBarProps> = ({ state, descript
           );
         })}
       </View>
-      <View style={styles.homeIndicator} />
     </View>
   );
 };
@@ -112,7 +111,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    height: 60,
+    height: 64,
   },
   tabButton: {
     flex: 1,
@@ -126,21 +125,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     backgroundColor: 'transparent',
   },
   activePill: {
     backgroundColor: LibbyColors.accentLime,
+    borderRadius: 16,
   },
   tabLabel: {
     fontSize: 12,
     fontFamily: LibbyFonts.semiBold,
-  },
-  homeIndicator: {
-    width: 134,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: LibbyColors.ink,
-    alignSelf: 'center',
-    marginTop: 6,
   },
 });
