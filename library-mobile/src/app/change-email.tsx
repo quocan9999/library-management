@@ -17,6 +17,7 @@ import { LibbyBackButton } from '@/components/ui/back-button';
 import { LibbyColors, LibbyFonts } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { profileService } from '@/services/profileService';
+import { validateEmail } from '@/utils/validation';
 
 export default function ChangeEmailScreen() {
   const router = useRouter();
@@ -44,13 +45,14 @@ export default function ChangeEmailScreen() {
 
   const validateRequestStep = (): boolean => {
     const nextErrors: Record<string, string> = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const trimmedNewEmail = newEmail.trim().toLowerCase();
 
-    if (!trimmedNewEmail) {
-      nextErrors.newEmail = 'Vui lòng nhập địa chỉ email mới.';
-    } else if (!emailRegex.test(trimmedNewEmail)) {
-      nextErrors.newEmail = 'Vui lòng nhập địa chỉ email hợp lệ.';
+    const emailError = validateEmail(trimmedNewEmail);
+    if (emailError) {
+      nextErrors.newEmail =
+        emailError === 'Vui lòng nhập địa chỉ email.'
+          ? 'Vui lòng nhập địa chỉ email mới.'
+          : emailError;
     } else if (trimmedNewEmail === currentEmail.trim().toLowerCase()) {
       nextErrors.newEmail = 'Email mới phải khác email hiện tại.';
     }

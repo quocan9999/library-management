@@ -94,11 +94,11 @@ export default function PersonalInfoScreen() {
     }
 
     if (phone.trim()) {
-      const cleanPhone = phone.trim().replace(/[\s.-]/g, '');
+      const cleanPhone = phone.trim();
       const vnMobile = /^0[35789][0-9]{8}$/;
       if (!vnMobile.test(cleanPhone)) {
         nextErrors.phone =
-          'Số điện thoại phải có 10 chữ số và thuộc đầu số di động VN (03, 05, 07, 08, 09)';
+          'Số điện thoại phải có đúng 10 chữ số và thuộc đầu số di động Việt Nam (03, 05, 07, 08, 09)';
       }
     }
 
@@ -113,13 +113,17 @@ export default function PersonalInfoScreen() {
       } else {
         const birthDate = new Date(dateOfBirth.trim());
         const now = new Date();
-        let age = now.getFullYear() - birthDate.getFullYear();
-        const m = now.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) {
-          age--;
-        }
-        if (age < 16) {
-          nextErrors.dateOfBirth = 'Độc giả phải từ đủ 16 tuổi trở lên';
+        if (isNaN(birthDate.getTime()) || birthDate > now) {
+          nextErrors.dateOfBirth = 'Ngày sinh phải hợp lệ và thành viên đủ 16 tuổi';
+        } else {
+          let age = now.getFullYear() - birthDate.getFullYear();
+          const m = now.getMonth() - birthDate.getMonth();
+          if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) {
+            age--;
+          }
+          if (age < 16) {
+            nextErrors.dateOfBirth = 'Ngày sinh phải hợp lệ và thành viên đủ 16 tuổi';
+          }
         }
       }
     }
@@ -147,7 +151,18 @@ export default function PersonalInfoScreen() {
       setIsEditing(false);
       Alert.alert('Thành công', 'Thông tin cá nhân đã được cập nhật.');
     } catch (err: any) {
-      Alert.alert('Cập nhật thất bại', err.message || 'Đã có lỗi xảy ra.');
+      const msg = err.message || 'Đã có lỗi xảy ra.';
+      if (
+        msg.includes('Số điện thoại này đã được sử dụng') ||
+        msg.includes('MEMBER_PHONE_DUPLICATED')
+      ) {
+        setErrors((prev) => ({
+          ...prev,
+          phone: 'Số điện thoại này đã được sử dụng bởi thành viên khác.',
+        }));
+      } else {
+        Alert.alert('Cập nhật thất bại', msg);
+      }
     } finally {
       setSaving(false);
     }
@@ -228,16 +243,18 @@ export default function PersonalInfoScreen() {
 
               <LibbyInput
                 label="Số điện thoại"
-                placeholder={isEditing ? 'VD: 0912345678' : 'Chưa cập nhật'}
+                placeholder={isEditing ? 'Ví dụ: 0912345678' : 'Chưa cập nhật'}
                 value={phone}
                 onChangeText={(val) => {
-                  setPhone(val);
+                  const digitsOnly = val.replace(/[^0-9]/g, '').slice(0, 10);
+                  setPhone(digitsOnly);
                   if (errors.phone) {
                     setErrors((prev) => ({ ...prev, phone: '' }));
                   }
                 }}
+                maxLength={10}
+                keyboardType="number-pad"
                 editable={isEditing}
-                keyboardType="phone-pad"
                 errorMessage={errors.phone}
               />
 

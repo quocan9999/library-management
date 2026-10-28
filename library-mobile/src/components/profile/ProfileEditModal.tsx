@@ -43,11 +43,11 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
     }
 
     if (phone.trim()) {
-      const cleanPhone = phone.trim().replace(/[\s.-]/g, '');
+      const cleanPhone = phone.trim();
       const vnMobile = /^0[35789][0-9]{8}$/;
       if (!vnMobile.test(cleanPhone)) {
         nextErrors.phone =
-          'Số điện thoại phải có 10 chữ số và thuộc đầu số di động VN (03, 05, 07, 08, 09)';
+          'Số điện thoại phải có đúng 10 chữ số và thuộc đầu số di động Việt Nam (03, 05, 07, 08, 09)';
       }
     }
 
@@ -56,20 +56,23 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
     }
 
     if (dateOfBirth.trim()) {
-      // Expected YYYY-MM-DD
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(dateOfBirth.trim())) {
         nextErrors.dateOfBirth = 'Định dạng ngày sinh phải là YYYY-MM-DD (VD: 1998-08-15)';
       } else {
         const birthDate = new Date(dateOfBirth.trim());
         const now = new Date();
-        let age = now.getFullYear() - birthDate.getFullYear();
-        const m = now.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) {
-          age--;
-        }
-        if (age < 16) {
-          nextErrors.dateOfBirth = 'Độc giả phải từ đủ 16 tuổi trở lên';
+        if (isNaN(birthDate.getTime()) || birthDate > now) {
+          nextErrors.dateOfBirth = 'Ngày sinh phải hợp lệ và thành viên đủ 16 tuổi';
+        } else {
+          let age = now.getFullYear() - birthDate.getFullYear();
+          const m = now.getMonth() - birthDate.getMonth();
+          if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) {
+            age--;
+          }
+          if (age < 16) {
+            nextErrors.dateOfBirth = 'Ngày sinh phải hợp lệ và thành viên đủ 16 tuổi';
+          }
         }
       }
     }
@@ -154,10 +157,17 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
 
             <LibbyInput
               label="Số điện thoại"
-              placeholder="VD: 0912345678"
+              placeholder="Ví dụ: 0912345678"
               value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
+              onChangeText={(val) => {
+                const digitsOnly = val.replace(/[^0-9]/g, '').slice(0, 10);
+                setPhone(digitsOnly);
+                if (errors.phone) {
+                  setErrors((prev) => ({ ...prev, phone: '' }));
+                }
+              }}
+              maxLength={10}
+              keyboardType="number-pad"
               errorMessage={errors.phone}
             />
 

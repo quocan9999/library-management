@@ -100,7 +100,11 @@ export function ProfilePage() {
   };
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    let sanitizedValue = value;
+    if (field === 'phone') {
+      sanitizedValue = value.replace(/[^0-9]/g, '').slice(0, 10);
+    }
+    setFormData((prev) => ({ ...prev, [field]: sanitizedValue }));
     if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     }
@@ -123,16 +127,10 @@ export function ProfilePage() {
     }
 
     if (formData.phone) {
-      const trimmedPhone = formData.phone.trim();
-      const phoneFormat = /^[0-9.\s-]+$/;
+      const cleanPhone = formData.phone.trim();
       const vnMobile = /^0[35789][0-9]{8}$/;
-      if (!phoneFormat.test(trimmedPhone)) {
-        errors.phone = 'Số điện thoại chỉ được chứa chữ số, dấu chấm, gạch ngang hoặc khoảng trắng';
-      } else {
-        const digits = trimmedPhone.replace(/[.\s-]/g, '');
-        if (!vnMobile.test(digits)) {
-          errors.phone = 'Số điện thoại phải có 10 chữ số và đầu số di động Việt Nam hợp lệ (03, 05, 07, 08, 09)';
-        }
+      if (!vnMobile.test(cleanPhone)) {
+        errors.phone = 'Số điện thoại phải có đúng 10 chữ số và thuộc đầu số di động Việt Nam (03, 05, 07, 08, 09)';
       }
     }
 
@@ -428,7 +426,7 @@ export function ProfilePage() {
                       <input
                         id="profile-phone"
                         type="tel"
-                        maxLength={15}
+                        inputMode="numeric" pattern="[0-9]*" maxLength={10}
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         placeholder="Ví dụ: 0912345678"
