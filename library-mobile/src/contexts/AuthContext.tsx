@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
+import { onSessionExpired } from '@/services/api';
 import { authService, User } from '@/services/authService';
 import { storage } from '@/utils/storage';
 
@@ -53,6 +54,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     initAuth();
+
+    // Lắng nghe sự kiện hết hạn phiên hoàn toàn (refresh token hết hạn hoặc thu hồi)
+    const unsubscribe = onSessionExpired(() => {
+      setToken(null);
+      setUser(null);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const login = async (identifier: string, password: string) => {
@@ -70,9 +81,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await storage.clearAuth();
-    setToken(null);
-    setUser(null);
+    try {
+      await authService.logout();
+    } catch {
+      // Ignored
+    } finally {
+      await storage.clearAuth();
+      setToken(null);
+      setUser(null);
+    }
   };
 
   const refreshUser = async () => {

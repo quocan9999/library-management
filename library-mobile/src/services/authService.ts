@@ -69,6 +69,14 @@ export const authService = {
     return res.data.data;
   },
 
+  async logout(): Promise<void> {
+    try {
+      await api.post<ApiResponse<void>>('/api/v1/auth/logout');
+    } catch {
+      // Ignored if token expired or network failed
+    }
+  },
+
   async resendVerification(email: string): Promise<string> {
     const res = await api.post<ApiResponse<void>>('/api/v1/auth/resend-verification', {
       email: email.trim().toLowerCase(),

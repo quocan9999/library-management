@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const TOKEN_KEY = 'libby_access_token';
+const REFRESH_TOKEN_KEY = 'libby_refresh_token';
 const USER_KEY = 'libby_user_profile';
 
 const memoryFallback = new Map<string, string>();
@@ -80,6 +81,18 @@ export const storage = {
     await this.removeItem(TOKEN_KEY);
   },
 
+  async saveRefreshToken(token: string): Promise<void> {
+    await this.setItem(REFRESH_TOKEN_KEY, token);
+  },
+
+  async getRefreshToken(): Promise<string | null> {
+    return await this.getItem(REFRESH_TOKEN_KEY);
+  },
+
+  async removeRefreshToken(): Promise<void> {
+    await this.removeItem(REFRESH_TOKEN_KEY);
+  },
+
   async saveUser(user: object): Promise<void> {
     await this.setItem(USER_KEY, JSON.stringify(user));
   },
@@ -99,6 +112,6 @@ export const storage = {
   },
 
   async clearAuth(): Promise<void> {
-    await Promise.all([this.removeToken(), this.removeUser()]);
+    await Promise.all([this.removeToken(), this.removeRefreshToken(), this.removeUser()]);
   },
 };
