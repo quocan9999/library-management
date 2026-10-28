@@ -39,28 +39,48 @@ api.interceptors.request.use(
 );
 
 export interface ApiErrorResponse {
+  success?: boolean;
+  code?: string;
   statusCode?: number;
   errorCode?: string;
   message?: string;
+  errors?: Record<string, string>;
   data?: any;
 }
 
-export const extractErrorMessage = (error: unknown, defaultMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.'): string => {
-  if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiErrorResponse>;
-    const serverMessage = axiosError.response?.data?.message;
-    if (serverMessage) {
-      return serverMessage;
+  export const extractErrorMessage = (error: unknown, defaultMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.'): string => {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<ApiErrorResponse>;
+      const resData = axiosError.response?.data;
+      const serverMessage = resData?.message;
+      if (serverMessage) {
+        return serverMessage;
+      }
+      const code = resData?.code || resData?.errorCode;
+      if (code === 'CURRENT_PASSWORD_INVALID') {
+        return 'Mật khẩu hiện tại không chính xác.';
+      }
+      if (code === 'EMAIL_ALREADY_REGISTERED') {
+        return 'Email này đã được sử dụng bởi tài khoản khác.';
+      }
+      if (code === 'EMAIL_CHANGE_CODE_INVALID') {
+        return 'Mã xác thực không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.';
+      }
+      if (code === 'EMAIL_CHANGE_RATE_LIMITED') {
+        return 'Bạn thao tác quá nhanh. Vui lòng đợi rồi thử lại.';
+      }
+      if (code === 'MAINTENANCE_MODE_ACTIVE') {
+        return 'Hệ thống đang bảo trì. Vui lòng thử lại sau ít phút.';
+      }
+      if (axiosError.code === 'ECONNABORTED') {
+        return 'Kết nối máy chủ quá thời gian. Vui lòng thử lại.';
+      }
+      if (!axiosError.response) {
+        return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng hoặc backend.';
+      }
     }
-    if (axiosError.code === 'ECONNABORTED') {
-      return 'Kết nối máy chủ quá thời gian. Vui lòng thử lại.';
+    if (error instanceof Error) {
+      return error.message;
     }
-    if (!axiosError.response) {
-      return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng hoặc backend.';
-    }
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return defaultMessage;
-};
+    return defaultMessage;
+  };

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -43,6 +43,12 @@ export default function ProfileScreen() {
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [fetchProfile])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -167,14 +173,10 @@ export default function ProfileScreen() {
 
               <View style={styles.actionList}>
                 <Pressable
-                  onPress={() =>
-                    Alert.alert(
-                      'Đổi mật khẩu',
-                      'Vui lòng sử dụng tính năng Quên mật khẩu tại màn hình đăng nhập hoặc cập nhật trên cổng trực tuyến.'
-                    )
-                  }
+                  onPress={() => router.push('/change-password')}
                   style={styles.actionRow}
                   accessibilityRole="button"
+                  accessibilityLabel="Đổi mật khẩu"
                 >
                   <View style={styles.actionLeft}>
                     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
@@ -187,6 +189,42 @@ export default function ProfileScreen() {
                       />
                     </Svg>
                     <Text style={styles.actionText}>Đổi mật khẩu</Text>
+                  </View>
+                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                    <Path
+                      d="M9 18l6-6-6-6"
+                      stroke={LibbyColors.textMuted}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => router.push('/change-email')}
+                  style={styles.actionRow}
+                  accessibilityRole="button"
+                  accessibilityLabel="Đổi email"
+                >
+                  <View style={styles.actionLeft}>
+                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                      <Path
+                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+                        stroke={LibbyColors.ink}
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <Path
+                        d="M22 6l-10 7L2 6"
+                        stroke={LibbyColors.ink}
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </Svg>
+                    <Text style={styles.actionText}>Đổi email</Text>
                   </View>
                   <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
                     <Path

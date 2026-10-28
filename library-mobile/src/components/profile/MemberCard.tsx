@@ -43,7 +43,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({ profile, email }) => {
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>{roleText}</Text>
         </View>
-        <Text style={styles.codeText}>Mã thẻ: {memberCode}</Text>
+        <Text style={styles.codeText}>Mã thành viên: {memberCode}</Text>
       </View>
     </View>
   );

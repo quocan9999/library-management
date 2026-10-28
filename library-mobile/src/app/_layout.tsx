@@ -44,6 +44,8 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="(auth)" />
+            <Stack.Screen name="change-password" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="change-email" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="explore" />
           </Stack>
         </ThemeProvider>
