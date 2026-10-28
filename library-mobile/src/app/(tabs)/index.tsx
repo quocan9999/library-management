@@ -307,7 +307,8 @@ export default function HomeScreen() {
         onClose={() => setQrRequest(null)}
         loanCode={qrRequest?.loanCode || ''}
         pickupReference={qrRequest?.pickupReference}
-        bookTitle={qrRequest?.items[0]?.title}
+        itemCount={qrRequest?.itemCount || qrRequest?.items.length}
+        items={qrRequest?.items}
       />
     </View>
   );

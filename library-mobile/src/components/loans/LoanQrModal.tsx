@@ -5,12 +5,15 @@ import Svg, { Path } from 'react-native-svg';
 
 import { LibbyColors, LibbyFonts } from '@/constants/theme';
 
-interface LoanQrModalProps {
+export interface LoanQrModalProps {
   visible: boolean;
   onClose: () => void;
   loanCode: string;
   pickupReference?: string;
+  itemCount?: number;
+  items?: Array<{ title: string; bookCode?: string; author?: string }>;
   bookTitle?: string;
+  bookSubtitle?: string;
 }
 
 export const LoanQrModal: React.FC<LoanQrModalProps> = ({
@@ -18,11 +21,27 @@ export const LoanQrModal: React.FC<LoanQrModalProps> = ({
   onClose,
   loanCode,
   pickupReference,
+  itemCount,
+  items = [],
   bookTitle,
+  bookSubtitle,
 }) => {
   if (!visible) return null;
 
   const qrValue = pickupReference || loanCode || 'LIBBY_DEFAULT';
+  const totalItems = itemCount ?? (items.length > 0 ? items.length : 1);
+
+  const displayTitle =
+    bookTitle ||
+    (totalItems > 1 ? `${totalItems} sách trong yêu cầu` : items[0]?.title || 'Sách mượn');
+
+  const displaySubtitle =
+    bookSubtitle ||
+    (totalItems > 1
+      ? items.map((i) => i.title).join(', ')
+      : items[0]
+      ? [items[0].bookCode, items[0].author].filter(Boolean).join(' · ')
+      : undefined);
 
   return (
     <Modal
@@ -35,18 +54,20 @@ export const LoanQrModal: React.FC<LoanQrModalProps> = ({
         <Pressable style={styles.backdrop} onPress={onClose} />
 
         <View style={styles.dialog}>
-          {/* Header */}
+          {/* Header Row */}
           <View style={styles.header}>
-            <View style={styles.headerTitleBox}>
-              <Text style={styles.title}>Mã nhận sách</Text>
-              <Text style={styles.subtitle}>Yêu cầu {loanCode}</Text>
+            <View style={styles.headerLeft}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>Mã nhận sách</Text>
+              </View>
+              <Text style={styles.title}>Yêu cầu {loanCode}</Text>
             </View>
 
             <Pressable
               onPress={onClose}
               style={styles.closeBtn}
               accessibilityRole="button"
-              accessibilityLabel="Đóng"
+              accessibilityLabel="Đóng mã QR"
             >
               <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
                 <Path
@@ -59,36 +80,34 @@ export const LoanQrModal: React.FC<LoanQrModalProps> = ({
             </Pressable>
           </View>
 
+          {/* Books Info */}
+          {(displayTitle || displaySubtitle) && (
+            <View style={styles.booksInfo}>
+              {displayTitle ? (
+                <Text style={styles.booksCountTitle}>{displayTitle}</Text>
+              ) : null}
+              {displaySubtitle ? (
+                <Text style={styles.booksListSubtitle}>{displaySubtitle}</Text>
+              ) : null}
+            </View>
+          )}
+
           {/* QR Code Container */}
           <View style={styles.qrWrapper}>
             <View style={styles.qrInner}>
               <QRCode
                 value={qrValue}
-                size={200}
+                size={220}
                 color={LibbyColors.ink}
                 backgroundColor={LibbyColors.white}
               />
             </View>
-            <Text style={styles.referenceCode}>{qrValue}</Text>
           </View>
 
-          {bookTitle && (
-            <Text numberOfLines={1} style={styles.bookTitle}>
-              {bookTitle}
-            </Text>
-          )}
-
+          {/* Footer instruction text */}
           <Text style={styles.instruction}>
-            Xuất trình mã này cho thủ thư tại quầy thư viện để hoàn tất thủ tục nhận sách.
+            Đưa mã này cho thủ thư tại quầy để quét và nhận sách.
           </Text>
-
-          {/* Close Action */}
-          <Pressable
-            onPress={onClose}
-            style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.85 }]}
-          >
-            <Text style={styles.doneBtnText}>Xong</Text>
-          </Pressable>
         </View>
       </View>
     </Modal>
@@ -100,7 +119,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   backdrop: {
     position: 'absolute',
@@ -114,93 +133,90 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     backgroundColor: LibbyColors.white,
-    borderRadius: 28,
+    borderRadius: 32,
     borderWidth: 2,
     borderColor: LibbyColors.ink,
     padding: 24,
-    alignItems: 'center',
     gap: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 8,
   },
   header: {
-    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  headerTitleBox: {
+  headerLeft: {
     flex: 1,
+    gap: 8,
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    backgroundColor: LibbyColors.accentLime,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  badgeText: {
+    fontFamily: LibbyFonts.bold,
+    fontSize: 12,
+    color: LibbyColors.ink,
   },
   title: {
     fontFamily: LibbyFonts.display,
-    fontSize: 22,
+    fontSize: 26,
     color: LibbyColors.ink,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontFamily: LibbyFonts.medium,
-    fontSize: 13,
-    color: LibbyColors.textMuted,
-    marginTop: 2,
+    letterSpacing: -0.5,
+    lineHeight: 30,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#EFEBFF',
+    borderWidth: 2,
+    borderColor: LibbyColors.accentViolet,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  booksInfo: {
+    gap: 4,
+  },
+  booksCountTitle: {
+    fontFamily: LibbyFonts.bold,
+    fontSize: 17,
+    color: LibbyColors.ink,
+    letterSpacing: -0.2,
+  },
+  booksListSubtitle: {
+    fontFamily: LibbyFonts.regular,
+    fontSize: 14,
+    color: LibbyColors.textMuted,
+    lineHeight: 20,
+  },
+  qrWrapper: {
+    backgroundColor: '#EFEBFF',
+    borderRadius: 24,
+    padding: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qrWrapper: {
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    backgroundColor: '#F7F5FF',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ECE8FF',
-  },
   qrInner: {
-    padding: 12,
     backgroundColor: LibbyColors.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#ECE8FF',
-  },
-  referenceCode: {
-    fontFamily: LibbyFonts.display,
-    fontSize: 18,
-    color: LibbyColors.ink,
-    letterSpacing: 1,
-  },
-  bookTitle: {
-    fontFamily: LibbyFonts.semiBold,
-    fontSize: 14,
-    color: LibbyColors.ink,
-    textAlign: 'center',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   instruction: {
     fontFamily: LibbyFonts.regular,
-    fontSize: 13,
+    fontSize: 14,
     color: LibbyColors.textMuted,
     textAlign: 'center',
-    lineHeight: 18,
-  },
-  doneBtn: {
-    width: '100%',
-    height: 48,
-    backgroundColor: LibbyColors.ink,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  doneBtnText: {
-    fontFamily: LibbyFonts.semiBold,
-    fontSize: 15,
-    color: LibbyColors.white,
+    lineHeight: 20,
   },
 });
