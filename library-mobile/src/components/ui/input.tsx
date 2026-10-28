@@ -22,6 +22,7 @@ export interface LibbyInputProps extends TextInputProps {
   error?: boolean;
   errorMessage?: string;
   containerStyle?: ViewStyle;
+  inputContainerStyle?: ViewStyle;
   inputStyle?: TextStyle;
 }
 
@@ -34,6 +35,7 @@ export const LibbyInput: React.FC<LibbyInputProps> = ({
   error = false,
   errorMessage,
   containerStyle,
+  inputContainerStyle,
   inputStyle,
   onFocus,
   onBlur,
@@ -42,6 +44,8 @@ export const LibbyInput: React.FC<LibbyInputProps> = ({
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const isEditable = rest.editable !== false;
 
   let borderColor: string = LibbyColors.ink;
   if (error) {
@@ -52,6 +56,11 @@ export const LibbyInput: React.FC<LibbyInputProps> = ({
 
   const isActuallySecure = isPassword ? !showPassword : secureTextEntry;
 
+  // Tách riêng backgroundColor từ inputStyle nếu có truyền vào, để gán cho inputContainer
+  // tránh việc thẻ TextInput dạng hình chữ nhật vuông vức đè lên viền bo cong 26px của container.
+  const flatInputStyle = StyleSheet.flatten(inputStyle) || {};
+  const { backgroundColor: customBgColor, ...cleanInputStyle } = flatInputStyle;
+
   return (
     <View style={[styles.wrapper, containerStyle]}>
       {label && (
@@ -61,7 +70,15 @@ export const LibbyInput: React.FC<LibbyInputProps> = ({
         </View>
       )}
 
-      <View style={[styles.inputContainer, { borderColor }]}>
+      <View
+        style={[
+          styles.inputContainer,
+          { borderColor },
+          !isEditable && styles.disabledInputContainer,
+          customBgColor ? { backgroundColor: customBgColor } : null,
+          inputContainerStyle,
+        ]}
+      >
         {leftIcon && <View style={styles.leftIconContainer}>{leftIcon}</View>}
 
         <TextInput
@@ -71,7 +88,8 @@ export const LibbyInput: React.FC<LibbyInputProps> = ({
             styles.textInput,
             leftIcon ? styles.paddingLeftWithIcon : styles.paddingLeftNormal,
             (isPassword || rightAccessory) ? styles.paddingRightWithAccessory : styles.paddingRightNormal,
-            inputStyle,
+            !isEditable && styles.disabledTextInput,
+            cleanInputStyle,
           ]}
           onBlur={(e) => {
             setIsFocused(false);
@@ -132,6 +150,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  disabledInputContainer: {
+    backgroundColor: '#FAF9FF',
+    borderColor: LibbyColors.ink,
   },
   leftIconContainer: {
     position: 'absolute',
@@ -145,6 +168,10 @@ const styles = StyleSheet.create({
     height: '100%',
     fontFamily: LibbyFonts.medium,
     fontSize: 15,
+    color: LibbyColors.ink,
+    backgroundColor: 'transparent',
+  },
+  disabledTextInput: {
     color: LibbyColors.ink,
   },
   paddingLeftWithIcon: {

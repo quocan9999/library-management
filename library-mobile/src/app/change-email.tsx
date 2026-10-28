@@ -337,7 +337,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   readOnlyInput: {
-    backgroundColor: '#F5F3FF',
     color: LibbyColors.textMuted,
   },
   errorBanner: {
