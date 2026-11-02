@@ -430,7 +430,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       key: 'username',
       sorter: true,
       sortOrder: sort.field === 'username' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
-      width: 140,
     },
     {
       title: 'Mã NV',
@@ -448,7 +447,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       sorter: true,
       sortOrder: sort.field === 'fullName' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
       render: (_value: string, account) => account.staff?.fullName || '—',
-      width: 170,
     },
     {
       title: 'Email',
@@ -456,7 +454,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       key: 'email',
       sorter: true,
       sortOrder: sort.field === 'email' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
-      width: 220,
     },
     {
       title: 'Nhóm quyền',
@@ -472,7 +469,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
           {roleState && !roleState.enabled && <Tag color="orange">Nhóm ngừng hoạt động</Tag>}
         </div>;
       },
-      width: 220,
     },
     {
       title: 'Xác minh email',
@@ -481,7 +477,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       sorter: true,
       sortOrder: sort.field === 'emailVerified' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
       render: (verified: boolean) => <Tag color={verified ? 'green' : 'default'}>{verified ? 'Đã xác minh' : 'Chưa xác minh'}</Tag>,
-      width: 150,
+      width: 140,
     },
     {
       title: 'Tài khoản',
@@ -499,11 +495,12 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       sorter: true,
       sortOrder: sort.field === 'createdAt' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
       render: formatCreatedAt,
-      width: 165,
+      width: 150,
     },
     {
       title: 'Thao tác',
       key: 'actions',
+      width: 120,
       render: (_value, account) => {
         if (mode === 'management') {
           return (

@@ -1216,6 +1216,14 @@ input:focus-visible,
   background: #fff;
 }
 
+.admin-account-table-wrap .ant-table {
+  min-width: 1050px;
+}
+
+.admin-account-table-wrap .ant-table-thead > tr > th {
+  white-space: nowrap;
+}
+
 .admin-account-table-wrap .ant-table-cell {
   vertical-align: middle;
 }
