@@ -15,10 +15,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LibbyBackButton, LibbyButton, LibbyInput } from '@/components/ui';
 import { LibbyColors, LibbyFonts } from '@/constants/theme';
-import { profileService, UserProfile } from '@/services/profileService';
+import { useAuth } from '@/contexts/AuthContext';
+import { profileService, ProfileUpdateError, UserProfile } from '@/services/profileService';
+
+const PHONE_ERROR =
+  'Số điện thoại phải có đúng 10 chữ số và thuộc đầu số di động Việt Nam (03, 05, 07, 08, 09)';
 
 export default function PersonalInfoScreen() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,8 +102,7 @@ export default function PersonalInfoScreen() {
       const cleanPhone = phone.trim();
       const vnMobile = /^0[35789][0-9]{8}$/;
       if (!vnMobile.test(cleanPhone)) {
-        nextErrors.phone =
-          'Số điện thoại phải có đúng 10 chữ số và thuộc đầu số di động Việt Nam (03, 05, 07, 08, 09)';
+        nextErrors.phone = PHONE_ERROR;
       }
     }
 
@@ -149,20 +153,46 @@ export default function PersonalInfoScreen() {
       setProfile(updated);
       populateForm(updated);
       setIsEditing(false);
+      await refreshUser();
       Alert.alert('Thành công', 'Thông tin cá nhân đã được cập nhật.');
-    } catch (err: any) {
-      const msg = err.message || 'Đã có lỗi xảy ra.';
-      if (
-        msg.includes('Số điện thoại này đã được sử dụng') ||
-        msg.includes('MEMBER_PHONE_DUPLICATED')
-      ) {
-        setErrors((prev) => ({
-          ...prev,
-          phone: 'Số điện thoại này đã được sử dụng bởi thành viên khác.',
-        }));
-      } else {
-        Alert.alert('Cập nhật thất bại', msg);
+    } catch (err) {
+      if (err instanceof ProfileUpdateError) {
+        const code = err.code;
+
+        if (code === 'MEMBER_PHONE_DUPLICATED') {
+          setErrors((prev) => ({
+            ...prev,
+            phone: 'Số điện thoại này đã được sử dụng bởi độc giả khác.',
+          }));
+          return;
+        }
+
+        if (code === 'MEMBER_VERSION_CONFLICT') {
+          setIsEditing(false);
+          await fetchProfile();
+          Alert.alert(
+            'Hồ sơ đã thay đổi',
+            'Dữ liệu hồ sơ đã được thay đổi từ một phiên làm việc khác. Vui lòng kiểm tra lại thông tin mới nhất.'
+          );
+          return;
+        }
+
+        if (err.fieldErrors) {
+          const fieldErrors = Object.fromEntries(
+            Object.entries(err.fieldErrors).filter(([, value]) => !!value)
+          ) as Record<string, string>;
+          if (Object.keys(fieldErrors).length > 0) {
+            setErrors((prev) => ({ ...prev, ...fieldErrors }));
+            return;
+          }
+        }
+
+        Alert.alert('Cập nhật thất bại', err.message);
+        return;
       }
+
+      const msg = err instanceof Error ? err.message : 'Đã có lỗi xảy ra.';
+      Alert.alert('Cập nhật thất bại', msg);
     } finally {
       setSaving(false);
     }

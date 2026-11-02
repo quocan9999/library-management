@@ -13,14 +13,10 @@ export const MemberCard: React.FC<MemberCardProps> = ({ profile, email }) => {
   const displayName = profile?.fullName || profile?.username || email.split('@')[0] || 'Độc giả';
   const initial = displayName.charAt(0).toUpperCase();
 
-  const roleText =
-    profile?.role === 'USER'
-      ? 'Độc giả thành viên'
-      : profile?.role === 'ADMIN'
-      ? 'Quản trị viên'
-      : 'Thành viên thư viện';
-
-  const memberCode = profile?.memberCode || (profile?.memberId ? `LIB-${profile.memberId}` : 'LIB-MEMBER');
+  const roleText = 'Độc giả thành viên';
+  const codeLabel = 'Mã thành viên';
+  const memberCode =
+    profile?.memberCode || (profile?.memberId ? `LIB-${profile.memberId}` : 'LIB-MEMBER');
 
   return (
     <View style={styles.card}>
@@ -43,7 +39,9 @@ export const MemberCard: React.FC<MemberCardProps> = ({ profile, email }) => {
         <View style={styles.roleBadge}>
           <Text style={styles.roleText}>{roleText}</Text>
         </View>
-        <Text style={styles.codeText}>Mã thành viên: {memberCode}</Text>
+        <Text style={styles.codeText}>
+          {codeLabel}: {memberCode}
+        </Text>
       </View>
     </View>
   );
