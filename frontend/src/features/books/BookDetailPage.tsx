@@ -2,10 +2,11 @@ import { Alert, Button, Descriptions, Modal, Spin } from 'antd';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../../auth/messages';
 import { usePermission } from '../../auth/permissions';
 import { useAppNotification } from '../../components/AppNotificationProvider';
+import { BackToListButton } from '../../components/BackToListButton';
 import { BookFormModal } from './BookFormModal';
 import { BookCoverImage } from './BookCoverImage';
 import { bookApi } from './api';
@@ -97,7 +98,7 @@ export function BookDetailPage() {
           <div className="member-detail-actions">
             {book && canUpdate && <Button onClick={() => setEditing(true)}>Chỉnh sửa</Button>}
             {book && canDelete && <Button danger onClick={() => { setDeleteError(null); setDeleteNotice(null); setDeleteOpen(true); }}>Xóa sách</Button>}
-            <Link className="member-back-link" to="/admin/books">Quay lại danh sách</Link>
+            <BackToListButton to="/admin/books" />
           </div>
         </div>
 
