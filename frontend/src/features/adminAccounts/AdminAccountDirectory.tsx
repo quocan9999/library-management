@@ -493,15 +493,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       width: 130,
     },
     {
-      title: 'Tài khoản hệ thống',
-      dataIndex: 'systemAccount',
-      key: 'systemAccount',
-      render: (systemAccount: boolean) => systemAccount
-        ? <Tag color="gold">Tài khoản hệ thống</Tag>
-        : <span aria-label="Tài khoản thông thường">—</span>,
-      width: 160,
-    },
-    {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',

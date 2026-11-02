@@ -320,7 +320,7 @@ describe('admin account UI routes', () => {
     expect(document.querySelector('#admin-account-title')?.textContent).toBe('Quản lý tài khoản quản trị');
     await waitFor(() => expect(document.querySelector('.admin-account-table-wrap')?.textContent).toContain('librarian@example.com'));
     expect(document.body.textContent).not.toContain('reader@example.com');
-    expect(accountRow(1).textContent).toContain('Tài khoản hệ thống');
+    expect(document.querySelector('.admin-account-table-wrap')?.textContent).not.toContain('Tài khoản hệ thống');
     openSelect('Lọc theo nhóm quyền');
     await waitFor(() => expect(Array.from(document.querySelectorAll('.ant-select-item-option'))
       .some((option) => option.textContent?.includes('Siêu quản trị (SUPER_ADMIN)'))).toBe(true));
