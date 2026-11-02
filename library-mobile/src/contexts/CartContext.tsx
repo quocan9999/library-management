@@ -15,6 +15,8 @@ interface CartContextType {
   items: CatalogBook[];
   itemCount: number;
   totalFee: number;
+  totalDeposit: number;
+  totalPayment: number;
   isCartOpen: boolean;
   addToCart: (book: CatalogBook) => AddToCartResult;
   removeFromCart: (bookId: number) => void;
@@ -92,6 +94,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const closeCart = () => setIsCartOpen(false);
 
   const totalFee = items.reduce((sum, item) => sum + (item.borrowFee || 0), 0);
+  const totalDeposit = items.reduce((sum, item) => sum + (item.price || 0), 0);
+  const totalPayment = totalFee + totalDeposit;
 
   return (
     <CartContext.Provider
@@ -99,6 +103,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         items,
         itemCount: items.length,
         totalFee,
+        totalDeposit,
+        totalPayment,
         isCartOpen,
         addToCart,
         removeFromCart,

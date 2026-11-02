@@ -32,7 +32,13 @@ const LOAN_FILTERS: FilterChipOption[] = [
   { value: 'HISTORY', label: 'Lịch sử' },
 ];
 
-const HISTORY_STATUSES: LoanItemStatus[] = ['RETURNED', 'CANCELLED', 'REJECTED', 'EXPIRED'];
+const HISTORY_STATUSES: LoanItemStatus[] = [
+  'RETURNED',
+  'LOST',
+  'CANCELLED',
+  'REJECTED',
+  'EXPIRED',
+];
 
 function filterItem(item: BorrowItem, filter: string): boolean {
   if (filter === 'ALL') return true;

@@ -14,17 +14,28 @@ import { BookCoverMini } from '@/components/books/BookCoverMini';
 import { LibbyButton } from '@/components/ui';
 import { LibbyColors, LibbyFonts } from '@/constants/theme';
 import { useCart } from '@/contexts/CartContext';
-import { borrowService } from '@/services/borrowService';
+import { borrowService, BorrowRequest } from '@/services/borrowService';
 
 interface CartDrawerModalProps {
-  onCheckoutSuccess?: (loanCode: string) => void;
+  onCheckoutSuccess?: (loanCode: string, paymentStatus?: BorrowRequest['paymentStatus']) => void;
 }
 
 export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({ onCheckoutSuccess }) => {
-  const { isCartOpen, closeCart, items, removeFromCart, clearCart, totalFee } = useCart();
+  const {
+    isCartOpen,
+    closeCart,
+    items,
+    removeFromCart,
+    clearCart,
+    totalFee,
+    totalDeposit,
+    totalPayment,
+  } = useCart();
   const [submitting, setSubmitting] = useState(false);
 
-  const formattedTotal = totalFee.toLocaleString('vi-VN');
+  const formattedFee = totalFee.toLocaleString('vi-VN');
+  const formattedDeposit = totalDeposit.toLocaleString('vi-VN');
+  const formattedTotal = totalPayment.toLocaleString('vi-VN');
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
@@ -36,9 +47,13 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({ onCheckoutSucc
       closeCart();
       Alert.alert(
         'Đặt mượn thành công!',
-        `Yêu cầu mã ${res.loanCode} đã được ghi nhận. Vui lòng kiểm tra mã QR trong mục Sách của tôi để nhận sách.`
+        `Yêu cầu mã ${res.loanCode} đã được ghi nhận. ${
+          res.paymentStatus === 'PENDING'
+            ? 'Vui lòng hoàn tất thanh toán để thư viện chuẩn bị sách.'
+            : 'Vui lòng kiểm tra mã QR trong mục Sách của tôi để nhận sách.'
+        }`
       );
-      onCheckoutSuccess?.(res.loanCode);
+      onCheckoutSuccess?.(res.loanCode, res.paymentStatus);
     } catch (err: any) {
       Alert.alert('Không thể đặt mượn', err.message || 'Đã có lỗi xảy ra.');
     } finally {
@@ -128,8 +143,8 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({ onCheckoutSucc
                       {item.title}
                     </Text>
                     <Text style={styles.itemFee}>
-                      {(item.borrowFee || 0).toLocaleString('vi-VN')} đ{' '}
-                      <Text style={styles.itemFeeUnit}>/lượt</Text>
+                      Phí {(item.borrowFee || 0).toLocaleString('vi-VN')} đ · Cọc{' '}
+                      {(item.price || 0).toLocaleString('vi-VN')} đ
                     </Text>
                   </View>
 
@@ -156,10 +171,21 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({ onCheckoutSucc
           {/* Footer Checkout */}
           {items.length > 0 && (
             <View style={styles.footer}>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Tổng phí mượn</Text>
-                <Text style={styles.totalAmount}>{formattedTotal} đ</Text>
+              <View style={styles.subtotalRow}>
+                <Text style={styles.subtotalLabel}>Tổng phí mượn</Text>
+                <Text style={styles.subtotalAmount}>{formattedFee} đ</Text>
               </View>
+              <View style={styles.subtotalRow}>
+                <Text style={styles.subtotalLabel}>Tổng tiền cọc</Text>
+                <Text style={styles.subtotalAmount}>{formattedDeposit} đ</Text>
+              </View>
+              <View style={[styles.subtotalRow, styles.grandTotalRow]}>
+                <Text style={styles.grandTotalLabel}>Tổng thanh toán</Text>
+                <Text style={styles.grandTotalAmount}>{formattedTotal} đ</Text>
+              </View>
+              <Text style={styles.depositNote}>
+                Tiền cọc được hoàn trả 100% khi trả sách nguyên vẹn tại quầy.
+              </Text>
 
               <LibbyButton
                 title={
@@ -289,13 +315,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   itemFee: {
-    fontFamily: LibbyFonts.semiBold,
-    fontSize: 14,
-    color: LibbyColors.ink,
-  },
-  itemFeeUnit: {
     fontFamily: LibbyFonts.regular,
-    fontSize: 12,
+    fontSize: 13,
     color: LibbyColors.textMuted,
   },
   deleteBtn: {
@@ -316,20 +337,42 @@ const styles = StyleSheet.create({
     borderTopColor: LibbyColors.ink,
     gap: 14,
   },
-  totalRow: {
+  subtotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
   },
-  totalLabel: {
+  subtotalLabel: {
+    fontFamily: LibbyFonts.regular,
+    fontSize: 14,
+    color: LibbyColors.textMuted,
+  },
+  subtotalAmount: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 14,
+    color: LibbyColors.ink,
+  },
+  grandTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: LibbyColors.borderSubtle,
+    paddingTop: 8,
+    marginTop: 2,
+  },
+  grandTotalLabel: {
     fontFamily: LibbyFonts.semiBold,
     fontSize: 16,
     color: LibbyColors.ink,
   },
-  totalAmount: {
+  grandTotalAmount: {
     fontFamily: LibbyFonts.display,
     fontSize: 26,
     color: LibbyColors.ink,
     letterSpacing: -0.5,
+  },
+  depositNote: {
+    fontFamily: LibbyFonts.regular,
+    fontSize: 12,
+    color: LibbyColors.textMuted,
+    lineHeight: 17,
   },
 });

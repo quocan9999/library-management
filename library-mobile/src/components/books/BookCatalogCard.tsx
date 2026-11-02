@@ -28,8 +28,10 @@ export const BookCatalogCard: React.FC<BookCatalogCardProps> = ({
   const [imageError, setImageError] = useState(false);
   const currentTheme = THEMES[Math.abs(themeIndex) % THEMES.length];
   const isAvailable = book.availableQuantity > 0;
+  const isLowStock = book.availableQuantity === 1;
 
   const formattedFee = (book.borrowFee || 0).toLocaleString('vi-VN');
+  const formattedDeposit = (book.price || 0).toLocaleString('vi-VN');
   const imageUri = (!imageError && (book.coverImageUrl || DEFAULT_BOOK_COVER_URL)) || null;
 
   return (
@@ -73,19 +75,33 @@ export const BookCatalogCard: React.FC<BookCatalogCardProps> = ({
         <Text style={styles.feeUnit}>/lượt</Text>
       </View>
 
+      {book.price > 0 && (
+        <Text style={styles.depositText}>Cọc: {formattedDeposit} đ</Text>
+      )}
+
       <View
         style={[
           styles.badge,
-          isAvailable ? styles.badgeAvailable : styles.badgeOutOfStock,
+          isLowStock
+            ? styles.badgeLowStock
+            : isAvailable
+            ? styles.badgeAvailable
+            : styles.badgeOutOfStock,
         ]}
       >
         <Text
           style={[
             styles.badgeText,
-            isAvailable ? styles.badgeTextAvailable : styles.badgeTextOutOfStock,
+            isLowStock
+              ? styles.badgeTextLowStock
+              : isAvailable
+              ? styles.badgeTextAvailable
+              : styles.badgeTextOutOfStock,
           ]}
         >
-          {isAvailable
+          {isLowStock
+            ? 'Sắp hết · còn 1'
+            : isAvailable
             ? `Còn ${book.availableQuantity}/${book.totalQuantity}`
             : 'Hết sách'}
         </Text>
@@ -146,6 +162,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: LibbyColors.textMuted,
   },
+  depositText: {
+    fontFamily: LibbyFonts.regular,
+    fontSize: 12,
+    color: LibbyColors.textMuted,
+    marginTop: -4,
+  },
   badge: {
     alignSelf: 'flex-start',
     borderRadius: 14,
@@ -154,6 +176,9 @@ const styles = StyleSheet.create({
   },
   badgeAvailable: {
     backgroundColor: LibbyColors.accentLime,
+  },
+  badgeLowStock: {
+    backgroundColor: '#FFF1C2',
   },
   badgeOutOfStock: {
     backgroundColor: '#FFE4E8',
@@ -164,6 +189,9 @@ const styles = StyleSheet.create({
   },
   badgeTextAvailable: {
     color: LibbyColors.ink,
+  },
+  badgeTextLowStock: {
+    color: '#7A4B00',
   },
   badgeTextOutOfStock: {
     color: '#9B1C31',

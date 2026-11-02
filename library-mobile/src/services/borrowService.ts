@@ -7,6 +7,7 @@ export type LoanItemStatus =
   | 'READY_FOR_PICKUP'
   | 'BORROWED'
   | 'RETURNED'
+  | 'LOST'
   | 'CANCELLED'
   | 'REJECTED'
   | 'EXPIRED';
@@ -33,8 +34,13 @@ export interface BorrowItem {
   coverImageUrl: string | null;
   status: LoanItemStatus;
   borrowFee: number;
+  depositAmount: number;
   lateFeePerDay: number;
   paidBorrowFee: number;
+  paidDepositAmount?: number | null;
+  depositRefundedAmount?: number | null;
+  depositRefundedAt?: string | null;
+  depositForfeitedAt?: string | null;
   lateFee: number;
   borrowedAt: string | null;
   dueDate: string | null;
@@ -54,6 +60,8 @@ export interface BorrowRequestSummary {
   paymentStatus?: 'PENDING' | 'PAID' | 'NOT_REQUIRED' | 'EXPIRED';
   paymentAmount?: number;
   paymentExpiresAt?: string | null;
+  refundedAmount?: number | null;
+  refundedAt?: string | null;
   itemCount: number;
   statuses: LoanItemStatus[];
   items: BorrowItem[];
@@ -66,7 +74,12 @@ export interface BorrowRequest {
   createdAt: string;
   version: number;
   paymentStatus?: 'PENDING' | 'PAID' | 'NOT_REQUIRED' | 'EXPIRED';
+  paymentMethod?: 'MOCK_VIETQR' | 'COUNTER' | 'NO_CHARGE' | null;
   paymentAmount?: number;
+  paymentExpiresAt?: string | null;
+  paidAt?: string | null;
+  refundedAmount?: number | null;
+  refundedAt?: string | null;
   items: BorrowItem[];
 }
 
@@ -92,6 +105,20 @@ export const borrowService = {
     }
   },
 
+  async getMine(loanCode: string): Promise<BorrowRequest> {
+    try {
+      const response = await api.get<ApiEnvelope<BorrowRequest>>(
+        `/api/v1/borrow-requests/mine/${encodeURIComponent(loanCode)}`
+      );
+      if (!response.data.data) {
+        throw new Error(response.data.message || 'Không thể tải yêu cầu mượn.');
+      }
+      return response.data.data;
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Không thể tải yêu cầu mượn.'));
+    }
+  },
+
   async createRequest(bookIds: number[]): Promise<BorrowRequest> {
     try {
       if (bookIds.length < 1 || bookIds.length > 3) {
@@ -104,6 +131,25 @@ export const borrowService = {
       return response.data.data;
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Đặt mượn sách không thành công.'));
+    }
+  },
+
+  async confirmMockPayment(
+    loanCode: string,
+    expectedLoanVersion: number,
+    confirmedAmount: number
+  ): Promise<BorrowRequest> {
+    try {
+      const response = await api.post<ApiEnvelope<BorrowRequest>>(
+        `/api/v1/borrow-requests/mine/${encodeURIComponent(loanCode)}/mock-payment`,
+        { expectedLoanVersion, confirmedAmount }
+      );
+      if (!response.data.data) {
+        throw new Error(response.data.message || 'Không thể xác nhận thanh toán.');
+      }
+      return response.data.data;
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Xác nhận thanh toán không thành công.'));
     }
   },
 

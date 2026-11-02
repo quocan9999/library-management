@@ -21,6 +21,7 @@ export interface CatalogBook {
   totalQuantity: number;
   availableQuantity: number;
   borrowFee: number;
+  price: number;
   lateFeePerDay: number;
   coverImageUrl: string | null;
 }

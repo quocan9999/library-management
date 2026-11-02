@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -17,6 +18,8 @@ export const LoanRequestCard: React.FC<LoanRequestCardProps> = ({
   onShowQr,
   onItemUpdated,
 }) => {
+  const router = useRouter();
+
   const formatDate = (isoDate?: string | null): string => {
     if (!isoDate) return '—';
     try {
@@ -28,7 +31,27 @@ export const LoanRequestCard: React.FC<LoanRequestCardProps> = ({
     }
   };
 
+  const formatDateTime = (isoDate?: string | null): string => {
+    if (!isoDate) return '—';
+    try {
+      const d = new Date(isoDate);
+      if (Number.isNaN(d.getTime())) return '—';
+      return `${formatDate(isoDate)} ${d.getHours().toString().padStart(2, '0')}:${d
+        .getMinutes()
+        .toString()
+        .padStart(2, '0')}`;
+    } catch {
+      return '—';
+    }
+  };
+
   const hasPickup = !!request.pickupReference;
+  const allClosed =
+    request.items.length > 0 &&
+    request.items.every((item) =>
+      ['CANCELLED', 'EXPIRED', 'REJECTED'].includes(item.status)
+    );
+  const showRefund = request.paymentStatus === 'PAID' && allClosed;
 
   return (
     <View style={styles.card}>
@@ -62,10 +85,47 @@ export const LoanRequestCard: React.FC<LoanRequestCardProps> = ({
               <Text style={styles.paymentBadgeText}>Chờ thanh toán</Text>
             </View>
             <Text style={styles.paymentDesc}>
-              Cần thanh toán {(request.paymentAmount || 0).toLocaleString('vi-VN')} đ tại quầy để thư viện chuẩn bị sách.
+              Cần thanh toán {(request.paymentAmount || 0).toLocaleString('vi-VN')} đ để thư viện
+              bắt đầu xử lý.
             </Text>
+            <Pressable
+              onPress={() =>
+                router.push(`/borrow-payment/${encodeURIComponent(request.loanCode)}`)
+              }
+              style={({ pressed }) => [styles.payBtn, pressed && { opacity: 0.8 }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Thanh toán yêu cầu ${request.loanCode}`}
+            >
+              <Text style={styles.payBtnText}>Tiếp tục thanh toán</Text>
+            </Pressable>
           </View>
         )}
+
+        {/* Refund notice for paid requests that were cancelled/expired */}
+        {showRefund &&
+          (request.refundedAt ? (
+            <View style={[styles.refundBox, styles.refundDoneBox]}>
+              <View style={[styles.refundBadge, styles.refundDoneBadge]}>
+                <Text style={styles.refundDoneText}>Đã hoàn tiền</Text>
+              </View>
+              <Text style={styles.refundDoneDesc}>
+                Đã nhận lại tiền hoàn{' '}
+                {(request.refundedAmount ?? request.paymentAmount ?? 0).toLocaleString('vi-VN')} đ
+                trực tiếp tại quầy thư viện vào {formatDateTime(request.refundedAt)}.
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.refundBox, styles.refundPendingBox]}>
+              <View style={[styles.refundBadge, styles.refundPendingBadge]}>
+                <Text style={styles.refundPendingText}>Hoàn tiền tại quầy</Text>
+              </View>
+              <Text style={styles.refundPendingDesc}>
+                Yêu cầu đã hủy / hết hạn nhưng bạn đã thanh toán{' '}
+                {(request.paymentAmount ?? 0).toLocaleString('vi-VN')} đ. Vui lòng đến quầy thư
+                viện để nhận lại 100% số tiền hoàn trực tiếp (bao gồm phí mượn và tiền cọc).
+              </Text>
+            </View>
+          ))}
 
         {request.items.map((item) => (
           <LoanItemRow
@@ -155,6 +215,68 @@ const styles = StyleSheet.create({
     color: '#7A4B00',
   },
   paymentDesc: {
+    fontFamily: LibbyFonts.regular,
+    fontSize: 13,
+    color: '#7A4B00',
+    lineHeight: 18,
+  },
+  payBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: LibbyColors.ink,
+  },
+  payBtnText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 13,
+    color: LibbyColors.white,
+  },
+  refundBox: {
+    marginVertical: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 6,
+  },
+  refundDoneBox: {
+    backgroundColor: '#F6FFED',
+    borderColor: '#52C41A',
+  },
+  refundPendingBox: {
+    backgroundColor: '#FFFBE6',
+    borderColor: '#FAAD14',
+  },
+  refundBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  refundDoneBadge: {
+    backgroundColor: '#D9F7BE',
+  },
+  refundPendingBadge: {
+    backgroundColor: '#FFE8A3',
+  },
+  refundDoneText: {
+    fontFamily: LibbyFonts.bold,
+    fontSize: 11,
+    color: '#135200',
+  },
+  refundPendingText: {
+    fontFamily: LibbyFonts.bold,
+    fontSize: 11,
+    color: '#7A4B00',
+  },
+  refundDoneDesc: {
+    fontFamily: LibbyFonts.regular,
+    fontSize: 13,
+    color: '#135200',
+    lineHeight: 18,
+  },
+  refundPendingDesc: {
     fontFamily: LibbyFonts.regular,
     fontSize: 13,
     color: '#7A4B00',
