@@ -1,3 +1,15 @@
+export interface StaffProfile {
+  id: number;
+  staffCode: string;
+  fullName: string;
+  dateOfBirth: string;
+  phone: string;
+  address?: string | null;
+  version: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface AdminAccount {
   id: number;
   username: string;
@@ -9,6 +21,7 @@ export interface AdminAccount {
   systemAccount: boolean;
   sessionVersion: number;
   createdAt: string;
+  staff?: StaffProfile | null;
 }
 
 export interface AdminAccountPage {
@@ -37,6 +50,10 @@ export interface AdminAccountCreateRequest {
   email: string;
   password: string;
   roleCode: string;
+  fullName: string;
+  dateOfBirth: string;
+  phone: string;
+  address?: string | null;
 }
 
 export interface AdminAccountRoleUpdateRequest {
@@ -47,4 +64,12 @@ export interface AdminAccountRoleUpdateRequest {
 export interface AdminAccountStatusUpdateRequest {
   enabled: boolean;
   expectedSessionVersion: number;
+}
+
+export interface StaffProfileUpdateRequest {
+  version: number;
+  fullName?: string | null;
+  dateOfBirth?: string | null;
+  phone?: string | null;
+  address?: string | null;
 }

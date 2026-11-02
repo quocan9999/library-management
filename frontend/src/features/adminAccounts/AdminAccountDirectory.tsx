@@ -15,7 +15,33 @@ const PAGE_SIZE = 10;
 const PASSWORD_POLICY = /^(?=.{8,20}$)(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\p{P}\p{S}])\S+$/u;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type DirectoryMode = 'management' | 'assignments';
-type CreateField = 'username' | 'email' | 'password' | 'password-confirm' | 'role';
+type CreateField = 'username' | 'email' | 'password' | 'password-confirm' | 'role' | 'fullName' | 'dateOfBirth' | 'phone' | 'address';
+
+const VIETNAM_PHONE_REGEX = /^0[35789][0-9]{8}$/;
+
+function isEligibleBirthDate(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return false;
+  const birthYear = parseInt(parts[0], 10);
+  const birthMonth = parseInt(parts[1], 10) - 1;
+  const birthDay = parseInt(parts[2], 10);
+  const birth = new Date(birthYear, birthMonth, birthDay);
+  if (isNaN(birth.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (birth > today) return false;
+  const eighteenth = new Date(birthYear + 18, birthMonth, birthDay);
+  return eighteenth <= today;
+}
+
+function getMaxBirthDateForStaff(): string {
+  const today = new Date();
+  const maxYear = today.getFullYear() - 18;
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${maxYear}-${month}-${day}`;
+}
 type SortState = { field: string; direction: 'asc' | 'desc' };
 type FilterState = {
   username: string;
@@ -115,6 +141,10 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
   const [createPassword, setCreatePassword] = useState('');
   const [createPasswordConfirm, setCreatePasswordConfirm] = useState('');
   const [createRoleCode, setCreateRoleCode] = useState<string>();
+  const [createFullName, setCreateFullName] = useState('');
+  const [createDateOfBirth, setCreateDateOfBirth] = useState('');
+  const [createPhone, setCreatePhone] = useState('');
+  const [createAddress, setCreateAddress] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [createTouched, setCreateTouched] = useState<Partial<Record<CreateField, boolean>>>({});
   const [confirmAdminCreate, setConfirmAdminCreate] = useState(false);
@@ -212,12 +242,17 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     setCreatePassword('');
     setCreatePasswordConfirm('');
     setCreateRoleCode(undefined);
+    setCreateFullName('');
+    setCreateDateOfBirth('');
+    setCreatePhone('');
+    setCreateAddress('');
     setConfirmAdminCreate(false);
   };
 
   const createValues: Record<CreateField, string> = {
     username: createUsername, email: createEmail, password: createPassword,
     'password-confirm': createPasswordConfirm, role: createRoleCode ?? '',
+    fullName: createFullName, dateOfBirth: createDateOfBirth, phone: createPhone, address: createAddress,
   };
   const createErrors: Record<CreateField, string | null> = {
     username: !createUsername.trim() ? 'Vui lòng nhập tên đăng nhập.'
@@ -233,6 +268,14 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     role: !createRoleCode ? 'Vui lòng chọn nhóm quyền.'
       : !activeAssignableRoles.some(({ code }) => code === createRoleCode)
         ? 'Chọn một nhóm đang hoạt động và khác USER.' : null,
+    fullName: !createFullName.trim() ? 'Vui lòng nhập họ và tên.'
+      : createFullName.trim().length > 100 ? 'Họ và tên tối đa 100 ký tự.' : null,
+    dateOfBirth: !createDateOfBirth ? 'Vui lòng chọn ngày sinh.'
+      : !isEligibleBirthDate(createDateOfBirth) ? 'Nhân viên phải từ 18 tuổi trở lên và ngày sinh không thuộc tương lai.' : null,
+    phone: !createPhone.trim() ? 'Vui lòng nhập số điện thoại.'
+      : !VIETNAM_PHONE_REGEX.test(createPhone.trim().replace(/[.\s-]/g, ''))
+        ? 'Số điện thoại phải có 10 chữ số và thuộc đầu số di động Việt Nam (03, 05, 07, 08, 09).' : null,
+    address: createAddress.trim().length > 255 ? 'Địa chỉ tối đa 255 ký tự.' : null,
   };
   const createFormValid = Object.values(createErrors).every((message) => message === null);
   const visibleCreateError = (field: CreateField) =>
@@ -274,6 +317,10 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
         email: createEmail.trim(),
         password: createPassword,
         roleCode: createRoleCode,
+        fullName: createFullName.trim(),
+        dateOfBirth: createDateOfBirth,
+        phone: createPhone.trim().replace(/[.\s-]/g, ''),
+        address: createAddress.trim() || undefined,
       });
       setCreateOpen(false);
       setCreateTouched({});
@@ -282,6 +329,10 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       setCreatePassword('');
       setCreatePasswordConfirm('');
       setCreateRoleCode(undefined);
+      setCreateFullName('');
+      setCreateDateOfBirth('');
+      setCreatePhone('');
+      setCreateAddress('');
       setCreateError(null);
       setConfirmAdminCreate(false);
       notify('success', {
@@ -441,7 +492,21 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       key: 'username',
       sorter: true,
       sortOrder: sort.field === 'username' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
-      width: 150,
+      width: 140,
+    },
+    {
+      title: 'Mã NV',
+      dataIndex: ['staff', 'staffCode'],
+      key: 'staffCode',
+      render: (_value: string, account) => account.staff?.staffCode || '—',
+      width: 110,
+    },
+    {
+      title: 'Họ và tên',
+      dataIndex: ['staff', 'fullName'],
+      key: 'fullName',
+      render: (_value: string, account) => account.staff?.fullName || '—',
+      width: 170,
     },
     {
       title: 'Email',
@@ -512,7 +577,16 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
         const protectedAccount = isProtectedAccount(account, currentUser?.id);
         const protectionLabel = account.systemAccount ? 'Tài khoản hệ thống được bảo vệ' : 'Không thể thay đổi chính tài khoản đang đăng nhập';
         return <div className="admin-account-actions">
-          {mode === 'management' && <Button type="link" onClick={() => void openDetails(account)}>Xem</Button>}
+          {mode === 'management' && (
+            <Link
+              to={`/admin/accounts/${account.id}`}
+              className="ant-btn ant-btn-link"
+              style={{ padding: '0 4px', height: 'auto', lineHeight: 'normal' }}
+            >
+              Xem chi tiết
+            </Link>
+          )}
+          {mode === 'management' && <Button type="link" onClick={() => void openDetails(account)}>Xem nhanh</Button>}
           <Tooltip title={protectedAccount ? protectionLabel : ''}>
             <Button
               type="link"
@@ -711,6 +785,28 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
             />
             {createFieldError('role')}
           </div>
+
+          <label htmlFor="admin-account-fullName">Họ và tên</label>
+          <div className="admin-account-form-field">
+            <Input id="admin-account-fullName" {...createFieldProps('fullName')} aria-label="Họ và tên" maxLength={100} value={createFullName} onChange={(event) => { setCreateFullName(event.target.value); setCreateError(null); }} autoComplete="name" placeholder="Nguyễn Văn A" />
+            {createFieldError('fullName')}
+          </div>
+          <label htmlFor="admin-account-dateOfBirth">Ngày sinh</label>
+          <div className="admin-account-form-field">
+            <Input id="admin-account-dateOfBirth" {...createFieldProps('dateOfBirth')} aria-label="Ngày sinh" type="date" max={getMaxBirthDateForStaff()} value={createDateOfBirth} onChange={(event) => { setCreateDateOfBirth(event.target.value); setCreateError(null); }} />
+            {createFieldError('dateOfBirth')}
+          </div>
+          <label htmlFor="admin-account-phone">Số điện thoại</label>
+          <div className="admin-account-form-field">
+            <Input id="admin-account-phone" {...createFieldProps('phone')} aria-label="Số điện thoại" maxLength={10} value={createPhone} onChange={(event) => { setCreatePhone(event.target.value); setCreateError(null); }} placeholder="0912345678" />
+            {createFieldError('phone')}
+          </div>
+          <label htmlFor="admin-account-address">Địa chỉ</label>
+          <div className="admin-account-form-field">
+            <Input.TextArea id="admin-account-address" {...createFieldProps('address')} aria-label="Địa chỉ" maxLength={255} rows={2} value={createAddress} onChange={(event) => { setCreateAddress(event.target.value); setCreateError(null); }} placeholder="Địa chỉ cư trú (tùy chọn)" />
+            {createFieldError('address')}
+          </div>
+
           <p className="admin-account-form-hint">Tài khoản mới cần xác minh email trước khi đăng nhập. Mật khẩu gồm 8–20 ký tự, chữ hoa, chữ thường, số và ký tự đặc biệt; không có khoảng trắng.</p>
         </div>
         {createError && <Alert className="admin-account-inline-alert" type="error" showIcon role="alert" title={createError} />}
@@ -740,8 +836,13 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
         onCancel={() => { setDetailTarget(null); setDetailError(null); }}
       >
         {detailLoading ? <div className="admin-account-loading" role="status"><Spin /> Đang tải chi tiết…</div> : detailTarget && <dl className="admin-account-detail-grid">
+          <dt>Mã nhân viên</dt><dd>{detailTarget.staff?.staffCode || '—'}</dd>
+          <dt>Họ và tên</dt><dd>{detailTarget.staff?.fullName || '—'}</dd>
           <dt>Tên đăng nhập</dt><dd>{detailTarget.username}</dd>
           <dt>Email</dt><dd>{detailTarget.email}</dd>
+          <dt>Ngày sinh</dt><dd>{detailTarget.staff?.dateOfBirth || '—'}</dd>
+          <dt>Số điện thoại</dt><dd>{detailTarget.staff?.phone || '—'}</dd>
+          <dt>Địa chỉ</dt><dd>{detailTarget.staff?.address || '—'}</dd>
           <dt>Nhóm quyền</dt><dd>{detailTarget.roleDisplayName} ({detailTarget.roleCode})</dd>
           <dt>Xác minh email</dt><dd>{detailTarget.emailVerified ? 'Đã xác minh' : 'Chưa xác minh email'}</dd>
           <dt>Trạng thái tài khoản</dt><dd>{detailTarget.enabled ? 'Đang hoạt động' : 'Đã khóa'}</dd>

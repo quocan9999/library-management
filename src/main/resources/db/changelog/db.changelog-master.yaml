@@ -166,3 +166,7 @@ databaseChangeLog:
   - include:
       file: changes/042-seed-admin-members.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/043-create-staffs.yaml
+      relativeToChangelogFile: true

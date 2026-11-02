@@ -19,6 +19,8 @@ import sparkminds.librarymanagement.adminaccount.dto.AdminAccountPageResponse;
 import sparkminds.librarymanagement.adminaccount.dto.AdminAccountResponse;
 import sparkminds.librarymanagement.adminaccount.dto.AdminAccountRoleUpdateRequest;
 import sparkminds.librarymanagement.adminaccount.dto.AdminAccountStatusUpdateRequest;
+import sparkminds.librarymanagement.adminaccount.dto.StaffProfileResponse;
+import sparkminds.librarymanagement.adminaccount.dto.StaffProfileUpdateRequest;
 import sparkminds.librarymanagement.adminaccount.service.AdminAccountService;
 import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
 import sparkminds.librarymanagement.common.api.ApiResponse;
@@ -83,5 +85,15 @@ public class AdminAccountController {
             @Valid @RequestBody AdminAccountStatusUpdateRequest request) {
         return ResponseEntity.ok(ApiResponse.success(200, "ADMIN_ACCOUNT_STATUS_UPDATED", "Đã cập nhật trạng thái tài khoản",
                 service.updateStatus(actor, accountId, request)));
+    }
+
+    @PatchMapping("/{accountId}/profile")
+    @PreAuthorize("hasAuthority('role:update')")
+    public ResponseEntity<ApiResponse<StaffProfileResponse>> updateProfile(
+            @AuthenticationPrincipal CustomUserPrincipal actor,
+            @PathVariable Integer accountId,
+            @Valid @RequestBody StaffProfileUpdateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(200, "STAFF_PROFILE_UPDATED", "Đã cập nhật hồ sơ nhân viên",
+                service.updateStaffProfile(actor, accountId, request)));
     }
 }

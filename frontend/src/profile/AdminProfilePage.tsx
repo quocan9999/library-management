@@ -21,7 +21,7 @@ function formatDateOfBirth(isoDate: string | null | undefined): string {
 
 function getMaxBirthDate(): string {
   const d = new Date();
-  d.setFullYear(d.getFullYear() - 16);
+  d.setFullYear(d.getFullYear() - 18);
   return d.toISOString().split('T')[0];
 }
 
@@ -118,7 +118,7 @@ export function AdminProfilePage() {
     if (formData.dateOfBirth) {
       const maxAllowed = getMaxBirthDate();
       if (formData.dateOfBirth > maxAllowed) {
-        errors.dateOfBirth = 'Ngày sinh phải hợp lệ và thành viên đủ 16 tuổi';
+        errors.dateOfBirth = 'Ngày sinh phải hợp lệ và nhân viên đủ 18 tuổi';
       }
     }
 
@@ -244,6 +244,12 @@ export function AdminProfilePage() {
           ) : !isEditing ? (
             <div className="admin-profile-details">
               <div className="admin-profile-detail-item">
+                <span className="admin-profile-detail-label">Mã nhân viên</span>
+                <span className="admin-profile-detail-value">
+                  <code>{profile?.memberCode || '—'}</code>
+                </span>
+              </div>
+              <div className="admin-profile-detail-item">
                 <span className="admin-profile-detail-label">Họ và tên</span>
                 <span className="admin-profile-detail-value">
                   <strong>{profile?.fullName?.trim() || 'Chưa cập nhật'}</strong>
@@ -310,7 +316,7 @@ export function AdminProfilePage() {
                 {/* Date of Birth */}
                 <div className="form-field">
                   <label htmlFor="admin-profile-dob">
-                    Ngày sinh (từ 16 tuổi trở lên)
+                    Ngày sinh (từ 18 tuổi trở lên)
                   </label>
                   <Input
                     id="admin-profile-dob"
@@ -395,22 +401,26 @@ export function AdminProfilePage() {
 
           <div className="admin-profile-security-rows">
             {/* Email Row */}
-            <section className="profile-summary__row" aria-label="Email hiện tại">
-              <h2>Email</h2>
-              <p>{profile?.email ?? currentUser?.email ?? '—'}</p>
-              <Link to="/profile/change-email" className="profile-action__link">
+            <div className="admin-profile-security-row" aria-label="Email hiện tại">
+              <div className="admin-profile-security-info">
+                <h3>Email</h3>
+                <p>{profile?.email ?? currentUser?.email ?? '—'}</p>
+              </div>
+              <Link to="/profile/change-email" className="ant-btn ant-btn-default">
                 Đổi email
               </Link>
-            </section>
+            </div>
 
             {/* Password Row */}
-            <section className="profile-summary__row" aria-label="Mật khẩu">
-              <h2>Mật khẩu</h2>
-              <p aria-label="Mật khẩu được ẩn">••••••••</p>
-              <Link to="/profile/change-password" className="profile-action__link">
+            <div className="admin-profile-security-row" aria-label="Mật khẩu">
+              <div className="admin-profile-security-info">
+                <h3>Mật khẩu</h3>
+                <p aria-label="Mật khẩu được ẩn">••••••••</p>
+              </div>
+              <Link to="/profile/change-password" className="ant-btn ant-btn-default">
                 Đổi mật khẩu
               </Link>
-            </section>
+            </div>
           </div>
         </section>
       </section>

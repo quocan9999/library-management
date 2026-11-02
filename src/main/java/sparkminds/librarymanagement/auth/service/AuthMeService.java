@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import sparkminds.librarymanagement.adminaccount.entity.Staff;
+import sparkminds.librarymanagement.adminaccount.repository.StaffRepository;
 import sparkminds.librarymanagement.auth.dto.AuthMeResponse;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
@@ -11,6 +13,7 @@ import sparkminds.librarymanagement.auth.security.EffectivePermissionService;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.member.entity.Member;
 import sparkminds.librarymanagement.member.repository.MemberRepository;
+import sparkminds.librarymanagement.role.policy.RoleAccessPolicy;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +21,7 @@ public class AuthMeService {
 
     private final AccountRepository accountRepository;
     private final MemberRepository memberRepository;
+    private final StaffRepository staffRepository;
     private final EffectivePermissionService effectivePermissionService;
 
     @Transactional(readOnly = true)
@@ -29,9 +33,16 @@ public class AuthMeService {
                         "Access Token không hợp lệ"
                 ));
 
-        String fullName = memberRepository.findByAccountId(account.getId())
-                .map(Member::getFullName)
-                .orElse(null);
+        String fullName;
+        if (!RoleAccessPolicy.USER.equals(account.getRole().getCode())) {
+            fullName = staffRepository.findByAccountId(account.getId())
+                    .map(Staff::getFullName)
+                    .orElse(null);
+        } else {
+            fullName = memberRepository.findByAccountId(account.getId())
+                    .map(Member::getFullName)
+                    .orElse(null);
+        }
 
         return new AuthMeResponse(
                 account.getId(),

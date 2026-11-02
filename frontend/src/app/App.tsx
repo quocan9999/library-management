@@ -19,6 +19,7 @@ import { RoleManagementPage } from '../role/RoleManagementPage';
 import { RolePermissionDetailPage } from '../role/RolePermissionDetailPage';
 import { AuthorizationLandingPage } from '../role/AuthorizationPages';
 import { AdminAccountAssignmentPage, AdminAccountManagementPage } from '../features/adminAccounts/AdminAccountDirectory';
+import { StaffDetailPage } from '../features/adminAccounts/StaffDetailPage';
 import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
 import { BookDetailPage } from '../features/books/BookDetailPage';
@@ -239,6 +240,13 @@ export function App() {
             <RequireRole role="ADMIN">
               <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
                 <AdminAccountManagementPage />
+              </RequirePermission>
+            </RequireRole>
+          } />
+          <Route path="admin/accounts/:id" element={
+            <RequireRole role="ADMIN">
+              <RequirePermission permission="role:read" allowedRoles={['ADMIN']}>
+                <StaffDetailPage />
               </RequirePermission>
             </RequireRole>
           } />

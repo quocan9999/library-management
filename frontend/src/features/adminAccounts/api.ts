@@ -7,6 +7,8 @@ import type {
   AdminAccountRoleUpdateRequest,
   AdminAccountSearchQuery,
   AdminAccountStatusUpdateRequest,
+  StaffProfile,
+  StaffProfileUpdateRequest,
 } from './types';
 
 function readRequiredData<T>(envelope: ApiEnvelope<T>, code: string): T {
@@ -49,5 +51,13 @@ export const adminAccountApi = {
       request,
     );
     return readRequiredData(response.data, 'ADMIN_ACCOUNT_STATUS_UPDATED');
+  },
+
+  async updateStaffProfile(accountId: number, request: StaffProfileUpdateRequest): Promise<StaffProfile> {
+    const response = await apiClient.patch<ApiEnvelope<StaffProfile>>(
+      `/api/v1/admin/accounts/${accountId}/profile`,
+      request,
+    );
+    return readRequiredData(response.data, 'STAFF_PROFILE_UPDATED');
   },
 };
