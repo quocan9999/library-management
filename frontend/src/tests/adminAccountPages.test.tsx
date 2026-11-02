@@ -406,14 +406,26 @@ describe('admin account UI routes', () => {
     fireEvent.click(buttonByText(document, 'Hủy'));
   });
 
-  it('confirms disabling another account with its current session version', async () => {
+  it('confirms disabling another account with its current session version via detail page', async () => {
     const api = configureApi();
     renderApp('/admin/accounts');
 
     await waitFor(() => expect(document.querySelector('.admin-account-table-wrap')?.textContent).toContain('librarian@example.com'));
-    fireEvent.click(buttonByText(accountRow(3), 'Khóa tài khoản'));
-    await waitFor(() => expect(document.body.textContent).toContain('phải đăng nhập lại'));
-    fireEvent.click(buttonByText(document, 'Xác nhận khóa tài khoản'));
+    const actionsCell = accountRow(3).querySelector('td:last-child');
+    expect(actionsCell?.textContent).toContain('Xem chi tiết');
+    expect(actionsCell?.textContent).not.toContain('Xem nhanh');
+    expect(actionsCell?.textContent).not.toContain('Đổi nhóm');
+    expect(actionsCell?.textContent).not.toContain('Khóa tài khoản');
+
+    const detailLink = actionsCell?.querySelector('a');
+    expect(detailLink).not.toBeNull();
+    fireEvent.click(detailLink!);
+
+    await waitFor(() => expect(document.querySelector('#staff-detail-heading')?.textContent).toContain('Thủ thư B'));
+    fireEvent.click(buttonByText(document, 'Khóa tài khoản'));
+    await waitFor(() => expect(document.body.textContent).toContain('Mọi phiên đăng nhập hiện tại sẽ bị thu hồi'));
+    const modalFooter = document.querySelector('.ant-modal-footer')!;
+    fireEvent.click(buttonByText(modalFooter, 'Khóa tài khoản'));
 
     await waitFor(() => expect(api.requests.some(({ method, url }) => method === 'patch' && url === '/api/v1/admin/accounts/3/status')).toBe(true));
     const request = api.requests.find(({ method, url }) => method === 'patch' && url === '/api/v1/admin/accounts/3/status');

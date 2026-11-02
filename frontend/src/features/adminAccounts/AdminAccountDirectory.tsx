@@ -149,17 +149,11 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
   const [createTouched, setCreateTouched] = useState<Partial<Record<CreateField, boolean>>>({});
   const [confirmAdminCreate, setConfirmAdminCreate] = useState(false);
 
-  const [detailTarget, setDetailTarget] = useState<AdminAccount | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
   const [assignmentTarget, setAssignmentTarget] = useState<AdminAccount | null>(null);
   const [assignmentRoleCode, setAssignmentRoleCode] = useState<string>();
   const [assignmentSaving, setAssignmentSaving] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [confirmRoleChange, setConfirmRoleChange] = useState(false);
-  const [statusTarget, setStatusTarget] = useState<AdminAccount | null>(null);
-  const [statusSaving, setStatusSaving] = useState(false);
-  const [statusError, setStatusError] = useState<string | null>(null);
 
   const query = useMemo<AdminAccountSearchQuery>(() => ({
     username: appliedText.username.trim() || undefined,
@@ -353,27 +347,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     }
   };
 
-  const openDetails = async (account: AdminAccount) => {
-    setDetailTarget(account);
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
-      setDetailTarget(await adminAccountApi.get(account.id));
-    } catch (detailFailure) {
-      const message = isMaintenanceError(detailFailure)
-        ? MAINTENANCE_MESSAGE
-        : statusOf(detailFailure) === 404
-          ? 'Tài khoản không còn tồn tại. Danh sách đang được tải lại.'
-          : statusOf(detailFailure) === 403
-            ? 'Phiên quản trị không còn quyền xem tài khoản này.'
-            : 'Không thể tải chi tiết tài khoản. Vui lòng thử lại.';
-      setDetailError(message);
-      if (statusOf(detailFailure) === 404 || statusOf(detailFailure) === 403) refresh();
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
   const openAssignment = (account: AdminAccount) => {
     if (isProtectedAccount(account, currentUser?.id)) {
       notify('warning', {
@@ -430,41 +403,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       });
     } finally {
       setAssignmentSaving(false);
-    }
-  };
-
-  const confirmStatusChange = async () => {
-    if (!statusTarget || statusSaving || !canManage) return;
-    setStatusSaving(true);
-    setStatusError(null);
-    try {
-      const updated = await adminAccountApi.updateStatus(statusTarget.id, {
-        enabled: !statusTarget.enabled,
-        expectedSessionVersion: statusTarget.sessionVersion,
-      });
-      setStatusTarget(null);
-      notify('success', {
-        title: updated.enabled ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản',
-        description: updated.enabled
-          ? `${updated.username} cần đăng nhập lại để bắt đầu phiên mới.`
-          : `Các phiên của ${updated.username} đã bị kết thúc.`,
-      });
-      refresh();
-    } catch (writeError) {
-      const message = getMessageForWriteError(writeError, 'status');
-      if (statusOf(writeError) === 403) void refreshCapabilities().catch(() => undefined);
-      if (statusOf(writeError) === 409 || statusOf(writeError) === 404) refresh();
-      if (statusOf(writeError) === 409 || statusOf(writeError) === 403 || statusOf(writeError) === 404) {
-        setStatusTarget(null);
-      } else {
-        setStatusError(message);
-      }
-      notify(statusOf(writeError) === 403 ? 'warning' : 'error', {
-        title: 'Không thể cập nhật trạng thái',
-        description: message,
-      });
-    } finally {
-      setStatusSaving(false);
     }
   };
 
@@ -575,38 +513,29 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     {
       title: 'Thao tác',
       key: 'actions',
-      fixed: 'right',
-      width: mode === 'management' ? 300 : 145,
       render: (_value, account) => {
-        const protectedAccount = isProtectedAccount(account, currentUser?.id);
-        const protectionLabel = account.systemAccount ? 'Tài khoản hệ thống được bảo vệ' : 'Không thể thay đổi chính tài khoản đang đăng nhập';
-        return <div className="admin-account-actions">
-          {mode === 'management' && (
-            <Link
-              to={`/admin/accounts/${account.id}`}
-              className="ant-btn ant-btn-link"
-              style={{ padding: '0 4px', height: 'auto', lineHeight: 'normal' }}
-            >
+        if (mode === 'management') {
+          return (
+            <Link to={`/admin/accounts/${account.id}`} aria-label="Xem chi tiết">
               Xem chi tiết
             </Link>
-          )}
-          {mode === 'management' && <Button type="link" onClick={() => void openDetails(account)}>Xem nhanh</Button>}
-          <Tooltip title={protectedAccount ? protectionLabel : ''}>
-            <Button
-              type="link"
-              disabled={protectedAccount || !canManage || rolesLoading}
-              onClick={() => openAssignment(account)}
-            >Đổi nhóm</Button>
-          </Tooltip>
-          {mode === 'management' && <Tooltip title={protectedAccount ? protectionLabel : ''}>
-            <Button
-              type="link"
-              danger={account.enabled}
-              disabled={protectedAccount || !canManage}
-              onClick={() => { setStatusTarget(account); setStatusError(null); }}
-            >{account.enabled ? 'Khóa tài khoản' : 'Mở khóa'}</Button>
-          </Tooltip>}
-        </div>;
+          );
+        }
+        const protectedAccount = isProtectedAccount(account, currentUser?.id);
+        const protectionLabel = account.systemAccount ? 'Tài khoản hệ thống được bảo vệ' : 'Không thể thay đổi chính tài khoản đang đăng nhập';
+        return (
+          <div className="admin-account-actions">
+            <Tooltip title={protectedAccount ? protectionLabel : ''}>
+              <Button
+                type="link"
+                disabled={protectedAccount || !canManage || rolesLoading}
+                onClick={() => openAssignment(account)}
+              >
+                Đổi nhóm
+              </Button>
+            </Tooltip>
+          </div>
+        );
       },
     },
   ];
@@ -723,7 +652,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
             locale={{ emptyText: request?.isMaintenance ? MAINTENANCE_MESSAGE : (error ? 'Không thể tải dữ liệu. Hãy thử lại.' : 'Không có tài khoản quản trị phù hợp.') }}
             sortDirections={['ascend', 'descend', 'ascend']}
             showSorterTooltip={false}
-            scroll={{ x: 1200 }}
           />
         </div>
         {pageData && pageData.totalElements > 0 && <div className="admin-account-pagination-row">
@@ -833,30 +761,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       </Modal>
 
       <Modal
-        title="Chi tiết tài khoản quản trị"
-        open={Boolean(detailTarget)}
-        centered
-        footer={<Button onClick={() => { setDetailTarget(null); setDetailError(null); }}>Đóng</Button>}
-        onCancel={() => { setDetailTarget(null); setDetailError(null); }}
-      >
-        {detailLoading ? <div className="admin-account-loading" role="status"><Spin /> Đang tải chi tiết…</div> : detailTarget && <dl className="admin-account-detail-grid">
-          <dt>Mã nhân viên</dt><dd>{detailTarget.staff?.staffCode || '—'}</dd>
-          <dt>Họ và tên</dt><dd>{detailTarget.staff?.fullName || '—'}</dd>
-          <dt>Tên đăng nhập</dt><dd>{detailTarget.username}</dd>
-          <dt>Email</dt><dd>{detailTarget.email}</dd>
-          <dt>Ngày sinh</dt><dd>{detailTarget.staff?.dateOfBirth || '—'}</dd>
-          <dt>Số điện thoại</dt><dd>{detailTarget.staff?.phone || '—'}</dd>
-          <dt>Địa chỉ</dt><dd>{detailTarget.staff?.address || '—'}</dd>
-          <dt>Nhóm quyền</dt><dd>{detailTarget.roleDisplayName} ({detailTarget.roleCode})</dd>
-          <dt>Xác minh email</dt><dd>{detailTarget.emailVerified ? 'Đã xác minh' : 'Chưa xác minh email'}</dd>
-          <dt>Trạng thái tài khoản</dt><dd>{detailTarget.enabled ? 'Đang hoạt động' : 'Đã khóa'}</dd>
-          <dt>Tài khoản hệ thống</dt><dd>{detailTarget.systemAccount ? 'Có' : 'Không'}</dd>
-          <dt>Ngày tạo</dt><dd>{formatCreatedAt(detailTarget.createdAt)}</dd>
-        </dl>}
-        {detailError && <Alert className="admin-account-inline-alert" type="error" showIcon role="alert" title={detailError} action={<Button onClick={() => detailTarget && void openDetails(detailTarget)}>Thử lại</Button>} />}
-      </Modal>
-
-      <Modal
         title={`Đổi nhóm quyền${assignmentTarget ? ` · ${assignmentTarget.username}` : ''}`}
         open={Boolean(assignmentTarget)}
         centered
@@ -912,24 +816,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
         </>}
       </Modal>
 
-      <Modal
-        title={statusTarget?.enabled ? 'Khóa tài khoản quản trị?' : 'Mở khóa tài khoản quản trị?'}
-        open={Boolean(statusTarget)}
-        centered
-        onCancel={() => { if (!statusSaving) { setStatusTarget(null); setStatusError(null); } }}
-        onOk={() => void confirmStatusChange()}
-        okText={statusTarget?.enabled ? 'Xác nhận khóa tài khoản' : 'Xác nhận mở khóa'}
-        cancelText="Hủy"
-        confirmLoading={statusSaving}
-        closable={!statusSaving}
-        keyboard={!statusSaving}
-        mask={{ closable: !statusSaving }}
-      >
-        {statusTarget?.enabled
-          ? <Alert type="warning" showIcon title={`Khóa ${statusTarget.username}?`} description="Tất cả phiên của tài khoản sẽ kết thúc. Khi mở khóa, tài khoản phải đăng nhập lại." />
-          : <Alert type="info" showIcon title={`Mở khóa ${statusTarget?.username}?`} description="Tài khoản sẽ có thể đăng nhập bằng phiên mới." />}
-        {statusError && <Alert className="admin-account-inline-alert" type="error" showIcon role="alert" title={statusError} />}
-      </Modal>
     </main>
   );
 }
