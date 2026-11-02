@@ -24,6 +24,9 @@ import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
 import sparkminds.librarymanagement.auth.service.RegistrationMailRequested;
 import sparkminds.librarymanagement.auth.service.VerificationTokenService;
 import sparkminds.librarymanagement.common.api.BusinessException;
+import sparkminds.librarymanagement.member.entity.Member;
+import sparkminds.librarymanagement.member.repository.MemberRepository;
+import java.util.Locale;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -42,6 +45,7 @@ public class AdminAccountMutationTransactionService {
 
     private final AccountRepository accountRepository;
     private final RoleRepositoy roleRepository;
+    private final MemberRepository memberRepository;
     private final EmailVerificationTokenRepository verificationTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -75,6 +79,13 @@ public class AdminAccountMutationTransactionService {
         account.setSessionVersion(0);
         account.setLastSessionChangeReason("OTHER");
         accountRepository.saveAndFlush(account);
+
+        Member member = new Member();
+        member.setAccount(account);
+        member.setMemberCode("A" + String.format(Locale.ROOT, "%06d", account.getId()));
+        member.setFullName(account.getUsername());
+        member.setVersion(0L);
+        memberRepository.saveAndFlush(member);
 
         VerificationTokenService.IssuedToken issued = verificationTokenService.issue(account);
         verificationTokenRepository.saveAndFlush(issued.token());

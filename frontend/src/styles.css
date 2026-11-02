@@ -2304,6 +2304,143 @@ input:focus-visible,
   }
 }
 
+/* Admin Profile Page */
+.admin-profile-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.admin-profile-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-profile-card__header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--navy);
+}
+
+.admin-profile-card__header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.admin-profile-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  background: #fcfcfd;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 18px 20px;
+}
+
+.admin-profile-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-profile-detail-item--full {
+  grid-column: 1 / -1;
+}
+
+.admin-profile-detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-profile-detail-value {
+  font-size: 14px;
+  color: #1d2939;
+}
+
+.admin-profile-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.admin-profile-form-grid--full {
+  grid-column: 1 / -1;
+}
+
+.admin-profile-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #344054;
+  outline: none;
+  resize: vertical;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  box-sizing: border-box;
+}
+
+.admin-profile-textarea:focus {
+  border-color: #d4a017;
+  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2);
+}
+
+.admin-profile-textarea--error {
+  border-color: #ff4d4f;
+}
+
+.admin-profile-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.admin-profile-security-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-profile-security-rows .profile-summary__row {
+  margin-top: 0;
+}
+
+.admin-profile-security-info h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.admin-profile-security-info p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #344054;
+}
+
+@media (max-width: 640px) {
+  .admin-profile-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .auth-stage--centered {
   display: grid;
   min-height: 100svh;
@@ -2390,6 +2527,7 @@ input:focus-visible,
 
 .profile-summary__row .profile-action__link {
   width: 144px;
+  justify-self: end;
 }
 
 @media (max-width: 600px) {

@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 042-seed-admin-members
+      author: quocan9999
+      changes:
+        - sql:
+            dbms: mysql
+            sql: >
+              INSERT INTO members (account_id, member_code, full_name, created_at, updated_at, version)
+              SELECT a.id, CONCAT('A', LPAD(a.id, 6, '0')), COALESCE(NULLIF(a.username, ''), 'Quản trị viên'), NOW(), NOW(), 0
+              FROM accounts a
+              LEFT JOIN members m ON m.account_id = a.id
+              WHERE m.id IS NULL;
+      rollback:
+        - sql:
+            dbms: mysql
+            sql: >
+              DELETE FROM members WHERE member_code LIKE 'A%';
