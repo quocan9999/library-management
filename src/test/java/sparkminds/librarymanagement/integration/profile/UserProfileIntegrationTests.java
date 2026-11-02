@@ -118,6 +118,47 @@ class UserProfileIntegrationTests {
     }
 
     @Test
+    void adminCanGetAndPatchProfileSuccessfully() throws Exception {
+        Account adminAccount = createAccount("ADMIN");
+        String token = loginAndGetToken(adminAccount.getEmail(), PASSWORD);
+
+        // GET profile initially (without member row -> version 0)
+        mockMvc.perform(get(PROFILE_PATH).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("PROFILE_FETCHED"))
+                .andExpect(jsonPath("$.data.email").value(adminAccount.getEmail()))
+                .andExpect(jsonPath("$.data.version").value(0));
+
+        // PATCH profile for admin
+        String patchBody = """
+                {
+                    "version": 0,
+                    "fullName": "Quản Trị Viên A",
+                    "phone": "0912999888",
+                    "dateOfBirth": "1992-03-25",
+                    "address": "Số 1 Trần Phú, Hà Nội"
+                }
+                """;
+
+        mockMvc.perform(patch(PROFILE_PATH)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(patchBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("PROFILE_UPDATED"))
+                .andExpect(jsonPath("$.data.fullName").value("Quản Trị Viên A"))
+                .andExpect(jsonPath("$.data.phone").value("0912999888"))
+                .andExpect(jsonPath("$.data.dateOfBirth").value("1992-03-25"))
+                .andExpect(jsonPath("$.data.address").value("Số 1 Trần Phú, Hà Nội"))
+                .andExpect(jsonPath("$.data.version").value(1));
+
+        // Check that auth/me now returns the updated fullName
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fullName").value("Quản Trị Viên A"));
+    }
+
+    @Test
     void patchProfileRejectsVersionConflict() throws Exception {
         Account userAccount = createAccount("USER");
         Member member = createMember(userAccount, "M000098", "Trần Văn C", "0911223344", LocalDate.of(1990, 1, 1), "Đà Nẵng");

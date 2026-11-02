@@ -9,6 +9,8 @@ import sparkminds.librarymanagement.adminaccount.dto.AdminAccountPageResponse;
 import sparkminds.librarymanagement.adminaccount.dto.AdminAccountResponse;
 import sparkminds.librarymanagement.adminaccount.dto.AdminAccountRoleUpdateRequest;
 import sparkminds.librarymanagement.adminaccount.dto.AdminAccountStatusUpdateRequest;
+import sparkminds.librarymanagement.adminaccount.dto.StaffProfileResponse;
+import sparkminds.librarymanagement.adminaccount.dto.StaffProfileUpdateRequest;
 import sparkminds.librarymanagement.auth.repository.AccountRepository;
 import sparkminds.librarymanagement.auth.security.CustomUserPrincipal;
 import sparkminds.librarymanagement.common.api.BusinessException;
@@ -35,6 +37,9 @@ public class AdminAccountService {
         } catch (DataIntegrityViolationException exception) {
             if (accountRepository.existsByUsernameIgnoreCase(request.username())) throw duplicateUsername();
             if (accountRepository.existsByEmailIgnoreCase(request.email())) throw duplicateEmail();
+            if (exception.getMessage() != null && exception.getMessage().contains("uk_staffs_phone")) {
+                throw new BusinessException(HttpStatus.CONFLICT, "PHONE_ALREADY_EXISTS", "Số điện thoại đã được sử dụng");
+            }
             throw new BusinessException(HttpStatus.CONFLICT, "ADMIN_ACCOUNT_CONFLICT", "Tài khoản đã được thay đổi đồng thời");
         }
     }
@@ -45,6 +50,10 @@ public class AdminAccountService {
 
     public AdminAccountResponse updateStatus(CustomUserPrincipal actor, Integer accountId, AdminAccountStatusUpdateRequest request) {
         return transactionService.updateStatus(actor, accountId, request);
+    }
+
+    public StaffProfileResponse updateStaffProfile(CustomUserPrincipal actor, Integer accountId, StaffProfileUpdateRequest request) {
+        return transactionService.updateStaffProfile(actor, accountId, request);
     }
 
     private static BusinessException duplicateUsername() {

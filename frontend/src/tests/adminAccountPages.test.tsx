@@ -58,6 +58,17 @@ interface AccountRow {
   systemAccount: boolean;
   sessionVersion: number;
   createdAt: string;
+  staff?: {
+    id: number;
+    staffCode: string;
+    fullName: string;
+    dateOfBirth: string;
+    phone: string;
+    address: string | null;
+    version: number;
+    createdAt?: string;
+    updatedAt?: string;
+  } | null;
 }
 
 function response<T>(config: InternalAxiosRequestConfig, data: T, status = 200): AxiosResponse<T> {
@@ -82,13 +93,13 @@ function apiFailure(config: InternalAxiosRequestConfig, status: number, code: st
 
 function initialAccounts(): AccountRow[] {
   return [
-    { id: 1, username: 'root-admin', email: 'root@example.com', roleCode: 'ADMIN', roleDisplayName: 'Quản trị viên', emailVerified: true, enabled: true, systemAccount: true, sessionVersion: 1, createdAt: '2026-10-01T10:00:00' },
-    { id: 2, username: 'admin', email: 'admin@example.com', roleCode: 'ADMIN', roleDisplayName: 'Quản trị viên', emailVerified: true, enabled: true, systemAccount: false, sessionVersion: 5, createdAt: '2026-10-02T10:00:00' },
-    { id: 3, username: 'librarian', email: 'librarian@example.com', roleCode: 'LIBRARIAN', roleDisplayName: 'Thủ thư', emailVerified: false, enabled: true, systemAccount: false, sessionVersion: 7, createdAt: '2026-10-03T10:00:00' },
-    { id: 4, username: 'archive', email: 'archive@example.com', roleCode: 'ARCHIVE', roleDisplayName: 'Nhóm lưu trữ', emailVerified: true, enabled: true, systemAccount: false, sessionVersion: 9, createdAt: '2026-10-04T10:00:00' },
-    { id: 5, username: 'locked', email: 'locked@example.com', roleCode: 'LIBRARIAN', roleDisplayName: 'Thủ thư', emailVerified: true, enabled: false, systemAccount: false, sessionVersion: 14, createdAt: '2026-10-05T10:00:00' },
+    { id: 1, username: 'root-admin', email: 'root@example.com', roleCode: 'ADMIN', roleDisplayName: 'Quản trị viên', emailVerified: true, enabled: true, systemAccount: true, sessionVersion: 1, createdAt: '2026-10-01T10:00:00', staff: { id: 1, staffCode: 'NV000001', fullName: 'Quản trị viên Hệ thống', dateOfBirth: '1990-01-01', phone: '0901234567', address: null, version: 0, createdAt: '2026-10-01T10:00:00', updatedAt: '2026-10-01T10:00:00' } },
+    { id: 2, username: 'admin', email: 'admin@example.com', roleCode: 'ADMIN', roleDisplayName: 'Quản trị viên', emailVerified: true, enabled: true, systemAccount: false, sessionVersion: 5, createdAt: '2026-10-02T10:00:00', staff: { id: 2, staffCode: 'NV000002', fullName: 'Quản trị viên A', dateOfBirth: '1992-05-10', phone: '0902345678', address: null, version: 0, createdAt: '2026-10-02T10:00:00', updatedAt: '2026-10-02T10:00:00' } },
+    { id: 3, username: 'librarian', email: 'librarian@example.com', roleCode: 'LIBRARIAN', roleDisplayName: 'Thủ thư', emailVerified: false, enabled: true, systemAccount: false, sessionVersion: 7, createdAt: '2026-10-03T10:00:00', staff: { id: 3, staffCode: 'NV000003', fullName: 'Thủ thư B', dateOfBirth: '1994-08-20', phone: '0903456789', address: null, version: 0, createdAt: '2026-10-03T10:00:00', updatedAt: '2026-10-03T10:00:00' } },
+    { id: 4, username: 'archive', email: 'archive@example.com', roleCode: 'ARCHIVE', roleDisplayName: 'Nhóm lưu trữ', emailVerified: true, enabled: true, systemAccount: false, sessionVersion: 9, createdAt: '2026-10-04T10:00:00', staff: { id: 4, staffCode: 'NV000004', fullName: 'Nhân viên lưu trữ', dateOfBirth: '1991-03-12', phone: '0904567890', address: null, version: 0, createdAt: '2026-10-04T10:00:00', updatedAt: '2026-10-04T10:00:00' } },
+    { id: 5, username: 'locked', email: 'locked@example.com', roleCode: 'LIBRARIAN', roleDisplayName: 'Thủ thư', emailVerified: true, enabled: false, systemAccount: false, sessionVersion: 14, createdAt: '2026-10-05T10:00:00', staff: { id: 5, staffCode: 'NV000005', fullName: 'Nhân viên khóa', dateOfBirth: '1993-11-25', phone: '0905678901', address: null, version: 0, createdAt: '2026-10-05T10:00:00', updatedAt: '2026-10-05T10:00:00' } },
     // Deliberately malformed API data verifies that the UI also excludes USER rows defensively.
-    { id: 99, username: 'reader', email: 'reader@example.com', roleCode: 'USER', roleDisplayName: 'Người dùng', emailVerified: true, enabled: true, systemAccount: false, sessionVersion: 0, createdAt: '2026-10-06T10:00:00' },
+    { id: 99, username: 'reader', email: 'reader@example.com', roleCode: 'USER', roleDisplayName: 'Người dùng', emailVerified: true, enabled: true, systemAccount: false, sessionVersion: 0, createdAt: '2026-10-06T10:00:00', staff: null },
   ];
 }
 
@@ -156,9 +167,36 @@ function configureApi(options: { statusFailure?: { status: number; code: string 
         systemAccount: false,
         sessionVersion: 0,
         createdAt: '2026-10-15T10:00:00',
+        staff: {
+          id: nextId,
+          staffCode: `NV${String(nextId).padStart(6, '0')}`,
+          fullName: String(body.fullName || 'Nhân viên mới'),
+          dateOfBirth: String(body.dateOfBirth || '1995-01-01'),
+          phone: String(body.phone || '0901234567'),
+          address: body.address ? String(body.address) : null,
+          version: 0,
+          createdAt: '2026-10-15T10:00:00',
+          updatedAt: '2026-10-15T10:00:00',
+        },
       };
       accounts.push(created);
       return response(config, success('ADMIN_ACCOUNT_CREATED', created, 201), 201);
+    }
+    const staffMatch = url.match(/^\/api\/v1\/admin\/accounts\/(\d+)\/profile$/);
+    if (staffMatch && method === 'patch') {
+      const account = accounts.find(({ id }) => id === Number(staffMatch[1]));
+      if (!account || !account.staff) apiFailure(config, 404, 'STAFF_NOT_FOUND');
+      const body = typeof config.data === 'string' ? JSON.parse(config.data) as Record<string, unknown> : config.data as Record<string, unknown>;
+      account!.staff = {
+        ...account!.staff!,
+        fullName: body.fullName !== undefined ? String(body.fullName) : account!.staff!.fullName,
+        dateOfBirth: body.dateOfBirth !== undefined ? String(body.dateOfBirth) : account!.staff!.dateOfBirth,
+        phone: body.phone !== undefined ? String(body.phone) : account!.staff!.phone,
+        address: body.address !== undefined ? (body.address ? String(body.address) : null) : account!.staff!.address,
+        version: account!.staff!.version + 1,
+        updatedAt: '2026-10-16T10:00:00',
+      };
+      return response(config, success('STAFF_PROFILE_UPDATED', account!.staff));
     }
     if (accountMatch && method === 'patch' && accountMatch[2] === 'role') {
       if (options.roleFailure) apiFailure(config, options.roleFailure.status, options.roleFailure.code);
@@ -282,7 +320,7 @@ describe('admin account UI routes', () => {
     expect(document.querySelector('#admin-account-title')?.textContent).toBe('Quản lý tài khoản quản trị');
     await waitFor(() => expect(document.querySelector('.admin-account-table-wrap')?.textContent).toContain('librarian@example.com'));
     expect(document.body.textContent).not.toContain('reader@example.com');
-    expect(accountRow(1).textContent).toContain('Tài khoản hệ thống');
+    expect(document.querySelector('.admin-account-table-wrap')?.textContent).not.toContain('Tài khoản hệ thống');
     openSelect('Lọc theo nhóm quyền');
     await waitFor(() => expect(Array.from(document.querySelectorAll('.ant-select-item-option'))
       .some((option) => option.textContent?.includes('Siêu quản trị (SUPER_ADMIN)'))).toBe(true));
@@ -305,7 +343,10 @@ describe('admin account UI routes', () => {
     fireEvent.change(inputById('admin-account-password'), { target: { value: 'admin2' } });
     fireEvent.change(inputById('admin-account-password-confirm'), { target: { value: 'admin' } });
     fireEvent.blur(inputById('admin-account-role'));
-    for (const field of ['username', 'email', 'password', 'password-confirm', 'role']) {
+    fireEvent.blur(inputById('admin-account-fullName'));
+    fireEvent.change(inputById('admin-account-dateOfBirth'), { target: { value: '2025-01-01' } });
+    fireEvent.change(inputById('admin-account-phone'), { target: { value: '123' } });
+    for (const field of ['username', 'email', 'password', 'password-confirm', 'role', 'fullName', 'dateOfBirth', 'phone']) {
       expect(document.getElementById(`admin-account-${field}-error`)?.textContent).toBeTruthy();
       expect(inputById(`admin-account-${field}`).getAttribute('aria-invalid')).toBe('true');
     }
@@ -316,6 +357,9 @@ describe('admin account UI routes', () => {
     fireEvent.change(inputById('admin-account-password-confirm'), { target: { value: 'StrongPass1!' } });
     openSelect('Nhóm quyền');
     await chooseRoleOption('Thủ thư (LIBRARIAN)');
+    fireEvent.change(inputById('admin-account-fullName'), { target: { value: 'Nguyễn Văn Mới' } });
+    fireEvent.change(inputById('admin-account-dateOfBirth'), { target: { value: '1995-05-15' } });
+    fireEvent.change(inputById('admin-account-phone'), { target: { value: '0912345678' } });
     expect(document.querySelector('.admin-account-field-error')).toBeNull();
     expect(buttonByText(document, 'Tạo tài khoản').disabled).toBe(false);
   });
@@ -335,6 +379,9 @@ describe('admin account UI routes', () => {
     expect(createButton.disabled).toBe(true);
     openSelect('Nhóm quyền');
     await chooseRoleOption('Quản trị viên (ADMIN)');
+    fireEvent.change(inputById('admin-account-fullName'), { target: { value: 'Nguyễn Văn Mới' } });
+    fireEvent.change(inputById('admin-account-dateOfBirth'), { target: { value: '1995-05-15' } });
+    fireEvent.change(inputById('admin-account-phone'), { target: { value: '0912345678' } });
     expect(buttonByText(document, 'Tạo tài khoản').disabled).toBe(false);
     fireEvent.click(buttonByText(document, 'Tạo tài khoản'));
 
@@ -344,21 +391,41 @@ describe('admin account UI routes', () => {
     await waitFor(() => expect(api.requests.some(({ method, url }) => method === 'post' && url === '/api/v1/admin/accounts')).toBe(true));
     const request = api.requests.find(({ method, url }) => method === 'post' && url === '/api/v1/admin/accounts');
     const body = typeof request?.body === 'string' ? JSON.parse(request.body) as Record<string, unknown> : request?.body as Record<string, unknown>;
-    expect(body).toEqual({ username: 'newadmin', email: 'newadmin@example.com', password: 'StrongPass1!', roleCode: 'ADMIN' });
+    expect(body).toEqual({
+      username: 'newadmin',
+      email: 'newadmin@example.com',
+      password: 'StrongPass1!',
+      roleCode: 'ADMIN',
+      fullName: 'Nguyễn Văn Mới',
+      dateOfBirth: '1995-05-15',
+      phone: '0912345678',
+    });
     await waitFor(() => expect(document.body.textContent).toContain('chưa xác minh email'));
     fireEvent.click(buttonByText(document, 'Tạo tài khoản quản trị'));
     expect(document.querySelector('#admin-account-role')?.closest('.ant-select')?.textContent).toContain('Chọn nhóm đang hoạt động');
     fireEvent.click(buttonByText(document, 'Hủy'));
   });
 
-  it('confirms disabling another account with its current session version', async () => {
+  it('confirms disabling another account with its current session version via detail page', async () => {
     const api = configureApi();
     renderApp('/admin/accounts');
 
     await waitFor(() => expect(document.querySelector('.admin-account-table-wrap')?.textContent).toContain('librarian@example.com'));
-    fireEvent.click(buttonByText(accountRow(3), 'Khóa tài khoản'));
-    await waitFor(() => expect(document.body.textContent).toContain('phải đăng nhập lại'));
-    fireEvent.click(buttonByText(document, 'Xác nhận khóa tài khoản'));
+    const actionsCell = accountRow(3).querySelector('td:last-child');
+    expect(actionsCell?.textContent).toContain('Xem chi tiết');
+    expect(actionsCell?.textContent).not.toContain('Xem nhanh');
+    expect(actionsCell?.textContent).not.toContain('Đổi nhóm');
+    expect(actionsCell?.textContent).not.toContain('Khóa tài khoản');
+
+    const detailLink = actionsCell?.querySelector('a');
+    expect(detailLink).not.toBeNull();
+    fireEvent.click(detailLink!);
+
+    await waitFor(() => expect(document.querySelector('#staff-detail-heading')?.textContent).toContain('Thủ thư B'));
+    fireEvent.click(buttonByText(document, 'Khóa tài khoản'));
+    await waitFor(() => expect(document.body.textContent).toContain('Mọi phiên đăng nhập hiện tại sẽ bị thu hồi'));
+    const modalFooter = document.querySelector('.ant-modal-footer')!;
+    fireEvent.click(buttonByText(modalFooter, 'Khóa tài khoản'));
 
     await waitFor(() => expect(api.requests.some(({ method, url }) => method === 'patch' && url === '/api/v1/admin/accounts/3/status')).toBe(true));
     const request = api.requests.find(({ method, url }) => method === 'patch' && url === '/api/v1/admin/accounts/3/status');
@@ -396,5 +463,26 @@ describe('admin account UI routes', () => {
     const body = typeof request?.body === 'string' ? JSON.parse(request.body) as Record<string, unknown> : request?.body as Record<string, unknown>;
     expect(body).toEqual({ roleCode: 'ADMIN', expectedSessionVersion: 7 });
     expect(api.accounts.find(({ id }) => id === 3)?.roleCode).toBe('ADMIN');
+  });
+
+  it('renders staff detail page and allows updating staff profile', async () => {
+    const api = configureApi();
+    renderApp('/admin/accounts/3');
+
+    await waitFor(() => expect(document.querySelector('#staff-detail-heading')?.textContent).toContain('Thủ thư B'));
+    expect(document.body.textContent).toContain('NV000003');
+    expect(document.body.textContent).toContain('librarian@example.com');
+    expect(document.body.textContent).toContain('0903456789');
+
+    fireEvent.click(buttonByText(document, 'Chỉnh sửa hồ sơ'));
+    expect(document.querySelector('form[aria-label="Biểu mẫu chỉnh sửa hồ sơ nhân viên"]')).not.toBeNull();
+
+    fireEvent.change(inputById('staff-edit-fullname'), { target: { value: 'Thủ thư B Đã Cập Nhật' } });
+    fireEvent.change(inputById('staff-edit-phone'), { target: { value: '0909999888' } });
+    fireEvent.click(buttonByText(document, 'Lưu thay đổi'));
+
+    await waitFor(() => expect(api.requests.some(({ method, url }) => method === 'patch' && url === '/api/v1/admin/accounts/3/profile')).toBe(true));
+    await waitFor(() => expect(document.body.textContent).toContain('Thủ thư B Đã Cập Nhật'));
+    expect(document.body.textContent).toContain('0909999888');
   });
 });

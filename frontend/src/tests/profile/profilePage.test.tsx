@@ -5,6 +5,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { ProfilePage } from '../../profile/ProfilePage';
 import { profileApi } from '../../profile/api';
 
+if (typeof window.ResizeObserver === 'undefined') {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 const mockProfileData = {
   accountId: 17,
   username: 'reader',
@@ -142,7 +150,7 @@ describe('ProfilePage Component', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
     expect(await screen.findByText('Ngày sinh phải hợp lệ và thành viên đủ 16 tuổi')).toBeTruthy();
-    expect(screen.getByText('Số điện thoại phải có 10 chữ số và đầu số di động Việt Nam hợp lệ (03, 05, 07, 08, 09)')).toBeTruthy();
+    expect(screen.getByText('Số điện thoại phải có đúng 10 chữ số và thuộc đầu số di động Việt Nam (03, 05, 07, 08, 09)')).toBeTruthy();
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
@@ -169,7 +177,7 @@ describe('ProfilePage Component', () => {
     expect(within(resetSection).getByText('Nguyễn Văn A')).toBeTruthy();
   });
 
-  it('hides personal information card and member loan button for ADMIN', async () => {
+  it('renders admin profile with personal info and security cards for ADMIN', async () => {
     mocks.auth.role = 'ADMIN';
     mocks.auth.currentUser = {
       id: 1,
@@ -183,13 +191,13 @@ describe('ProfilePage Component', () => {
       username: 'admin',
       email: 'admin@example.com',
       role: 'ADMIN',
-      memberId: null,
-      memberCode: null,
-      fullName: null,
-      dateOfBirth: null,
-      phone: null,
-      address: null,
-      version: null,
+      memberId: 1,
+      memberCode: 'A000001',
+      fullName: 'Quản trị viên Hệ thống',
+      dateOfBirth: '1990-01-01',
+      phone: '0912999888',
+      address: 'Văn phòng Thư viện',
+      version: 0,
     });
 
     render(
@@ -199,8 +207,93 @@ describe('ProfilePage Component', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' })).toBeTruthy();
-    expect(screen.queryByLabelText('Thông tin cá nhân')).toBeNull();
+    expect(screen.getByText('HỒ SƠ TÀI KHOẢN')).toBeTruthy();
+    const personalSection = screen.getByLabelText('Thông tin cá nhân');
+    expect(within(personalSection).getByText('Quản trị viên Hệ thống')).toBeTruthy();
+    expect(within(personalSection).getByText('01/01/1990')).toBeTruthy();
+    expect(within(personalSection).getByText('0912999888')).toBeTruthy();
+    expect(within(personalSection).getByText('Văn phòng Thư viện')).toBeTruthy();
+    expect(within(personalSection).getByText('Quản trị viên')).toBeTruthy();
+    expect(within(personalSection).getByRole('button', { name: 'Chỉnh sửa thông tin' })).toBeTruthy();
+
+    // Security section
+    const securitySection = screen.getByLabelText('Thông tin đăng nhập & Bảo mật');
+    expect(within(securitySection).getByText('admin@example.com')).toBeTruthy();
+    expect(within(securitySection).getByRole('link', { name: 'Đổi email' })).toBeTruthy();
+    expect(within(securitySection).getByRole('link', { name: 'Đổi mật khẩu' })).toBeTruthy();
+
+    // Admin should not have reader specific links
     expect(screen.queryByRole('link', { name: 'Xem sách của tôi' })).toBeNull();
-    expect(screen.getByText('Quản trị viên')).toBeTruthy();
+    expect(screen.queryByText('Khám phá')).toBeNull();
+  });
+
+  it('allows admin to edit and save personal profile successfully', async () => {
+    mocks.auth.role = 'ADMIN';
+    mocks.auth.currentUser = {
+      id: 1,
+      username: 'admin',
+      email: 'admin@example.com',
+      role: 'ADMIN',
+      permissions: [],
+    };
+    vi.spyOn(profileApi, 'getProfile').mockResolvedValue({
+      accountId: 1,
+      username: 'admin',
+      email: 'admin@example.com',
+      role: 'ADMIN',
+      memberId: 1,
+      memberCode: 'A000001',
+      fullName: 'Quản trị viên',
+      dateOfBirth: '1990-01-01',
+      phone: '0912999888',
+      address: 'Hà Nội',
+      version: 0,
+    });
+    const updateSpy = vi.spyOn(profileApi, 'updateProfile').mockResolvedValue({
+      accountId: 1,
+      username: 'admin',
+      email: 'admin@example.com',
+      role: 'ADMIN',
+      memberId: 1,
+      memberCode: 'A000001',
+      fullName: 'Quản trị viên Mới',
+      dateOfBirth: '1990-01-01',
+      phone: '0987111222',
+      address: 'TP HCM',
+      version: 1,
+    });
+
+    render(
+      <MemoryRouter>
+        <ProfilePage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Hồ sơ tài khoản' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Chỉnh sửa thông tin' }));
+
+    const nameInput = screen.getByRole('textbox', { name: 'Họ và tên' });
+    const phoneInput = screen.getByRole('textbox', { name: 'Số điện thoại (10 chữ số)' });
+    const addressInput = screen.getByRole('textbox', { name: 'Địa chỉ cư trú' });
+
+    fireEvent.change(nameInput, { target: { value: 'Quản trị viên Mới' } });
+    fireEvent.change(phoneInput, { target: { value: '0987111222' } });
+    fireEvent.change(addressInput, { target: { value: 'TP HCM' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith({
+        version: 0,
+        fullName: 'Quản trị viên Mới',
+        dateOfBirth: '1990-01-01',
+        phone: '0987111222',
+        address: 'TP HCM',
+      });
+    });
+
+    expect(await screen.findByText('Cập nhật thông tin cá nhân thành công!')).toBeTruthy();
+    const updatedSection = screen.getByLabelText('Thông tin cá nhân');
+    expect(within(updatedSection).getByText('Quản trị viên Mới')).toBeTruthy();
   });
 });

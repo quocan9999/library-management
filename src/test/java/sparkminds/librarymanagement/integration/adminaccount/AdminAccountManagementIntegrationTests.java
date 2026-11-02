@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -74,6 +75,7 @@ class AdminAccountManagementIntegrationTests {
             jdbc.update("DELETE FROM password_reset_tokens WHERE account_id = ?", id);
             jdbc.update("DELETE FROM refresh_tokens WHERE account_id = ?", id);
             jdbc.update("DELETE FROM revoked_access_tokens WHERE account_id = ?", id);
+            jdbc.update("DELETE FROM staffs WHERE account_id = ?", id);
             jdbc.update("DELETE FROM members WHERE account_id = ?", id);
             jdbc.update("DELETE FROM accounts WHERE id = ?", id);
         }
@@ -92,13 +94,15 @@ class AdminAccountManagementIntegrationTests {
         mockMvc.perform(post("/api/v1/admin/accounts")
                         .header("Authorization", bearer(adminToken)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"this-username-is-over-twenty\",\"email\":\"not-an-email\","
-                                + "\"password\":\"weak\",\"roleCode\":\"ADMIN\"}"))
+                                + "\"password\":\"weak\",\"roleCode\":\"ADMIN\","
+                                + "\"fullName\":\"Admin User\",\"dateOfBirth\":\"1990-01-01\",\"phone\":\"0988776655\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
         mockMvc.perform(post("/api/v1/admin/accounts")
                         .header("Authorization", bearer(adminToken)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"email\":\"" + email
-                                + "\",\"password\":\"Strong1!\",\"roleCode\":\"USER\"}"))
+                                + "\",\"password\":\"Strong1!\",\"roleCode\":\"USER\","
+                                + "\"fullName\":\"Admin User\",\"dateOfBirth\":\"1990-01-01\",\"phone\":\"0988776655\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ROLE_ASSIGNMENT_FORBIDDEN"));
 
@@ -106,13 +110,17 @@ class AdminAccountManagementIntegrationTests {
                         .header("Authorization", bearer(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"email\":\" " + email.toUpperCase()
-                                + " \",\"password\":\"Strong1!\",\"roleCode\":\"ADMIN\"}"))
+                                + " \",\"password\":\"Strong1!\",\"roleCode\":\"ADMIN\","
+                                + "\"fullName\":\"Admin User\",\"dateOfBirth\":\"1990-01-01\",\"phone\":\"0988776655\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.username").value(username))
                 .andExpect(jsonPath("$.data.emailVerified").value(false))
                 .andExpect(jsonPath("$.data.enabled").value(true))
                 .andExpect(jsonPath("$.data.systemAccount").value(false))
                 .andExpect(jsonPath("$.data.sessionVersion").value(0))
+                .andExpect(jsonPath("$.data.staff.staffCode").exists())
+                .andExpect(jsonPath("$.data.staff.fullName").value("Admin User"))
+                .andExpect(jsonPath("$.data.staff.phone").value("0988776655"))
                 .andReturn();
         assertThat(created.getResponse().getHeader("Location")).contains("/api/v1/admin/accounts/");
         assertThat(created.getResponse().getContentAsString()).doesNotContain("passwordHash", "Strong1!");
@@ -120,6 +128,7 @@ class AdminAccountManagementIntegrationTests {
         Integer id = JsonPath.read(created.getResponse().getContentAsString(), "$.data.id");
         accountIds.add(id);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM members WHERE account_id = ?", Integer.class, id)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staffs WHERE account_id = ?", Integer.class, id)).isEqualTo(1);
         String passwordHash = jdbc.queryForObject("SELECT password_hash FROM accounts WHERE id = ?", String.class, id);
         assertThat(passwordEncoder.matches("Strong1!", passwordHash)).isTrue();
 
@@ -173,6 +182,13 @@ class AdminAccountManagementIntegrationTests {
         mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("size", "51"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("ADMIN_ACCOUNT_SEARCH_INVALID"));
+        mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("sort", "createdAt,desc"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("sort", "staffCode,asc"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("sort", "fullName,desc"))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("sort", "email desc; delete"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("ADMIN_ACCOUNT_SEARCH_INVALID"));
@@ -273,10 +289,14 @@ class AdminAccountManagementIntegrationTests {
         String adminToken = login("admin", "admin").accessToken();
         String username = "dup" + suffix(8);
         String email = username + "@example.test";
+        String phone1 = "0971" + suffix(6).replaceAll("[^0-9]", "2");
+        String phone2 = "0972" + suffix(6).replaceAll("[^0-9]", "3");
+        String phone3 = "0973" + suffix(6).replaceAll("[^0-9]", "4");
         MvcResult created = mockMvc.perform(post("/api/v1/admin/accounts")
                         .header("Authorization", bearer(adminToken)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"email\":\"" + email
-                                + "\",\"password\":\"Strong1!\",\"roleCode\":\"ADMIN\"}"))
+                                + "\",\"password\":\"Strong1!\",\"roleCode\":\"ADMIN\","
+                                + "\"fullName\":\"Admin User\",\"dateOfBirth\":\"1990-01-01\",\"phone\":\"" + phone1 + "\"}"))
                 .andExpect(status().isCreated()).andReturn();
         Integer id = JsonPath.read(created.getResponse().getContentAsString(), "$.data.id");
         accountIds.add(id);
@@ -284,14 +304,16 @@ class AdminAccountManagementIntegrationTests {
         mockMvc.perform(post("/api/v1/admin/accounts")
                         .header("Authorization", bearer(adminToken)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"" + username + "\",\"email\":\"other" + email
-                                + "\",\"password\":\"Strong1!\",\"roleCode\":\"ADMIN\"}"))
+                                + "\",\"password\":\"Strong1!\",\"roleCode\":\"ADMIN\","
+                                + "\"fullName\":\"Admin User\",\"dateOfBirth\":\"1990-01-01\",\"phone\":\"" + phone2 + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_USERNAME_DUPLICATED"));
 
         mockMvc.perform(post("/api/v1/admin/accounts")
                         .header("Authorization", bearer(adminToken)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"other" + suffix(7) + "\",\"email\":\"" + email
-                                + "\",\"password\":\"Strong1!\",\"roleCode\":\"ADMIN\"}"))
+                                + "\",\"password\":\"Strong1!\",\"roleCode\":\"ADMIN\","
+                                + "\"fullName\":\"Admin User\",\"dateOfBirth\":\"1990-01-01\",\"phone\":\"" + phone3 + "\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_EMAIL_DUPLICATED"));
 
@@ -299,6 +321,68 @@ class AdminAccountManagementIntegrationTests {
         mockMvc.perform(get("/api/v1/admin/accounts/{id}", userId)
                         .header("Authorization", bearer(adminToken)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminCanViewAndPatchStaffProfileSuccessfully() throws Exception {
+        createRole("LIBRARIAN");
+        Integer targetId = createFixtureAccount("stafftest" + suffix(6), "LIBRARIAN");
+        String adminToken = login("admin", "admin").accessToken();
+
+        // 1. GET admin account detail includes staff profile
+        mockMvc.perform(get("/api/v1/admin/accounts/{id}", targetId)
+                        .header("Authorization", bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("ADMIN_ACCOUNT_DETAIL_SUCCESS"))
+                .andExpect(jsonPath("$.data.staff.staffCode").exists())
+                .andExpect(jsonPath("$.data.staff.version").value(0));
+
+        // 2. PATCH staff profile successfully
+        mockMvc.perform(patch("/api/v1/admin/accounts/{id}/profile", targetId)
+                        .header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "version": 0,
+                                    "fullName": "Thủ Thư Mới",
+                                    "dateOfBirth": "1995-06-15",
+                                    "phone": "0981234567",
+                                    "address": "456 Nguyễn Huệ, TP.HCM"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("STAFF_PROFILE_UPDATED"))
+                .andExpect(jsonPath("$.data.fullName").value("Thủ Thư Mới"))
+                .andExpect(jsonPath("$.data.phone").value("0981234567"))
+                .andExpect(jsonPath("$.data.dateOfBirth").value("1995-06-15"))
+                .andExpect(jsonPath("$.data.address").value("456 Nguyễn Huệ, TP.HCM"))
+                .andExpect(jsonPath("$.data.version").value(1));
+
+        // 3. Stale version throws STAFF_VERSION_CONFLICT
+        mockMvc.perform(patch("/api/v1/admin/accounts/{id}/profile", targetId)
+                        .header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "version": 0,
+                                    "fullName": "Tên Cũ"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STAFF_VERSION_CONFLICT"));
+
+        // 4. Underage (< 18) throws INVALID_STAFF_AGE
+        mockMvc.perform(patch("/api/v1/admin/accounts/{id}/profile", targetId)
+                        .header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "version": 1,
+                                    "dateOfBirth": "2015-01-01"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_STAFF_AGE"));
     }
 
     @Test
@@ -339,6 +423,10 @@ class AdminAccountManagementIntegrationTests {
                 """, username, email, passwordEncoder.encode("Strong1!"), roleCode);
         Integer id = jdbc.queryForObject("SELECT id FROM accounts WHERE username = ?", Integer.class, username);
         accountIds.add(id);
+        jdbc.update("""
+                INSERT INTO staffs (account_id, staff_code, full_name, date_of_birth, phone, address, version, created_at, updated_at)
+                VALUES (?, ?, ?, '1990-01-01', ?, NULL, 0, NOW(), NOW())
+                """, id, "NV" + String.format(Locale.ROOT, "%06d", id), username, "096" + String.format(Locale.ROOT, "%07d", id));
         return id;
     }
 

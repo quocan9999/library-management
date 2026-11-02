@@ -15,7 +15,33 @@ const PAGE_SIZE = 10;
 const PASSWORD_POLICY = /^(?=.{8,20}$)(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\p{P}\p{S}])\S+$/u;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type DirectoryMode = 'management' | 'assignments';
-type CreateField = 'username' | 'email' | 'password' | 'password-confirm' | 'role';
+type CreateField = 'username' | 'email' | 'password' | 'password-confirm' | 'role' | 'fullName' | 'dateOfBirth' | 'phone' | 'address';
+
+const VIETNAM_PHONE_REGEX = /^0[35789][0-9]{8}$/;
+
+function isEligibleBirthDate(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return false;
+  const birthYear = parseInt(parts[0], 10);
+  const birthMonth = parseInt(parts[1], 10) - 1;
+  const birthDay = parseInt(parts[2], 10);
+  const birth = new Date(birthYear, birthMonth, birthDay);
+  if (isNaN(birth.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (birth > today) return false;
+  const eighteenth = new Date(birthYear + 18, birthMonth, birthDay);
+  return eighteenth <= today;
+}
+
+function getMaxBirthDateForStaff(): string {
+  const today = new Date();
+  const maxYear = today.getFullYear() - 18;
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${maxYear}-${month}-${day}`;
+}
 type SortState = { field: string; direction: 'asc' | 'desc' };
 type FilterState = {
   username: string;
@@ -115,21 +141,19 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
   const [createPassword, setCreatePassword] = useState('');
   const [createPasswordConfirm, setCreatePasswordConfirm] = useState('');
   const [createRoleCode, setCreateRoleCode] = useState<string>();
+  const [createFullName, setCreateFullName] = useState('');
+  const [createDateOfBirth, setCreateDateOfBirth] = useState('');
+  const [createPhone, setCreatePhone] = useState('');
+  const [createAddress, setCreateAddress] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [createTouched, setCreateTouched] = useState<Partial<Record<CreateField, boolean>>>({});
   const [confirmAdminCreate, setConfirmAdminCreate] = useState(false);
 
-  const [detailTarget, setDetailTarget] = useState<AdminAccount | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
   const [assignmentTarget, setAssignmentTarget] = useState<AdminAccount | null>(null);
   const [assignmentRoleCode, setAssignmentRoleCode] = useState<string>();
   const [assignmentSaving, setAssignmentSaving] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [confirmRoleChange, setConfirmRoleChange] = useState(false);
-  const [statusTarget, setStatusTarget] = useState<AdminAccount | null>(null);
-  const [statusSaving, setStatusSaving] = useState(false);
-  const [statusError, setStatusError] = useState<string | null>(null);
 
   const query = useMemo<AdminAccountSearchQuery>(() => ({
     username: appliedText.username.trim() || undefined,
@@ -212,12 +236,17 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     setCreatePassword('');
     setCreatePasswordConfirm('');
     setCreateRoleCode(undefined);
+    setCreateFullName('');
+    setCreateDateOfBirth('');
+    setCreatePhone('');
+    setCreateAddress('');
     setConfirmAdminCreate(false);
   };
 
   const createValues: Record<CreateField, string> = {
     username: createUsername, email: createEmail, password: createPassword,
     'password-confirm': createPasswordConfirm, role: createRoleCode ?? '',
+    fullName: createFullName, dateOfBirth: createDateOfBirth, phone: createPhone, address: createAddress,
   };
   const createErrors: Record<CreateField, string | null> = {
     username: !createUsername.trim() ? 'Vui lòng nhập tên đăng nhập.'
@@ -233,6 +262,14 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     role: !createRoleCode ? 'Vui lòng chọn nhóm quyền.'
       : !activeAssignableRoles.some(({ code }) => code === createRoleCode)
         ? 'Chọn một nhóm đang hoạt động và khác USER.' : null,
+    fullName: !createFullName.trim() ? 'Vui lòng nhập họ và tên.'
+      : createFullName.trim().length > 100 ? 'Họ và tên tối đa 100 ký tự.' : null,
+    dateOfBirth: !createDateOfBirth ? 'Vui lòng chọn ngày sinh.'
+      : !isEligibleBirthDate(createDateOfBirth) ? 'Nhân viên phải từ 18 tuổi trở lên và ngày sinh không thuộc tương lai.' : null,
+    phone: !createPhone.trim() ? 'Vui lòng nhập số điện thoại.'
+      : !VIETNAM_PHONE_REGEX.test(createPhone.trim().replace(/[.\s-]/g, ''))
+        ? 'Số điện thoại phải có 10 chữ số và thuộc đầu số di động Việt Nam (03, 05, 07, 08, 09).' : null,
+    address: createAddress.trim().length > 255 ? 'Địa chỉ tối đa 255 ký tự.' : null,
   };
   const createFormValid = Object.values(createErrors).every((message) => message === null);
   const visibleCreateError = (field: CreateField) =>
@@ -274,6 +311,10 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
         email: createEmail.trim(),
         password: createPassword,
         roleCode: createRoleCode,
+        fullName: createFullName.trim(),
+        dateOfBirth: createDateOfBirth,
+        phone: createPhone.trim().replace(/[.\s-]/g, ''),
+        address: createAddress.trim() || undefined,
       });
       setCreateOpen(false);
       setCreateTouched({});
@@ -282,6 +323,10 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       setCreatePassword('');
       setCreatePasswordConfirm('');
       setCreateRoleCode(undefined);
+      setCreateFullName('');
+      setCreateDateOfBirth('');
+      setCreatePhone('');
+      setCreateAddress('');
       setCreateError(null);
       setConfirmAdminCreate(false);
       notify('success', {
@@ -299,27 +344,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       }
     } finally {
       setCreateSaving(false);
-    }
-  };
-
-  const openDetails = async (account: AdminAccount) => {
-    setDetailTarget(account);
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
-      setDetailTarget(await adminAccountApi.get(account.id));
-    } catch (detailFailure) {
-      const message = isMaintenanceError(detailFailure)
-        ? MAINTENANCE_MESSAGE
-        : statusOf(detailFailure) === 404
-          ? 'Tài khoản không còn tồn tại. Danh sách đang được tải lại.'
-          : statusOf(detailFailure) === 403
-            ? 'Phiên quản trị không còn quyền xem tài khoản này.'
-            : 'Không thể tải chi tiết tài khoản. Vui lòng thử lại.';
-      setDetailError(message);
-      if (statusOf(detailFailure) === 404 || statusOf(detailFailure) === 403) refresh();
-    } finally {
-      setDetailLoading(false);
     }
   };
 
@@ -382,41 +406,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
     }
   };
 
-  const confirmStatusChange = async () => {
-    if (!statusTarget || statusSaving || !canManage) return;
-    setStatusSaving(true);
-    setStatusError(null);
-    try {
-      const updated = await adminAccountApi.updateStatus(statusTarget.id, {
-        enabled: !statusTarget.enabled,
-        expectedSessionVersion: statusTarget.sessionVersion,
-      });
-      setStatusTarget(null);
-      notify('success', {
-        title: updated.enabled ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản',
-        description: updated.enabled
-          ? `${updated.username} cần đăng nhập lại để bắt đầu phiên mới.`
-          : `Các phiên của ${updated.username} đã bị kết thúc.`,
-      });
-      refresh();
-    } catch (writeError) {
-      const message = getMessageForWriteError(writeError, 'status');
-      if (statusOf(writeError) === 403) void refreshCapabilities().catch(() => undefined);
-      if (statusOf(writeError) === 409 || statusOf(writeError) === 404) refresh();
-      if (statusOf(writeError) === 409 || statusOf(writeError) === 403 || statusOf(writeError) === 404) {
-        setStatusTarget(null);
-      } else {
-        setStatusError(message);
-      }
-      notify(statusOf(writeError) === 403 ? 'warning' : 'error', {
-        title: 'Không thể cập nhật trạng thái',
-        description: message,
-      });
-    } finally {
-      setStatusSaving(false);
-    }
-  };
-
   const changeTextFilter = (field: 'username' | 'email', value: string) => {
     setFilters((current) => ({ ...current, [field]: value }));
     setPageNumber(0);
@@ -441,7 +430,23 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       key: 'username',
       sorter: true,
       sortOrder: sort.field === 'username' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
-      width: 150,
+    },
+    {
+      title: 'Mã NV',
+      dataIndex: ['staff', 'staffCode'],
+      key: 'staffCode',
+      sorter: true,
+      sortOrder: sort.field === 'staffCode' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
+      render: (_value: string, account) => account.staff?.staffCode || '—',
+      width: 110,
+    },
+    {
+      title: 'Họ và tên',
+      dataIndex: ['staff', 'fullName'],
+      key: 'fullName',
+      sorter: true,
+      sortOrder: sort.field === 'fullName' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
+      render: (_value: string, account) => account.staff?.fullName || '—',
     },
     {
       title: 'Email',
@@ -449,7 +454,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       key: 'email',
       sorter: true,
       sortOrder: sort.field === 'email' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
-      width: 220,
     },
     {
       title: 'Nhóm quyền',
@@ -465,7 +469,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
           {roleState && !roleState.enabled && <Tag color="orange">Nhóm ngừng hoạt động</Tag>}
         </div>;
       },
-      width: 220,
     },
     {
       title: 'Xác minh email',
@@ -474,7 +477,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       sorter: true,
       sortOrder: sort.field === 'emailVerified' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
       render: (verified: boolean) => <Tag color={verified ? 'green' : 'default'}>{verified ? 'Đã xác minh' : 'Chưa xác minh'}</Tag>,
-      width: 150,
+      width: 140,
     },
     {
       title: 'Tài khoản',
@@ -486,49 +489,41 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
       width: 130,
     },
     {
-      title: 'Tài khoản hệ thống',
-      dataIndex: 'systemAccount',
-      key: 'systemAccount',
-      render: (systemAccount: boolean) => systemAccount
-        ? <Tag color="gold">Tài khoản hệ thống</Tag>
-        : <span aria-label="Tài khoản thông thường">—</span>,
-      width: 160,
-    },
-    {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
       sorter: true,
       sortOrder: sort.field === 'createdAt' ? (sort.direction === 'asc' ? 'ascend' : 'descend') : null,
       render: formatCreatedAt,
-      width: 165,
+      width: 150,
     },
     {
       title: 'Thao tác',
       key: 'actions',
-      fixed: 'right',
-      width: mode === 'management' ? 300 : 145,
+      width: 120,
       render: (_value, account) => {
+        if (mode === 'management') {
+          return (
+            <Link to={`/admin/accounts/${account.id}`} aria-label="Xem chi tiết">
+              Xem chi tiết
+            </Link>
+          );
+        }
         const protectedAccount = isProtectedAccount(account, currentUser?.id);
         const protectionLabel = account.systemAccount ? 'Tài khoản hệ thống được bảo vệ' : 'Không thể thay đổi chính tài khoản đang đăng nhập';
-        return <div className="admin-account-actions">
-          {mode === 'management' && <Button type="link" onClick={() => void openDetails(account)}>Xem</Button>}
-          <Tooltip title={protectedAccount ? protectionLabel : ''}>
-            <Button
-              type="link"
-              disabled={protectedAccount || !canManage || rolesLoading}
-              onClick={() => openAssignment(account)}
-            >Đổi nhóm</Button>
-          </Tooltip>
-          {mode === 'management' && <Tooltip title={protectedAccount ? protectionLabel : ''}>
-            <Button
-              type="link"
-              danger={account.enabled}
-              disabled={protectedAccount || !canManage}
-              onClick={() => { setStatusTarget(account); setStatusError(null); }}
-            >{account.enabled ? 'Khóa tài khoản' : 'Mở khóa'}</Button>
-          </Tooltip>}
-        </div>;
+        return (
+          <div className="admin-account-actions">
+            <Tooltip title={protectedAccount ? protectionLabel : ''}>
+              <Button
+                type="link"
+                disabled={protectedAccount || !canManage || rolesLoading}
+                onClick={() => openAssignment(account)}
+              >
+                Đổi nhóm
+              </Button>
+            </Tooltip>
+          </div>
+        );
       },
     },
   ];
@@ -645,7 +640,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
             locale={{ emptyText: request?.isMaintenance ? MAINTENANCE_MESSAGE : (error ? 'Không thể tải dữ liệu. Hãy thử lại.' : 'Không có tài khoản quản trị phù hợp.') }}
             sortDirections={['ascend', 'descend', 'ascend']}
             showSorterTooltip={false}
-            scroll={{ x: 1200 }}
           />
         </div>
         {pageData && pageData.totalElements > 0 && <div className="admin-account-pagination-row">
@@ -711,6 +705,28 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
             />
             {createFieldError('role')}
           </div>
+
+          <label htmlFor="admin-account-fullName">Họ và tên</label>
+          <div className="admin-account-form-field">
+            <Input id="admin-account-fullName" {...createFieldProps('fullName')} aria-label="Họ và tên" maxLength={100} value={createFullName} onChange={(event) => { setCreateFullName(event.target.value); setCreateError(null); }} autoComplete="name" placeholder="Nguyễn Văn A" />
+            {createFieldError('fullName')}
+          </div>
+          <label htmlFor="admin-account-dateOfBirth">Ngày sinh</label>
+          <div className="admin-account-form-field">
+            <Input id="admin-account-dateOfBirth" {...createFieldProps('dateOfBirth')} aria-label="Ngày sinh" type="date" max={getMaxBirthDateForStaff()} value={createDateOfBirth} onChange={(event) => { setCreateDateOfBirth(event.target.value); setCreateError(null); }} />
+            {createFieldError('dateOfBirth')}
+          </div>
+          <label htmlFor="admin-account-phone">Số điện thoại</label>
+          <div className="admin-account-form-field">
+            <Input id="admin-account-phone" {...createFieldProps('phone')} aria-label="Số điện thoại" maxLength={10} value={createPhone} onChange={(event) => { setCreatePhone(event.target.value); setCreateError(null); }} placeholder="0912345678" />
+            {createFieldError('phone')}
+          </div>
+          <label htmlFor="admin-account-address">Địa chỉ</label>
+          <div className="admin-account-form-field">
+            <Input.TextArea id="admin-account-address" {...createFieldProps('address')} aria-label="Địa chỉ" maxLength={255} rows={2} value={createAddress} onChange={(event) => { setCreateAddress(event.target.value); setCreateError(null); }} placeholder="Địa chỉ cư trú (tùy chọn)" />
+            {createFieldError('address')}
+          </div>
+
           <p className="admin-account-form-hint">Tài khoản mới cần xác minh email trước khi đăng nhập. Mật khẩu gồm 8–20 ký tự, chữ hoa, chữ thường, số và ký tự đặc biệt; không có khoảng trắng.</p>
         </div>
         {createError && <Alert className="admin-account-inline-alert" type="error" showIcon role="alert" title={createError} />}
@@ -730,25 +746,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
         mask={{ closable: !createSaving }}
       >
         <Alert type="warning" showIcon title="Nhóm ADMIN có toàn quyền; bạn có chắc muốn cấp?" description="Tài khoản này có thể quản lý mọi nhóm quyền và tài khoản quản trị." />
-      </Modal>
-
-      <Modal
-        title="Chi tiết tài khoản quản trị"
-        open={Boolean(detailTarget)}
-        centered
-        footer={<Button onClick={() => { setDetailTarget(null); setDetailError(null); }}>Đóng</Button>}
-        onCancel={() => { setDetailTarget(null); setDetailError(null); }}
-      >
-        {detailLoading ? <div className="admin-account-loading" role="status"><Spin /> Đang tải chi tiết…</div> : detailTarget && <dl className="admin-account-detail-grid">
-          <dt>Tên đăng nhập</dt><dd>{detailTarget.username}</dd>
-          <dt>Email</dt><dd>{detailTarget.email}</dd>
-          <dt>Nhóm quyền</dt><dd>{detailTarget.roleDisplayName} ({detailTarget.roleCode})</dd>
-          <dt>Xác minh email</dt><dd>{detailTarget.emailVerified ? 'Đã xác minh' : 'Chưa xác minh email'}</dd>
-          <dt>Trạng thái tài khoản</dt><dd>{detailTarget.enabled ? 'Đang hoạt động' : 'Đã khóa'}</dd>
-          <dt>Tài khoản hệ thống</dt><dd>{detailTarget.systemAccount ? 'Có' : 'Không'}</dd>
-          <dt>Ngày tạo</dt><dd>{formatCreatedAt(detailTarget.createdAt)}</dd>
-        </dl>}
-        {detailError && <Alert className="admin-account-inline-alert" type="error" showIcon role="alert" title={detailError} action={<Button onClick={() => detailTarget && void openDetails(detailTarget)}>Thử lại</Button>} />}
       </Modal>
 
       <Modal
@@ -807,24 +804,6 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
         </>}
       </Modal>
 
-      <Modal
-        title={statusTarget?.enabled ? 'Khóa tài khoản quản trị?' : 'Mở khóa tài khoản quản trị?'}
-        open={Boolean(statusTarget)}
-        centered
-        onCancel={() => { if (!statusSaving) { setStatusTarget(null); setStatusError(null); } }}
-        onOk={() => void confirmStatusChange()}
-        okText={statusTarget?.enabled ? 'Xác nhận khóa tài khoản' : 'Xác nhận mở khóa'}
-        cancelText="Hủy"
-        confirmLoading={statusSaving}
-        closable={!statusSaving}
-        keyboard={!statusSaving}
-        mask={{ closable: !statusSaving }}
-      >
-        {statusTarget?.enabled
-          ? <Alert type="warning" showIcon title={`Khóa ${statusTarget.username}?`} description="Tất cả phiên của tài khoản sẽ kết thúc. Khi mở khóa, tài khoản phải đăng nhập lại." />
-          : <Alert type="info" showIcon title={`Mở khóa ${statusTarget?.username}?`} description="Tài khoản sẽ có thể đăng nhập bằng phiên mới." />}
-        {statusError && <Alert className="admin-account-inline-alert" type="error" showIcon role="alert" title={statusError} />}
-      </Modal>
     </main>
   );
 }

@@ -3,10 +3,11 @@ import axios from 'axios';
 import type { TableColumnsType } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../../auth/messages';
 import { usePermission } from '../../auth/permissions';
 import { useAppNotification } from '../../components/AppNotificationProvider';
+import { BackToListButton } from '../../components/BackToListButton';
 import { memberApi } from './api';
 import { MemberProfileEditModal } from './MemberProfileEditModal';
 import type { HistoryStatus, LoanHistoryItem, MemberDetail, PageResponse } from './types';
@@ -229,7 +230,7 @@ export function MemberDetailPage() {
                 setDeleteDialogOpen(true);
               }}
             >Xóa thành viên</Button>}
-            <Link className="member-back-link" to="/admin/members">Quay lại danh sách</Link>
+            <BackToListButton to="/admin/members" />
           </div>
         </div>
 

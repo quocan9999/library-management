@@ -1,10 +1,11 @@
 import { Alert, Button, Checkbox, Modal, Spin, Tabs, Tag, Tooltip } from 'antd';
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { isMaintenanceError, MAINTENANCE_MESSAGE, MAINTENANCE_TITLE } from '../auth/messages';
 import { useAppNotification } from '../components/AppNotificationProvider';
+import { BackToListButton } from '../components/BackToListButton';
 import { roleApi } from './api';
 import {
   findMissingPermissionDependencies,
@@ -323,9 +324,7 @@ export function RolePermissionDetailPage() {
     <main className="role-stage">
       <section id="role-permission-editor" className="role-workspace" aria-labelledby="role-title">
         <div className="role-detail-nav">
-          <Link className="member-back-link" to="/admin/authorization/groups">
-            ← Quay lại danh sách nhóm
-          </Link>
+          <BackToListButton to="/admin/authorization/groups" label="← Quay lại danh sách nhóm" />
         </div>
 
         <div className="role-heading">
