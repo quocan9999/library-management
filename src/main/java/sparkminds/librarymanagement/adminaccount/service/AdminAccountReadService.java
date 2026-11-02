@@ -134,9 +134,13 @@ public class AdminAccountReadService {
 
     private static Sort parseSort(String sort) {
         if (sort == null || sort.isBlank()) return new Sort("a.id", "ASC");
-        String[] parts = sort.split(" ");
-        String field = parts[0];
-        String direction = parts.length > 1 ? parts[1].toUpperCase(Locale.ROOT) : "ASC";
+        String text = sort.trim();
+        String[] parts = text.contains(",") ? text.split(",", -1) : text.split("\\s+", -1);
+        if (parts.length > 2 || parts.length == 0) {
+            throw searchInvalid();
+        }
+        String field = parts[0].trim();
+        String direction = parts.length > 1 && !parts[1].isBlank() ? parts[1].trim().toUpperCase(Locale.ROOT) : "ASC";
         String column = SORT_COLUMNS.get(field);
         if (column == null || (!"ASC".equals(direction) && !"DESC".equals(direction))) {
             throw searchInvalid();

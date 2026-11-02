@@ -406,7 +406,7 @@ export function AdminProfilePage() {
                 <h3>Email</h3>
                 <p>{profile?.email ?? currentUser?.email ?? '—'}</p>
               </div>
-              <Link to="/profile/change-email" className="ant-btn ant-btn-default">
+              <Link to="/profile/change-email" className="ant-btn ant-btn-default profile-action__link">
                 Đổi email
               </Link>
             </div>
@@ -417,7 +417,7 @@ export function AdminProfilePage() {
                 <h3>Mật khẩu</h3>
                 <p aria-label="Mật khẩu được ẩn">••••••••</p>
               </div>
-              <Link to="/profile/change-password" className="ant-btn ant-btn-default">
+              <Link to="/profile/change-password" className="ant-btn ant-btn-default profile-action__link">
                 Đổi mật khẩu
               </Link>
             </div>

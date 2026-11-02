@@ -2450,14 +2450,48 @@ input:focus-visible,
   margin: 0;
   font-size: 14px;
   color: #344054;
-  word-break: break-all;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
-.admin-profile-security-row .profile-action__link,
-.admin-profile-security-row .ant-btn {
+.admin-profile-security-row .profile-action__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong, #d0d5dd);
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--navy, #1a2b49);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease;
+  white-space: nowrap;
   flex-shrink: 0;
   min-width: 120px;
-  text-align: center;
+}
+
+.admin-profile-security-row .profile-action__link:hover {
+  border-color: var(--navy, #1a2b49);
+  background: #f6f8fc;
+  color: var(--navy, #1a2b49);
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .admin-profile-security-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .admin-profile-security-row .profile-action__link {
+    width: 100%;
+  }
 }
 
 /* Staff Detail Page Styles (Athenaeum Minimal) */

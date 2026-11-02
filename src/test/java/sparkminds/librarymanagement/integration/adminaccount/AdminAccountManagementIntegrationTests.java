@@ -182,6 +182,13 @@ class AdminAccountManagementIntegrationTests {
         mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("size", "51"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("ADMIN_ACCOUNT_SEARCH_INVALID"));
+        mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("sort", "createdAt,desc"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("sort", "staffCode,asc"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("sort", "fullName,desc"))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get("/api/v1/admin/accounts").header("Authorization", bearer(adminToken)).param("sort", "email desc; delete"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("ADMIN_ACCOUNT_SEARCH_INVALID"));
