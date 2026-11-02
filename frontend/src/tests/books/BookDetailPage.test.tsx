@@ -33,7 +33,7 @@ function success<T>(code: string, data: T): ApiEnvelope<T> {
 function detail(version = 0, title = 'Lập trình Java'): BookDetail {
   return {
     id: 12, bookCode: 'B000012', isbn: '9786041234567', title, author: 'Nguyễn An', publisher: 'NXB Trẻ',
-    publishedDate: '2024-03-10', totalQuantity: 8, availableQuantity: 5, borrowFee: 150000, lateFeePerDay: 0,
+    publishedDate: '2024-03-10', totalQuantity: 8, availableQuantity: 5, borrowFee: 150000, price: 150000, lateFeePerDay: 0,
     createdAt: '2026-10-01T08:30:00', updatedAt: '2026-10-02T08:30:00', version,
   };
 }

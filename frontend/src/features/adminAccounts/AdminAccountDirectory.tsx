@@ -727,7 +727,7 @@ function AdminAccountDirectory({ mode }: { mode: DirectoryMode }) {
             {createFieldError('address')}
           </div>
 
-          <p className="admin-account-form-hint">Tài khoản mới cần xác minh email trước khi đăng nhập. Mật khẩu gồm 8–20 ký tự, chữ hoa, chữ thường, số và ký tự đặc biệt; không có khoảng trắng.</p>
+          <p className="admin-account-form-hint">Tài khoản mới cần xác minh email trước khi đăng nhập.</p>
         </div>
         {createError && <Alert className="admin-account-inline-alert" type="error" showIcon role="alert" title={createError} />}
       </Modal>

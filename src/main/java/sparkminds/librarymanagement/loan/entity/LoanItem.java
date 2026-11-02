@@ -12,6 +12,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * Entity đại diện cho một cuốn sách cụ thể trong yêu cầu mượn.
+ * Lưu vết phí mượn, tiền cọc, ngày trả, và trạng thái hoàn cọc/tịch thu cọc.
+ * Bắt buộc sử dụng Lombok cho Getter/Setter/NoArgsConstructor.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -46,6 +51,10 @@ public class LoanItem {
     @Column(name = "borrow_fee", nullable = false, precision = 12, scale = 2)
     private BigDecimal borrowFee;
 
+    /** Tiền đặt cọc của cuốn sách, được snapshot từ giá gốc (book.price) lúc tạo đơn. */
+    @Column(name = "deposit_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal depositAmount = BigDecimal.ZERO;
+
     @Column(name = "late_fee_per_day", nullable = false, precision = 12, scale = 2)
     private BigDecimal lateFeePerDay;
 
@@ -70,12 +79,33 @@ public class LoanItem {
     @Column(name = "paid_borrow_fee", precision = 12, scale = 2)
     private BigDecimal paidBorrowFee;
 
+    /** Số tiền cọc độc giả thực tế đã thanh toán. */
+    @Column(name = "paid_deposit_amount", precision = 12, scale = 2)
+    private BigDecimal paidDepositAmount;
+
     @Column(name = "borrow_fee_paid_at")
     private LocalDateTime borrowFeePaidAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "borrow_fee_confirmed_by_account_id")
     private Account borrowFeeConfirmedByAccount;
+
+    /** Số tiền cọc đã hoàn trả lại cho độc giả khi trả sách tại quầy. */
+    @Column(name = "deposit_refunded_amount", precision = 12, scale = 2)
+    private BigDecimal depositRefundedAmount;
+
+    /** Thời điểm hoàn cọc tại quầy. */
+    @Column(name = "deposit_refunded_at")
+    private LocalDateTime depositRefundedAt;
+
+    /** Nhân viên thủ thư xác nhận hoàn cọc cho độc giả tại quầy. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deposit_refunded_by_account_id")
+    private Account depositRefundedByAccount;
+
+    /** Thời điểm ghi nhận tịch thu cọc khi báo mất sách (LOST). */
+    @Column(name = "deposit_forfeited_at")
+    private LocalDateTime depositForfeitedAt;
 
     @Column(name = "late_fee_paid_at")
     private LocalDateTime lateFeePaidAt;

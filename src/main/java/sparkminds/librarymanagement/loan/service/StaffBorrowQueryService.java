@@ -27,6 +27,10 @@ import org.springframework.http.HttpStatus;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import java.util.stream.Collectors;
 
+/**
+ * Service tra cứu yêu cầu mượn tại quầy cho nhân viên thủ thư.
+ * Bắt buộc sử dụng Lombok (@RequiredArgsConstructor) và comment tiếng Việt.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -116,6 +120,8 @@ public class StaffBorrowQueryService {
                     loan.getCreatedAt().toInstant(ZoneOffset.UTC), loan.getVersion(),
                     loan.getOrigin(), loan.getPaymentStatus(), loan.getPaymentAmount(),
                     loan.getPaymentExpiresAt() == null ? null : loan.getPaymentExpiresAt().toInstant(ZoneOffset.UTC),
+                    loan.getRefundedAmount(),
+                    loan.getRefundedAt() == null ? null : loan.getRefundedAt().toInstant(ZoneOffset.UTC),
                     new StaffBorrowResponse.MemberIdentity(member.getId(), member.getMemberCode(), member.getFullName()),
                     responses, warnings);
         }).toList();

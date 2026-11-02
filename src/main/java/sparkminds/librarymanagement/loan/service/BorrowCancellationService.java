@@ -22,6 +22,10 @@ import java.time.ZoneOffset;
 import java.math.BigDecimal;
 import java.util.TreeSet;
 
+/**
+ * Service xử lý hủy yêu cầu mượn sách của độc giả trước khi nhận sách.
+ * Bắt buộc sử dụng Lombok (@RequiredArgsConstructor) và comment tiếng Việt.
+ */
 @Service
 @RequiredArgsConstructor
 public class BorrowCancellationService {
@@ -75,7 +79,7 @@ public class BorrowCancellationService {
         if (loan.getPaymentStatus() != LoanPaymentStatus.PENDING) return;
         BigDecimal amount = loanItemRepository.findByLoanId(loan.getId()).stream()
                 .filter(candidate -> candidate.getStatus().isPending() && candidate.getPaidBorrowFee() == null)
-                .map(candidate -> candidate.getBorrowFee())
+                .map(candidate -> candidate.getBorrowFee().add(candidate.getDepositAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         loan.setPaymentAmount(amount);
         if (amount.signum() == 0) {

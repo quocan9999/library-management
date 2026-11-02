@@ -27,7 +27,9 @@ interface LibrarianBorrowRequestModalProps {
   onCancelReady: (request: StaffBorrowRequest, item: BorrowItem) => void;
   onReject: (request: StaffBorrowRequest, item: BorrowItem) => void;
   onHandover: (request: StaffBorrowRequest) => void;
-  onReturn?: (request: StaffBorrowRequest, itemIds: number[], physicalBookReceived: boolean, lateFeeCollected: boolean) => void;
+  onReturn?: (request: StaffBorrowRequest, itemIds: number[], physicalBookReceived: boolean, lateFeeCollected: boolean, depositRefunded: boolean) => void;
+  onReportLost?: (request: StaffBorrowRequest, item: BorrowItem) => void;
+  onConfirmRefund?: (request: StaffBorrowRequest) => void;
   onCopyReference: (reference: string) => void;
 }
 
@@ -71,6 +73,8 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
   const [selectedReturnIds, setSelectedReturnIds] = useState<Set<number>>(() => new Set());
   const [physicalBookReceived, setPhysicalBookReceived] = useState(false);
   const [lateFeeCollected, setLateFeeCollected] = useState(false);
+  const [depositRefunded, setDepositRefunded] = useState(false);
+  const [lostReportItem, setLostReportItem] = useState<BorrowItem | null>(null);
   const request = props.request;
   const readyItems = request ? getReadyItems(request) : [];
   const preparationItems = request && props.canPrepare
@@ -112,15 +116,21 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
   }, [selectedReturnItems, returnItemsOverdueMap]);
 
   const hasSelectedOverdue = totalSelectedLateFee > 0;
+  const totalSelectedDeposit = useMemo(() => {
+    return selectedReturnItems.reduce((sum, item) => sum + (item.depositAmount ?? 0), 0);
+  }, [selectedReturnItems]);
 
   useEffect(() => {
     setSelectedPreparationIds(new Set());
     setSelectedReturnIds(new Set());
     setPhysicalBookReceived(false);
     setLateFeeCollected(false);
+    setDepositRefunded(false);
+    setLostReportItem(null);
   }, [request?.loanCode]);
 
-  return <Modal
+  return <>
+    <Modal
     rootClassName="librarian-borrow-modal"
     open={props.open}
     centered
@@ -136,10 +146,12 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
     footer={request ? <div className="librarian-borrow-modal__footer">
       <div className="librarian-borrow-modal__total">
         <Typography.Text type="secondary">
-          {selectedReturnItems.length > 0 ? 'Tổng phạt trễ đã chọn:' : 'Tổng phí mượn:'}
+          {selectedReturnItems.length > 0 ? 'Phạt trễ / Hoàn cọc:' : 'Tổng phí mượn:'}
         </Typography.Text>
         <Typography.Text strong>
-          {formatVnd(selectedReturnItems.length > 0 ? totalSelectedLateFee : totalFee)}
+          {selectedReturnItems.length > 0
+            ? `Phạt: ${formatVnd(totalSelectedLateFee)} · Hoàn cọc: ${formatVnd(totalSelectedDeposit)}`
+            : formatVnd(totalFee)}
         </Typography.Text>
       </div>
       {selectedReturnItems.length > 0 && (
@@ -160,6 +172,14 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
               </span>
             </Checkbox>
           )}
+          <Checkbox
+            checked={depositRefunded}
+            onChange={(e) => setDepositRefunded(e.target.checked)}
+          >
+            <span style={{ color: '#389e0d' }}>
+              <strong>Xác nhận đã hoàn trả tiền cọc: {formatVnd(totalSelectedDeposit)} cho độc giả tại quầy (Bắt buộc)</strong>
+            </span>
+          </Checkbox>
         </div>
       )}
       <div className="librarian-borrow-modal__footer-actions">
@@ -189,6 +209,7 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
             disabled={
               props.pendingKey !== null ||
               !physicalBookReceived ||
+              !depositRefunded ||
               (hasSelectedOverdue && !lateFeeCollected)
             }
             loading={props.pendingKey === `${request.loanCode}:return-selected`}
@@ -198,7 +219,8 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
                   request,
                   selectedReturnItems.map((item) => item.id),
                   physicalBookReceived,
-                  lateFeeCollected
+                  lateFeeCollected,
+                  depositRefunded
                 );
               }
             }}
@@ -232,6 +254,32 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
           role="status"
           title={`Có ${preparingWarningCount} sách đã ở trạng thái chuẩn bị quá 24 giờ. Hãy kiểm tra và cập nhật trạng thái tại quầy.`}
         />}
+        {/* Chỉ hiển thị cảnh báo yêu cầu hoàn tiền khi chưa hoàn tiền, khi đã hoàn tiền thành công thì thông báo qua Notification thay vì Alert trong modal */}
+        {request.paymentStatus === 'PAID' && !request.refundedAt && request.items.length > 0 && request.items.every((i) => ['CANCELLED', 'EXPIRED', 'REJECTED'].includes(i.status)) && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Yêu cầu đã thanh toán bị hủy / hết hạn"
+            description={
+              <div>
+                <p style={{ margin: '0 0 8px' }}>
+                  Độc giả đã thanh toán trực tuyến số tiền <strong>{formatVnd(request.paymentAmount || 0)}</strong>. Độc giả nhận lại 100% tiền hoàn (phí mượn + tiền cọc) tại quầy thư viện.
+                </p>
+                {props.canReturn && (
+                  <Button
+                    type="primary"
+                    danger
+                    loading={props.pendingKey === `${request.loanCode}:confirm-refund`}
+                    onClick={() => props.onConfirmRefund?.(request)}
+                  >
+                    Xác nhận đã hoàn tiền {formatVnd(request.paymentAmount || 0)} tại quầy
+                  </Button>
+                )}
+              </div>
+            }
+            style={{ marginBottom: '16px' }}
+          />
+        )}
         <section className="librarian-borrow-modal__section" aria-label="Thông tin yêu cầu">
           <Typography.Title level={5}>Thông tin yêu cầu</Typography.Title>
           <Descriptions size="small" column={1} colon={false}>
@@ -281,17 +329,29 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
                     return next;
                   })}
                 >Đã chuẩn bị xong</Checkbox>}
-                {props.canReturn && item.status === 'BORROWED' && <Checkbox
-                  aria-label={`Đánh dấu ${item.title} để nhận trả`}
-                  checked={selectedReturnIds.has(item.id)}
-                  disabled={props.pendingKey !== null}
-                  onChange={(event) => setSelectedReturnIds((current) => {
-                    const next = new Set(current);
-                    if (event.target.checked) next.add(item.id);
-                    else next.delete(item.id);
-                    return next;
-                  })}
-                >Chọn nhận trả sách này</Checkbox>}
+                {props.canReturn && item.status === 'BORROWED' && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
+                    <Checkbox
+                      aria-label={`Đánh dấu ${item.title} để nhận trả`}
+                      checked={selectedReturnIds.has(item.id)}
+                      disabled={props.pendingKey !== null}
+                      onChange={(event) => setSelectedReturnIds((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(item.id);
+                        else next.delete(item.id);
+                        return next;
+                      })}
+                    >Chọn nhận trả sách này</Checkbox>
+                    <Button
+                      danger
+                      size="small"
+                      disabled={props.pendingKey !== null}
+                      onClick={() => setLostReportItem(item)}
+                    >
+                      Báo mất sách
+                    </Button>
+                  </div>
+                )}
                 {item.status === 'BORROWED' && (
                   <div style={{ marginTop: '4px', fontSize: '13px' }}>
                     <span>Hạn trả: {item.dueDate ? formatDeskDate(item.dueDate) : '—'}</span>
@@ -312,17 +372,33 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
                         Phí trễ đã nộp: {formatVnd(item.lateFee)}
                       </span>
                     )}
+                    {item.depositRefundedAt && (
+                      <Tag color="success" style={{ marginLeft: '8px' }}>
+                        Đã hoàn cọc {formatVnd(item.depositRefundedAmount ?? item.depositAmount)}
+                      </Tag>
+                    )}
+                  </div>
+                )}
+                {item.status === 'LOST' && (
+                  <div style={{ marginTop: '4px', fontSize: '13px' }}>
+                    <Tag color="error">
+                      Đã báo mất · Tịch thu cọc {formatVnd(item.depositAmount)}
+                    </Tag>
                   </div>
                 )}
                 <div className={`librarian-borrow-modal-item__fee${feeInactive || (isCounterRequest && !isReady) ? ' librarian-borrow-modal-item__fee--inactive' : ''}`} data-loan-item-fee={item.id}>
                   <span>{isCounterRequest
-                    ? (isReady ? 'Phí cần thu tại quầy' : 'Phí mượn chưa thu')
-                    : (feeInactive ? 'Phí mượn' : 'Đã thanh toán trực tuyến')}</span>
-                  {isCounterRequest
-                    ? isReady ? <strong>{formatFee(item.borrowFee)}</strong> : <span><del>{formatVnd(item.borrowFee)}</del> · Chưa thu</span>
-                    : feeInactive
-                      ? <span><del>{formatVnd(item.borrowFee)}</del> · Không còn hiệu lực</span>
-                      : <strong>{formatFee(item.borrowFee)}</strong>}
+                    ? (isReady ? 'Phí + Cọc thu tại quầy' : 'Phí mượn & cọc chưa thu')
+                    : (feeInactive ? 'Phí mượn & cọc' : 'Đã thanh toán trực tuyến')}</span>
+                  <div style={{ textAlign: 'right' }}>
+                    {isCounterRequest
+                      ? isReady
+                        ? <strong>{formatFee(item.borrowFee)} · Cọc: {formatVnd(item.depositAmount)}</strong>
+                        : <span><del>{formatVnd(item.borrowFee)}</del> · Cọc: {formatVnd(item.depositAmount)} (Chưa thu)</span>
+                      : feeInactive
+                        ? <span><del>{formatVnd(item.borrowFee)}</del> · Cọc: {formatVnd(item.depositAmount)} (Hết hiệu lực)</span>
+                        : <strong>{formatFee(item.borrowFee)} · Cọc: {formatVnd(item.depositAmount)}</strong>}
+                  </div>
                 </div>
                 {isReady && <Typography.Text type="secondary" className="librarian-borrow-modal-item__deadline">
                   Hạn nhận: {item.pickupExpiresAt ? formatDeskDate(item.pickupExpiresAt) : '—'}
@@ -343,5 +419,41 @@ export function LibrarianBorrowRequestModal(props: LibrarianBorrowRequestModalPr
         </section>
       </>}
     </div>
-  </Modal>;
+  </Modal>
+
+  {/* Modal xác nhận báo mất sách */}
+  <Modal
+    open={lostReportItem !== null}
+    title="Xác nhận báo mất sách"
+    okText="Xác nhận báo mất"
+    okButtonProps={{ danger: true }}
+    cancelText="Hủy"
+    confirmLoading={props.pendingKey === `${request?.loanCode}:lost-${lostReportItem?.id}`}
+    onCancel={() => setLostReportItem(null)}
+    onOk={() => {
+      if (lostReportItem && props.onReportLost && request) {
+        props.onReportLost(request, lostReportItem);
+        setLostReportItem(null);
+      }
+    }}
+  >
+    {lostReportItem && (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <p>Bạn đang thực hiện báo mất cuốn sách: <strong>{lostReportItem.title}</strong> ({lostReportItem.bookCode}).</p>
+        <Alert
+          type="warning"
+          showIcon
+          message="Lưu ý quan trọng:"
+          description={
+            <ul style={{ margin: 0, paddingLeft: '16px' }}>
+              <li>Tiền cọc của cuốn sách này (<strong>{formatVnd(lostReportItem.depositAmount)}</strong>) sẽ bị tịch thu và không hoàn lại cho độc giả.</li>
+              <li>Tổng số lượng sách (total quantity) trong kho của thư viện sẽ tự động bị giảm đi 1 cuốn.</li>
+              <li>Hành động này không thể hoàn tác.</li>
+            </ul>
+          }
+        />
+      </div>
+    )}
+  </Modal>
+  </>;
 }

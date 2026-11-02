@@ -147,6 +147,7 @@ export function CatalogPage() {
         id: book.id,
         title: book.title,
         borrowFee: book.borrowFee,
+        price: book.price,
         coverImageUrl: book.coverImageUrl,
         bookCode: book.bookCode,
       };
@@ -215,13 +216,18 @@ export function CatalogPage() {
           )}
         </div>
 
-        {/* Hàng 2: Bộ lọc chip tình trạng sách */}
-        <UserFilterChips
-          ariaLabel="Lọc sách theo tình trạng"
-          options={AVAILABILITY_CHIPS}
-          value={availability}
-          onChange={handleAvailabilityChange}
-        />
+        {/* Hàng 2: Bộ lọc chip tình trạng sách và nút tải lại */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <UserFilterChips
+            ariaLabel="Lọc sách theo tình trạng"
+            options={AVAILABILITY_CHIPS}
+            value={availability}
+            onChange={handleAvailabilityChange}
+          />
+          <UserButton variant="ghost" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
+            Tải lại
+          </UserButton>
+        </div>
       </div>
 
       {/* 3. Các trạng thái giao diện */}
@@ -260,7 +266,7 @@ export function CatalogPage() {
           </p>
           <div style={{ marginTop: '12px' }}>
             <UserButton variant="primary" onClick={() => setReloadKey((k) => k + 1)}>
-              Thử lại
+              Tải lại
             </UserButton>
           </div>
         </section>
@@ -308,6 +314,7 @@ export function CatalogPage() {
                 author: book.author,
                 coverImageUrl: book.coverImageUrl,
                 borrowFee: book.borrowFee,
+                price: book.price,
                 lateFeePerDay: book.lateFeePerDay,
                 availableQuantity: book.availableQuantity,
                 totalQuantity: book.totalQuantity,

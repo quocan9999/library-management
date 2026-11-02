@@ -15,13 +15,20 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
+/**
+ * Service xử lý import danh sách sách từ file CSV.
+ * Áp dụng partial import: các dòng hợp lệ được lưu, các dòng lỗi (thiếu giá, giá <= 0đ, trùng ISBN,...)
+ * được ghi nhận kèm rowData để hỗ trợ xuất file CSV các dòng lỗi.
+ * Bắt buộc sử dụng Lombok và chú thích bằng tiếng Việt.
+ */
 @Service
 @RequiredArgsConstructor
 public class BookImportService {
 
     private static final int MAX_FILE_BYTES = 5 * 1024 * 1024;
-    private static final int MAX_ERROR_DETAILS = 100;
+    private static final int MAX_ERROR_DETAILS = 200;
     private static final String DUPLICATE_ISBN = "BOOK_ISBN_DUPLICATED";
     private static final String SIMILAR_BOOK = "SIMILAR_BOOK_REQUIRES_MANUAL_CONFIRMATION";
 
@@ -37,7 +44,7 @@ public class BookImportService {
      * đủ số lỗi nhưng giới hạn chi tiết hiển thị để kích thước response không tăng theo số dòng lỗi.
      *
      * @param file file CSV người dùng tải lên
-     * @return số dòng và tối đa 100 lỗi chi tiết; omittedErrorCount cho biết số chi tiết đã lược bỏ
+     * @return số dòng và danh sách lỗi chi tiết kèm dữ liệu nguyên bản của dòng để hỗ trợ xuất CSV lỗi
      * @throws BusinessException nếu bản thân file không hợp lệ
      */
     @BookOperationLog("book.import")
@@ -74,20 +81,20 @@ public class BookImportService {
             rowTransactionService.importRow(row);
             counts.importedRows++;
         } catch (BookImportRowException exception) {
-            counts.addError(row.rowNumber(), exception.getField(), exception.getCode(), exception.getMessage());
+            counts.addError(row.rowNumber(), exception.getField(), exception.getCode(), exception.getMessage(), row.fields());
         } catch (BusinessException exception) {
             if (DUPLICATE_ISBN.equals(exception.getCode())) {
-                counts.addError(row.rowNumber(), "isbn", DUPLICATE_ISBN, "ISBN đã được sử dụng; dòng này không được nhập");
+                counts.addError(row.rowNumber(), "isbn", DUPLICATE_ISBN, "ISBN đã được sử dụng; dòng này không được nhập", row.fields());
             } else if ("SIMILAR_BOOK_CONFIRMATION_REQUIRED".equals(exception.getCode())) {
                 counts.addError(row.rowNumber(), "title", SIMILAR_BOOK,
-                        "Đã có sách không ISBN cùng tên và tác giả; hãy thêm thủ công để xác nhận");
+                        "Đã có sách không ISBN cùng tên và tác giả; hãy thêm thủ công để xác nhận", row.fields());
             } else {
                 throw exception;
             }
         } catch (DataIntegrityViolationException exception) {
             String isbn = normalizeIsbn(row.value("isbn"));
             if (isbn != null && bookRepository.existsByIsbn(isbn)) {
-                counts.addError(row.rowNumber(), "isbn", DUPLICATE_ISBN, "ISBN đã được sử dụng; dòng này không được nhập");
+                counts.addError(row.rowNumber(), "isbn", DUPLICATE_ISBN, "ISBN đã được sử dụng; dòng này không được nhập", row.fields());
                 return;
             }
             throw exception;
@@ -124,10 +131,10 @@ public class BookImportService {
             this.totalRows = totalRows;
         }
 
-        private void addError(int rowNumber, String field, String code, String message) {
+        private void addError(int rowNumber, String field, String code, String message, Map<String, String> rowData) {
             failedRows++;
             if (errors.size() < MAX_ERROR_DETAILS) {
-                errors.add(new BookImportErrorResponse(rowNumber, field, code, message));
+                errors.add(new BookImportErrorResponse(rowNumber, field, code, message, rowData != null ? Map.copyOf(rowData) : Map.of()));
             } else {
                 omittedErrorCount++;
             }

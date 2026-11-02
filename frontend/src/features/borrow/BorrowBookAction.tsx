@@ -83,7 +83,8 @@ export function BorrowBookAction({ book, onCreated, selected = false, selectionD
       onOk={() => { void submit(); }}
     >
       <p><strong>{book.title}</strong> · {book.author}</p>
-      <p>Phí mượn đã công bố: {new Intl.NumberFormat('vi-VN').format(book.borrowFee)} ₫.</p>
+      <p>Phí mượn: {new Intl.NumberFormat('vi-VN').format(book.borrowFee)} ₫ · Tiền cọc: {new Intl.NumberFormat('vi-VN').format(book.price ?? 0)} ₫</p>
+      <p>Tổng thanh toán: <strong>{new Intl.NumberFormat('vi-VN').format(book.borrowFee + (book.price ?? 0))} ₫</strong> (Tiền cọc sẽ được hoàn trả 100% khi trả sách nguyên vẹn).</p>
       <p>Yêu cầu sẽ được xử lý theo tình trạng bản sách tại thời điểm máy chủ nhận.</p>
       <p>Chỉ xác nhận thành công khi máy chủ trả kết quả. Nếu kết nối hết thời gian chờ, hãy tải danh sách yêu cầu trước khi gửi lại.</p>
     </Modal>

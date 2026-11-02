@@ -11,6 +11,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * Entity đại diện cho thông tin một đầu sách trong hệ thống thư viện.
+ * Áp dụng Lombok để giảm thiểu mã boilerplate, giữ nguyên semantics của JPA.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -53,6 +57,10 @@ public class Book {
 
     @Column(name = "borrow_fee", nullable = false, precision = 12, scale = 2)
     private BigDecimal borrowFee;
+
+    /** Giá gốc của cuốn sách, dùng làm tiền đặt cọc khi độc giả mượn sách. */
+    @Column(name = "price", nullable = false, precision = 12, scale = 2)
+    private BigDecimal price = BigDecimal.ZERO;
 
     @Column(name = "late_fee_per_day", nullable = false, precision = 12, scale = 2)
     private BigDecimal lateFeePerDay;

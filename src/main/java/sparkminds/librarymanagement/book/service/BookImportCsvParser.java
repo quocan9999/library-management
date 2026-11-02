@@ -23,16 +23,19 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 
-/** Đọc và kiểm tra cấu trúc CSV trước khi service bắt đầu ghi bất kỳ dòng nào vào database. */
+/**
+ * Đọc và kiểm tra cấu trúc file CSV trước khi lưu dữ liệu sách vào database.
+ * Bổ sung kiểm tra cột price trong header bắt buộc.
+ */
 @Component
 class BookImportCsvParser {
 
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
     private static final List<String> REQUIRED_HEADERS = List.of(
-            "title", "author", "total_quantity", "borrow_fee", "late_fee_per_day"
+            "title", "author", "total_quantity", "borrow_fee", "price", "late_fee_per_day"
     );
     private static final Set<String> ALLOWED_HEADERS = Set.of(
-            "title", "author", "total_quantity", "borrow_fee", "late_fee_per_day",
+            "title", "author", "total_quantity", "borrow_fee", "price", "late_fee_per_day",
             "isbn", "publisher", "published_date"
     );
     private static final CSVFormat FORMAT = CSVFormat.RFC4180.builder()
@@ -141,7 +144,7 @@ class BookImportCsvParser {
             headers.add(header);
         }
         if (!headers.containsAll(REQUIRED_HEADERS)) {
-            throw invalidHeader("Thiếu một hoặc nhiều cột bắt buộc của file CSV");
+            throw invalidHeader("Thiếu một hoặc nhiều cột bắt buộc của file CSV (title, author, total_quantity, borrow_fee, price, late_fee_per_day)");
         }
         return List.copyOf(headers);
     }

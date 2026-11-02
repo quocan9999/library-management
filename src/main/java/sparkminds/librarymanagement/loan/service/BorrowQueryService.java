@@ -20,6 +20,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Service tra cứu yêu cầu mượn của độc giả.
+ * Bắt buộc sử dụng Lombok (@RequiredArgsConstructor) và comment tiếng Việt.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -70,7 +74,10 @@ public class BorrowQueryService {
                 loan.getCreatedAt().toInstant(ZoneOffset.UTC), loan.getVersion(), loan.getPaymentStatus(),
                 loan.getPaymentMethod(), loan.getPaymentAmount(),
                 loan.getPaymentExpiresAt() == null ? null : loan.getPaymentExpiresAt().toInstant(ZoneOffset.UTC),
-                loan.getPaidAt() == null ? null : loan.getPaidAt().toInstant(ZoneOffset.UTC), responses);
+                loan.getPaidAt() == null ? null : loan.getPaidAt().toInstant(ZoneOffset.UTC),
+                loan.getRefundedAmount(),
+                loan.getRefundedAt() == null ? null : loan.getRefundedAt().toInstant(ZoneOffset.UTC),
+                responses);
     }
 
     static BusinessException notFound() {

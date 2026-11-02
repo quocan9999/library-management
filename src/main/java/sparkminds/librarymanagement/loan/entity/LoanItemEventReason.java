@@ -1,5 +1,9 @@
 package sparkminds.librarymanagement.loan.entity;
 
+/**
+ * Lý do phát sinh sự kiện thay đổi trạng thái của sách mượn.
+ * Bổ sung LOST_REPORTED và OFFLINE_REFUND_CONFIRMED.
+ */
 public enum LoanItemEventReason {
     REQUEST_CREATED,
     /** @deprecated Legacy reason from waitlist queue; retained for historical audit trail. */
@@ -19,5 +23,7 @@ public enum LoanItemEventReason {
     LEGACY_IMPORTED,
     DUE_REMINDER_THREE_DAYS,
     DUE_REMINDER_TODAY,
-    OVERDUE_REMINDER_FIRST_DAY
+    OVERDUE_REMINDER_FIRST_DAY,
+    LOST_REPORTED,
+    OFFLINE_REFUND_CONFIRMED
 }

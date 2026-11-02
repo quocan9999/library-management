@@ -209,7 +209,7 @@ public class LibrarianBorrowController {
     }
 
     @PostMapping("/borrow-requests/{loanCode}/return")
-    @Operation(summary = "Tiếp nhận trả sách tại quầy", description = "Xác nhận nhận sách vật lý và thu phí trễ hạn (nếu có). Hỗ trợ trả lẻ từng cuốn.")
+    @Operation(summary = "Tiếp nhận trả sách tại quầy", description = "Xác nhận nhận sách vật lý, hoàn cọc và thu phí trễ hạn (nếu có).")
     @PreAuthorize("hasAuthority('borrow:return') and principal.roleCode != 'USER'")
     public ResponseEntity<ApiResponse<StaffBorrowResponse>> returnItems(
             @AuthenticationPrincipal CustomUserPrincipal principal,
@@ -217,6 +217,27 @@ public class LibrarianBorrowController {
             @Valid @RequestBody ReturnBorrowItemsRequest request) {
         return success("BORROW_RETURN_SUCCESS", "Tiếp nhận trả sách thành công",
                 returnService.returnItems(principal.getAccountId(), loanCode, request));
+    }
+
+    @PostMapping("/borrow-requests/{loanCode}/report-lost")
+    @Operation(summary = "Báo mất sách tại quầy", description = "Xác nhận độc giả làm mất sách, tịch thu tiền cọc và khấu trừ tổng kho sách.")
+    @PreAuthorize("hasAuthority('borrow:return') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<StaffBorrowResponse>> reportLost(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @PathVariable String loanCode,
+            @Valid @RequestBody sparkminds.librarymanagement.loan.dto.ReportLostItemsRequest request) {
+        return success("BORROW_REPORT_LOST_SUCCESS", "Báo mất sách thành công",
+                returnService.reportLostItems(principal.getAccountId(), loanCode, request));
+    }
+
+    @PostMapping("/borrow-requests/{loanCode}/confirm-refund")
+    @Operation(summary = "Xác nhận hoàn tiền tại quầy cho đơn đã thanh toán bị hủy/hết hạn", description = "Lưu vết thủ thư hoàn tiền trực tiếp ngoài đời cho độc giả.")
+    @PreAuthorize("hasAuthority('borrow:return') and principal.roleCode != 'USER'")
+    public ResponseEntity<ApiResponse<StaffBorrowResponse>> confirmRefund(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @PathVariable String loanCode) {
+        return success("BORROW_REFUND_SUCCESS", "Xác nhận hoàn tiền tại quầy thành công",
+                returnService.confirmOfflineRefund(principal.getAccountId(), loanCode));
     }
 
     private <T> ResponseEntity<ApiResponse<T>> success(String code, String message, T data) {

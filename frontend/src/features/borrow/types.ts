@@ -32,6 +32,7 @@ export interface CatalogBook {
   totalQuantity: number;
   availableQuantity: number;
   borrowFee: number;
+  price: number;
   lateFeePerDay: number;
   coverImageUrl: string | null;
 }
@@ -44,7 +45,8 @@ export type LoanItemStatus =
   | 'RETURNED'
   | 'CANCELLED'
   | 'REJECTED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'LOST';
 
 export interface BorrowItem {
   id: number;
@@ -58,6 +60,11 @@ export interface BorrowItem {
   lateFeePerDay: number;
   paidBorrowFee: number;
   lateFee: number;
+  depositAmount: number;
+  paidDepositAmount?: number;
+  depositRefundedAmount?: number;
+  depositRefundedAt?: string | null;
+  depositForfeitedAt?: string | null;
   borrowedAt: string | null;
   dueDate: string | null;
   readyAt: string | null;
@@ -76,6 +83,8 @@ export interface BorrowRequestSummary {
   paymentStatus?: 'PENDING' | 'PAID' | 'NOT_REQUIRED' | 'EXPIRED';
   paymentAmount?: number;
   paymentExpiresAt?: string | null;
+  refundedAmount?: number;
+  refundedAt?: string | null;
   itemCount: number;
   statuses: LoanItemStatus[];
   items: BorrowItem[];
@@ -92,6 +101,8 @@ export interface BorrowRequest {
   paymentAmount?: number;
   paymentExpiresAt?: string | null;
   paidAt?: string | null;
+  refundedAmount?: number;
+  refundedAt?: string | null;
   items: BorrowItem[];
 }
 
@@ -107,6 +118,8 @@ export interface StaffBorrowRequest {
   paymentStatus?: 'PENDING' | 'PAID' | 'NOT_REQUIRED' | 'EXPIRED';
   paymentAmount?: number;
   paymentExpiresAt?: string | null;
+  refundedAmount?: number;
+  refundedAt?: string | null;
   member: { id: number; memberCode: string; fullName: string };
   items: BorrowItem[];
   preparingOverdueItemIds: number[];
@@ -126,13 +139,23 @@ export interface ConfirmMockPayment {
 export interface HandoverRequest {
   identityVerified: true;
   expectedLoanVersion: number;
-  items: Array<{ loanItemId: number; collectedBorrowFee: number }>;
+  items: Array<{ loanItemId: number; collectedBorrowFee: number; collectedDepositAmount: number }>;
 }
 
 export interface ReturnBorrowItemsRequest {
   itemIds: number[];
   physicalBookReceived: boolean;
   lateFeeCollected?: boolean;
+  depositRefunded: boolean;
+}
+
+export interface ReportLostItemsRequest {
+  itemIds: number[];
+  note?: string;
+}
+
+export interface ConfirmOfflineRefundRequest {
+  note?: string;
 }
 
 export interface BorrowListQuery {

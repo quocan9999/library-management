@@ -5,6 +5,10 @@ import sparkminds.librarymanagement.loan.entity.LoanStatus;
 
 import java.util.Collection;
 
+/**
+ * Tính toán trạng thái tổng hợp của đơn mượn (Loan) dựa trên trạng thái của các sách thành phần (LoanItem).
+ * Hỗ trợ trạng thái LOST: sách bị mất được xem như đã hoàn tất nghĩa vụ mượn (đã xử lý tịch thu cọc).
+ */
 public final class LoanStatusCalculator {
 
     private LoanStatusCalculator() {
@@ -12,18 +16,19 @@ public final class LoanStatusCalculator {
 
     /**
      * Tổng hợp trạng thái để hiển thị; từng LoanItem vẫn quyết định tồn kho và điều kiện nhận sách.
-     * Item đã trả phải được giữ trong kết quả ngay cả khi các item khác còn chờ chuẩn bị.
+     * Item đã trả (RETURNED) hoặc đã báo mất (LOST) được xem là hoàn tất xử lý.
      */
     public static LoanStatus calculate(Collection<LoanItemStatus> statuses) {
         boolean borrowed = statuses.contains(LoanItemStatus.BORROWED);
-        boolean returned = statuses.contains(LoanItemStatus.RETURNED);
+        boolean completed = statuses.contains(LoanItemStatus.RETURNED) || statuses.contains(LoanItemStatus.LOST);
         boolean pending = statuses.stream().anyMatch(LoanItemStatus::isPending);
+
         if (borrowed) {
-            return returned ? LoanStatus.PARTIALLY_RETURNED : LoanStatus.ACTIVE;
+            return completed ? LoanStatus.PARTIALLY_RETURNED : LoanStatus.ACTIVE;
         }
         if (pending) {
-            return returned ? LoanStatus.PARTIALLY_RETURNED : LoanStatus.OPEN;
+            return completed ? LoanStatus.PARTIALLY_RETURNED : LoanStatus.OPEN;
         }
-        return returned ? LoanStatus.RETURNED : LoanStatus.CLOSED;
+        return completed ? LoanStatus.RETURNED : LoanStatus.CLOSED;
     }
 }

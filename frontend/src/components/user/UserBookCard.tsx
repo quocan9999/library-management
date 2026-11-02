@@ -10,6 +10,7 @@ export interface UserBookCardItem {
   author: string;
   coverImageUrl?: string | null;
   borrowFee?: number;
+  price?: number;
   lateFeePerDay?: number;
   availableQuantity?: number;
   totalQuantity?: number;
@@ -48,6 +49,13 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
   };
 
   const renderBadge = () => {
+    if (available === 1) {
+      return (
+        <UserBadge variant="warning">
+          Sắp hết · còn 1
+        </UserBadge>
+      );
+    }
     if (isAvailable) {
       return (
         <UserBadge variant="success">
@@ -83,6 +91,7 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
         <UserButton
           variant="primary"
           fullWidth
+          aria-label={`Chọn mượn ${book.title}`}
           onClick={() => onAction?.(book)}
           style={{ marginTop: 'auto' }}
         >
@@ -105,39 +114,42 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
 
   return (
     <div
-      className={`user-book-card ${className}`}
+      className={`user-book-card user-no-select ${className}`}
       style={{
-        backgroundColor: '#FFFFFF',
-        border: '2px solid #14112B',
-        borderRadius: '24px',
-        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '24px',
+        border: '2px solid #14112B',
+        boxShadow: '4px 4px 0px 0px #14112B',
+        overflow: 'hidden',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
         ...style,
       }}
     >
-      {/* Khối bìa sách với theme pastel */}
+      {/* Visual Header / Cover Canvas */}
       <div
         style={{
-          width: '100%',
-          height: '240px',
+          position: 'relative',
+          padding: '24px 20px',
+          backgroundColor: '#F7F5FF',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: onClickTitle ? 'pointer' : 'default',
+          minHeight: '220px',
+          overflow: 'hidden',
         }}
-        onClick={() => onClickTitle?.(book)}
       >
         <UserBookCover
           title={book.title}
           coverImageUrl={book.coverImageUrl}
           themeIndex={themeIndex}
           theme={theme}
-          style={{ width: '130px', height: '185px' }}
+          size="md"
         />
       </div>
 
-      {/* Thông tin nội dung sách */}
+      {/* Meta Content */}
       <div
         style={{
           padding: '20px',
@@ -148,21 +160,28 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
           borderTop: '2px solid #14112B',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           {renderBadge()}
-          <span
-            style={{
-              fontWeight: 800,
-              fontSize: '15px',
-              color: '#6C4DFF',
-            }}
-          >
-            {formatCurrency(book.borrowFee)}
-          </span>
+          <div style={{ textAlign: 'right' }}>
+            <span
+              style={{
+                fontWeight: 800,
+                fontSize: '15px',
+                color: '#6C4DFF',
+                display: 'block',
+              }}
+            >
+              {formatCurrency(book.borrowFee)}
+            </span>
+            {book.price !== undefined && book.price > 0 && (
+              <span style={{ fontSize: '12px', color: '#7A7599', display: 'block' }}>
+                Cọc: {formatCurrency(book.price)}
+              </span>
+            )}
+          </div>
         </div>
 
         <h3
-          onClick={() => onClickTitle?.(book)}
           style={{
             fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
             fontWeight: 700,
@@ -180,7 +199,21 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
           }}
           title={book.title}
         >
-          {book.title}
+          <a
+            href={`/books/${book.id}`}
+            role="link"
+            onClick={(e) => {
+              e.preventDefault();
+              onClickTitle?.(book);
+            }}
+            style={{
+              color: 'inherit',
+              textDecoration: 'none',
+              cursor: onClickTitle ? 'pointer' : 'default',
+            }}
+          >
+            {book.title}
+          </a>
         </h3>
 
         <p
