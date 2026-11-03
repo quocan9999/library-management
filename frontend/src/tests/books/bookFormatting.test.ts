@@ -28,7 +28,42 @@ describe('book input and display formatting', () => {
     expect(parseVndInput('0,01')).toBe(0.01);
   });
 
-  it.each(['1,,2', '1,,', '1.000,001', '1.00'])('keeps malformed fee text %j visible for validation', (input) => {
+  it.each([
+    ['1000', '1.000', 1000],
+    ['10000', '10.000', 10000],
+    ['20000', '20.000', 20000],
+    ['100000', '100.000', 100000],
+    ['150000', '150.000', 150000],
+    ['1000000', '1.000.000', 1000000],
+  ])('formats entered VND amount %s into %s and parses as %s', (input, expectedDisplay, expectedNum) => {
+    expect(formatVndInput(input)).toBe(expectedDisplay);
+    expect(parseVndInput(expectedDisplay)).toBe(expectedNum);
+  });
+
+  it('re-formats dynamic typing into existing grouped text without producing invalid decimals', () => {
+    // Khi người dùng gõ số 0 tiếp theo sau khi đã được format 2.000 -> DOM nhận 2.0000 -> tự động nhóm lại thành 20.000
+    expect(formatVndInput('2.0000')).toBe('20.000');
+    expect(parseVndInput(formatVndInput('2.0000'))).toBe(20000);
+
+    // Khi gõ tiếp số 0 -> DOM nhận 20.0000 -> định dạng 200.000
+    expect(formatVndInput('20.0000')).toBe('200.000');
+    expect(parseVndInput(formatVndInput('20.0000'))).toBe(200000);
+
+    // Khi xóa điền lại 150000: sau khi gõ 1.500 thêm số 0 thành 1.5000 -> 15.000, thêm số 0 thành 15.0000 -> 150.000
+    expect(formatVndInput('1.5000')).toBe('15.000');
+    expect(formatVndInput('15.0000')).toBe('150.000');
+    expect(parseVndInput(formatVndInput('15.0000'))).toBe(150000);
+
+    // Khi người dùng bấm Backspace xóa bớt chữ số ở cuối 1.000 -> 1.00 -> thành 100
+    expect(formatVndInput('1.00')).toBe('100');
+    expect(parseVndInput(formatVndInput('1.00'))).toBe(100);
+
+    // Khi người dùng xóa bớt chữ số ở cuối 150.000 -> 150.00 -> thành 15.000
+    expect(formatVndInput('150.00')).toBe('15.000');
+    expect(parseVndInput(formatVndInput('150.00'))).toBe(15000);
+  });
+
+  it.each(['1,,2', '1,,', '1.000,001', '1,,0'])('keeps malformed fee text %j visible for validation', (input) => {
     expect(formatVndInput(input)).toBe(input);
     expect(parseVndInput(input)).toBeNull();
   });

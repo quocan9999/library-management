@@ -10,6 +10,7 @@ export interface BookListItem {
   totalQuantity: number;
   availableQuantity: number;
   borrowFee: number;
+  price: number;
   lateFeePerDay: number;
   createdAt: string;
   updatedAt: string;
@@ -27,6 +28,7 @@ export interface BookWriteInput {
   publishedDate: string | null;
   totalQuantity: number;
   borrowFee: number;
+  price: number;
   lateFeePerDay: number;
   confirmSimilar?: boolean;
 }
@@ -61,6 +63,7 @@ export interface BookImportError {
   field: string;
   code: string;
   message: string;
+  rowData?: Record<string, string>;
 }
 
 export interface BookImportReport {

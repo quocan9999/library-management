@@ -47,6 +47,10 @@ export default function RootLayout() {
             <Stack.Screen name="change-password" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="change-email" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="personal-info" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen
+              name="borrow-payment/[loanCode]"
+              options={{ animation: 'slide_from_right' }}
+            />
             <Stack.Screen name="explore" />
           </Stack>
         </ThemeProvider>

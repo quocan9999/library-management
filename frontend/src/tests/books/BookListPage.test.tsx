@@ -49,7 +49,7 @@ function book(id: number, title = 'Lập trình Java'): BookDetail {
   return {
     id, bookCode: `B${String(id).padStart(6, '0')}`, isbn: '9786041234567', title, author: 'Nguyễn An',
     publisher: 'Nhà xuất bản Trẻ', publishedDate: '2024-03-10', totalQuantity: 0, availableQuantity: 0,
-    borrowFee: 150000, lateFeePerDay: 0, createdAt: '2026-10-01T08:30:00', updatedAt: '2026-10-02T08:30:00', version: 0,
+    borrowFee: 150000, price: 150000, lateFeePerDay: 0, createdAt: '2026-10-01T08:30:00', updatedAt: '2026-10-02T08:30:00', version: 0,
   };
 }
 
@@ -228,14 +228,30 @@ describe('BookListPage', () => {
     const borrowFee = screen.getByRole('textbox', { name: 'Phí mượn (VND)' });
     expect(borrowFee).toHaveProperty('value', '0');
     expect(screen.getByRole('textbox', { name: 'Phí trễ mỗi ngày (VND)' })).toHaveProperty('value', '0');
-    fireEvent.change(borrowFee, { target: { value: '150000' } });
-    expect(borrowFee).toHaveProperty('value', '150.000');
+
+    // Kiểm tra gõ 20000: từ 2.000 gõ tiếp số 0 thành 2.0000 -> tự động định dạng thành 20.000 mà không bị lỗi số thập phân
+    fireEvent.change(borrowFee, { target: { value: '2000' } });
+    expect(borrowFee).toHaveProperty('value', '2.000');
+    fireEvent.change(borrowFee, { target: { value: '2.0000' } });
+    expect(borrowFee).toHaveProperty('value', '20.000');
+
+    // Kiểm tra xoá và điền lại 150000 vào ô giá gốc sách (price)
+    const priceInput = screen.getByRole('textbox', { name: 'Giá gốc sách (VND)' });
+    expect(priceInput).toHaveProperty('value', '0');
+    fireEvent.change(priceInput, { target: { value: '' } });
+    fireEvent.change(priceInput, { target: { value: '1500' } });
+    expect(priceInput).toHaveProperty('value', '1.500');
+    fireEvent.change(priceInput, { target: { value: '1.5000' } });
+    expect(priceInput).toHaveProperty('value', '15.000');
+    fireEvent.change(priceInput, { target: { value: '15.0000' } });
+    expect(priceInput).toHaveProperty('value', '150.000');
+
     const submitButtons = screen.getAllByRole('button', { name: 'Thêm sách' });
     fireEvent.click(submitButtons[submitButtons.length - 1]);
 
     await vi.waitFor(() => expect(submitted).not.toBeNull());
     expect(submitted).toMatchObject({
-      title: 'Lập trình Java', author: 'Nguyễn An', borrowFee: 150000, lateFeePerDay: 0, totalQuantity: 0,
+      title: 'Lập trình Java', author: 'Nguyễn An', borrowFee: 20000, price: 150000, lateFeePerDay: 0, totalQuantity: 0,
     });
     await vi.waitFor(() => expect(listReads).toBe(2));
   });

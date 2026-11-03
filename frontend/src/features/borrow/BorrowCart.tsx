@@ -31,12 +31,15 @@ export function BorrowCart({
   onRemove,
   onSubmit,
 }: BorrowCartProps) {
+  const totalDeposit = books.reduce((sum, b) => sum + (b.price || 0), 0);
+  const totalPayment = totalFee + totalDeposit;
+
   return <>
     {books.length > 0 && <div className="borrow-cart-bar" role="region" aria-label="Tóm tắt giỏ đặt mượn">
       <div className="borrow-cart-bar__inner">
         <div className="borrow-cart-bar__summary">
           <strong className="borrow-cart-bar__count">{books.length}/{maximumBooks} sách đã chọn</strong>
-          <span className="borrow-cart-bar__total">Tổng phí {formatVnd(totalFee)}</span>
+          <span className="borrow-cart-bar__total">Tổng cộng {formatVnd(totalPayment)}</span>
         </div>
         <Button className="borrow-cart-bar__button borrow-cart-bar__view" onClick={onOpenDrawer}>
           Xem giỏ
@@ -67,9 +70,19 @@ export function BorrowCart({
         footer: { padding: '16px 20px 20px', borderTop: '1px solid var(--line)' },
       }}
       footer={<div className="borrow-cart-drawer__footer">
-        <div className="borrow-cart-drawer__total">
-          <strong>Tổng phí mượn</strong>
-          <strong>{formatVnd(totalFee)}</strong>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+            <span>Tổng phí mượn:</span>
+            <strong>{formatVnd(totalFee)}</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+            <span>Tổng tiền cọc:</span>
+            <strong>{formatVnd(totalDeposit)}</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', borderTop: '1px solid var(--line, #eee)', paddingTop: '6px', marginTop: '4px' }}>
+            <strong>Tổng thanh toán:</strong>
+            <strong style={{ color: '#1677ff' }}>{formatVnd(totalPayment)}</strong>
+          </div>
         </div>
         <Button type="primary" block disabled={books.length === 0 || locked} onClick={onSubmit}>
           Đặt mượn
@@ -86,7 +99,7 @@ export function BorrowCart({
           </div>
           <div className="borrow-cart-list__details">
             <strong title={book.title}>{book.title}</strong>
-            <span>{formatVnd(book.borrowFee)}</span>
+            <span style={{ fontSize: '12px' }}>Phí: {formatVnd(book.borrowFee)} · Cọc: {formatVnd(book.price ?? 0)}</span>
           </div>
           <Button
             className="borrow-cart-icon-button borrow-cart-list__remove"

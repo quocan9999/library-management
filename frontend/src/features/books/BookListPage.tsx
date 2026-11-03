@@ -171,6 +171,7 @@ export function BookListPage() {
     { title: 'ISBN', dataIndex: 'isbn', key: 'isbn', sorter: true, sortOrder: sortOrder('isbn'), render: (value: string | null) => value || '—', width: 155 },
     { title: 'Sẵn có / Tổng', key: 'quantity', render: (_value, book) => `${book.availableQuantity} / ${book.totalQuantity}`, width: 130 },
     { title: 'Phí mượn', dataIndex: 'borrowFee', key: 'borrowFee', sorter: true, sortOrder: sortOrder('borrowFee'), align: 'right', render: formatVnd, width: 135 },
+    { title: 'Giá gốc', dataIndex: 'price', key: 'price', sorter: true, sortOrder: sortOrder('price'), align: 'right', render: formatVnd, width: 135 },
     { title: 'Phí trễ/ngày', dataIndex: 'lateFeePerDay', key: 'lateFeePerDay', sorter: true, sortOrder: sortOrder('lateFeePerDay'), align: 'right', render: formatVnd, width: 145 },
     { title: 'Cập nhật', dataIndex: 'updatedAt', key: 'updatedAt', sorter: true, sortOrder: sortOrder('updatedAt'), render: formatDate, width: 125 },
     { title: 'Thao tác', key: 'action', render: (_value, book) => <Link to={`/admin/books/${book.id}`} aria-label={`Xem chi tiết ${book.bookCode}`}>Xem chi tiết</Link>, width: 120 },

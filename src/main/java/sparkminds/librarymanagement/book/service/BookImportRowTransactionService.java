@@ -10,7 +10,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 
-/** Lưu từng dòng CSV trong transaction riêng do Spring quản lý. */
+/**
+ * Lưu từng dòng CSV trong transaction riêng do Spring quản lý.
+ * Bắt buộc sử dụng Lombok để tiêm phụ thuộc BookTransactionService.
+ */
 @Service
 @RequiredArgsConstructor
 class BookImportRowTransactionService {
@@ -66,6 +69,7 @@ class BookImportRowTransactionService {
         LocalDate publishedDate = parseDate(row.value("published_date"));
         int totalQuantity = parseQuantity(row.value("total_quantity"));
         BigDecimal borrowFee = parseFee(row.value("borrow_fee"), "borrow_fee");
+        BigDecimal price = parsePrice(row.value("price"));
         BigDecimal lateFeePerDay = parseFee(row.value("late_fee_per_day"), "late_fee_per_day");
 
         return new CreateBookRequest(
@@ -76,6 +80,7 @@ class BookImportRowTransactionService {
                 publishedDate,
                 totalQuantity,
                 borrowFee,
+                price,
                 lateFeePerDay,
                 false
         );
@@ -112,6 +117,27 @@ class BookImportRowTransactionService {
             return fee;
         } catch (NumberFormatException exception) {
             throw invalid(field, "INVALID_BOOK_IMPORT_ROW", "Phí phải là số hợp lệ");
+        }
+    }
+
+    private static BigDecimal parsePrice(String value) {
+        String text = trim(value);
+        if (text == null) {
+            throw invalid("price", "BOOK_IMPORT_PRICE_REQUIRED", "Giá gốc sách là bắt buộc");
+        }
+        try {
+            BigDecimal price = new BigDecimal(text);
+            BigDecimal normalized = price.stripTrailingZeros();
+            int integerDigits = Math.max(normalized.precision() - normalized.scale(), 0);
+            if (price.signum() <= 0) {
+                throw invalid("price", "BOOK_IMPORT_PRICE_MUST_BE_POSITIVE", "Giá gốc của sách trong file CSV phải lớn hơn 0đ");
+            }
+            if (normalized.scale() > 2 || integerDigits > 10) {
+                throw invalid("price", "INVALID_BOOK_IMPORT_ROW", "Giá gốc sách tối đa 10 chữ số nguyên và 2 số thập phân");
+            }
+            return price;
+        } catch (NumberFormatException exception) {
+            throw invalid("price", "INVALID_BOOK_IMPORT_ROW", "Giá gốc sách phải là số hợp lệ");
         }
     }
 

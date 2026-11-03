@@ -4,7 +4,10 @@ import sparkminds.librarymanagement.book.dto.BookDetailResponse;
 import sparkminds.librarymanagement.book.dto.BookListItemResponse;
 import sparkminds.librarymanagement.book.entity.Book;
 
-/** Chuyển dữ liệu Book thành DTO công khai để API không phụ thuộc hoặc trả trực tiếp JPA Entity. */
+/**
+ * Chuyển dữ liệu Book thành DTO công khai để API không phụ thuộc hoặc trả trực tiếp JPA Entity.
+ * Đảm bảo map đầy đủ trường price (giá gốc/tiền cọc).
+ */
 final class BookMapper {
 
     private BookMapper() {
@@ -22,6 +25,7 @@ final class BookMapper {
                 book.getTotalQuantity(),
                 book.getAvailableQuantity(),
                 book.getBorrowFee(),
+                book.getPrice(),
                 book.getLateFeePerDay(),
                 book.getCreatedAt(),
                 book.getUpdatedAt(),
@@ -42,6 +46,7 @@ final class BookMapper {
                 book.getTotalQuantity(),
                 book.getAvailableQuantity(),
                 book.getBorrowFee(),
+                book.getPrice(),
                 book.getLateFeePerDay(),
                 book.getCreatedAt(),
                 book.getUpdatedAt(),

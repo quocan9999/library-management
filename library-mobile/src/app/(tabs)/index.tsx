@@ -296,8 +296,12 @@ export default function HomeScreen() {
       />
 
       <CartDrawerModal
-        onCheckoutSuccess={() => {
+        onCheckoutSuccess={(loanCode, paymentStatus) => {
           loadData();
+          if (paymentStatus === 'PENDING') {
+            router.push(`/borrow-payment/${encodeURIComponent(loanCode)}`);
+            return;
+          }
           router.push('/(tabs)/my-books');
         }}
       />

@@ -8,10 +8,26 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-public record StaffBorrowResponse(String loanCode, String pickupReference, LoanStatus status, Instant createdAt,
-                                  long version, LoanOrigin origin, LoanPaymentStatus paymentStatus,
-                                  BigDecimal paymentAmount, Instant paymentExpiresAt, MemberIdentity member, List<BorrowItemResponse> items,
-                                  List<Integer> preparingOverdueItemIds) {
+/**
+ * DTO trả về thông tin yêu cầu mượn cho nhân viên thủ thư tại quầy.
+ * Bổ sung refundedAmount và refundedAt ghi nhận hoàn tiền quầy.
+ */
+public record StaffBorrowResponse(
+        String loanCode,
+        String pickupReference,
+        LoanStatus status,
+        Instant createdAt,
+        long version,
+        LoanOrigin origin,
+        LoanPaymentStatus paymentStatus,
+        BigDecimal paymentAmount,
+        Instant paymentExpiresAt,
+        BigDecimal refundedAmount,
+        Instant refundedAt,
+        MemberIdentity member,
+        List<BorrowItemResponse> items,
+        List<Integer> preparingOverdueItemIds
+) {
     public record MemberIdentity(Integer id, String memberCode, String fullName) {
     }
 }

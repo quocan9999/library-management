@@ -22,6 +22,7 @@ export const ITEM_STATUS_LABELS: Record<LoanItemStatus, string> = {
   CANCELLED: 'Đã hủy',
   EXPIRED: 'Đã hết hạn nhận',
   REJECTED: 'Không tìm thấy sách',
+  LOST: 'Báo mất sách',
 };
 
 export const LOAN_STATUS_LABELS: Record<StaffBorrowRequest['status'], string> = {
@@ -34,7 +35,7 @@ export const LOAN_STATUS_LABELS: Record<StaffBorrowRequest['status'], string> = 
 
 const ITEM_STATUS_PRIORITY: LoanItemStatus[] = [
   'READY_FOR_PICKUP', 'PREPARING', 'RESERVED', 'BORROWED',
-  'RETURNED', 'CANCELLED', 'EXPIRED', 'REJECTED',
+  'RETURNED', 'LOST', 'CANCELLED', 'EXPIRED', 'REJECTED',
 ];
 
 export function getPrimaryItemStatus(items: BorrowItem[]): LoanItemStatus | null {
@@ -54,6 +55,12 @@ export function getRequestFeeTotal(request: StaffBorrowRequest): number {
     .reduce((total, item) => total + item.borrowFee, 0);
 }
 
+export function getRequestDepositTotal(request: StaffBorrowRequest): number {
+  return request.items
+    .filter((item) => item.status === 'READY_FOR_PICKUP')
+    .reduce((total, item) => total + (item.depositAmount ?? 0), 0);
+}
+
 export function requestNeedsStaffAction(request: StaffBorrowRequest): boolean {
   return request.items.some((item) => ['RESERVED', 'PREPARING', 'READY_FOR_PICKUP'].includes(item.status));
 }
@@ -61,7 +68,7 @@ export function requestNeedsStaffAction(request: StaffBorrowRequest): boolean {
 export function statusTagColor(status: LoanItemStatus): string {
   if (status === 'READY_FOR_PICKUP' || status === 'RETURNED') return 'success';
   if (status === 'RESERVED' || status === 'PREPARING') return 'warning';
-  if (status === 'REJECTED' || status === 'EXPIRED') return 'error';
+  if (status === 'REJECTED' || status === 'EXPIRED' || status === 'LOST') return 'error';
   if (status === 'BORROWED') return 'processing';
   return 'default';
 }

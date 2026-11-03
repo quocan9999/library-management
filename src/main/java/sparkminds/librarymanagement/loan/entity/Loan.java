@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import sparkminds.librarymanagement.auth.entity.Account;
 import sparkminds.librarymanagement.loan.service.LoanTimestampListener;
 import sparkminds.librarymanagement.member.entity.Member;
 
@@ -11,6 +12,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entity đại diện cho một yêu cầu mượn sách (phiếu mượn) của độc giả.
+ * Lưu trữ trạng thái tổng thể, nguồn tạo (online/quầy), và thông tin thanh toán/hoàn tiền.
+ * Bắt buộc sử dụng Lombok cho Getter/Setter/NoArgsConstructor.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -74,6 +80,19 @@ public class Loan {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    /** Số tiền hoàn trả cho độc giả tại quầy khi đơn đã thanh toán bị hủy hoặc hết hạn. */
+    @Column(name = "refunded_amount", precision = 12, scale = 2)
+    private BigDecimal refundedAmount;
+
+    /** Thời điểm thủ thư xác nhận hoàn tiền tại quầy. */
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
+
+    /** Thủ thư xác nhận hoàn tiền tại quầy cho độc giả. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "refunded_by_account_id")
+    private Account refundedByAccount;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

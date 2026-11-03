@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -11,6 +12,7 @@ interface ReadyPickupCardProps {
 }
 
 export const ReadyPickupCard: React.FC<ReadyPickupCardProps> = ({ request, onShowQr }) => {
+  const router = useRouter();
   const firstBook = request.items[0];
   const otherBooksCount = Math.max(0, (request.itemCount || request.items.length) - 1);
 
@@ -91,6 +93,21 @@ export const ReadyPickupCard: React.FC<ReadyPickupCardProps> = ({ request, onSho
           <View style={styles.readyBadge}>
             <Text style={styles.readyBadgeText}>Sẵn sàng nhận</Text>
           </View>
+
+          {request.paymentStatus === 'PENDING' && (
+            <Pressable
+              onPress={() =>
+                router.push(`/borrow-payment/${encodeURIComponent(request.loanCode)}`)
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`Thanh toán yêu cầu ${request.loanCode}`}
+            >
+              <Text style={styles.paymentText}>
+                Chờ thanh toán {(request.paymentAmount || 0).toLocaleString('vi-VN')} đ · Thanh
+                toán ngay
+              </Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </View>
@@ -182,5 +199,11 @@ const styles = StyleSheet.create({
     fontFamily: LibbyFonts.semiBold,
     fontSize: 12,
     color: LibbyColors.ink,
+  },
+  paymentText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 12,
+    color: '#9B1C31',
+    lineHeight: 16,
   },
 });

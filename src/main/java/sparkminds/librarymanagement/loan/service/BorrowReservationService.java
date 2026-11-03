@@ -39,6 +39,11 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
 
+/**
+ * Service xử lý tạo và giữ chỗ yêu cầu mượn sách.
+ * Bổ sung snapshot tiền cọc (bằng giá gốc sách) và tính tổng thanh toán gồm phí mượn + tiền cọc.
+ * Bắt buộc sử dụng Lombok và chú thích bằng tiếng Việt.
+ */
 @Service
 @RequiredArgsConstructor
 public class BorrowReservationService {
@@ -96,10 +101,15 @@ public class BorrowReservationService {
         loan.setStatus(LoanStatus.OPEN);
         loan.setOrigin(origin);
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+
+        // Tổng tiền cần thanh toán cho đơn online = Tổng phí mượn + Tổng tiền cọc
+        BigDecimal totalBorrowFee = books.stream().map(Book::getBorrowFee).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalDeposit = books.stream().map(Book::getPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal paymentAmount = origin == LoanOrigin.ONLINE
-                ? books.stream().map(Book::getBorrowFee).reduce(BigDecimal.ZERO, BigDecimal::add)
+                ? totalBorrowFee.add(totalDeposit)
                 : BigDecimal.ZERO;
         loan.setPaymentAmount(paymentAmount);
+
         if (origin == LoanOrigin.COUNTER) {
             loan.setPaymentStatus(LoanPaymentStatus.NOT_REQUIRED);
             loan.setPaymentMethod(LoanPaymentMethod.COUNTER);
@@ -115,10 +125,13 @@ public class BorrowReservationService {
         loanRepository.saveAndFlush(loan);
         loan.setLoanCode(String.format(Locale.ROOT, "L%06d", loan.getId()));
         loanRepository.saveAndFlush(loan);
+
         for (int index = 0; index < books.size(); index++) {
             LoanItem item = createItem(loan, books.get(index), statuses.get(index));
-            if (origin == LoanOrigin.ONLINE && item.getBorrowFee().signum() == 0) {
-                item.setPaidBorrowFee(item.getBorrowFee());
+            BigDecimal itemTotal = item.getBorrowFee().add(item.getDepositAmount());
+            if (origin == LoanOrigin.ONLINE && itemTotal.signum() == 0) {
+                item.setPaidBorrowFee(BigDecimal.ZERO);
+                item.setPaidDepositAmount(BigDecimal.ZERO);
                 item.setBorrowFeePaidAt(now);
                 item.setBorrowFeeConfirmedByAccount(member.getAccount());
             }
@@ -171,6 +184,7 @@ public class BorrowReservationService {
         item.setBook(book);
         item.setStatus(status);
         item.setBorrowFee(book.getBorrowFee());
+        item.setDepositAmount(book.getPrice());
         item.setLateFeePerDay(book.getLateFeePerDay());
         return loanItemRepository.save(item);
     }

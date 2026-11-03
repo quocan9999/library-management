@@ -22,6 +22,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.EnumSet;
 
+/**
+ * Service xử lý thanh toán trực tuyến mô phỏng (Mock VietQR) cho đơn mượn online.
+ * Xác nhận thanh toán đầy đủ cả phí mượn và tiền cọc cho từng sách.
+ * Bắt buộc sử dụng Lombok và chú thích bằng tiếng Việt.
+ */
 @Service
 @RequiredArgsConstructor
 public class BorrowMockPaymentService {
@@ -76,7 +81,9 @@ public class BorrowMockPaymentService {
 
         var unpaid = items.stream().filter(item -> UNPAID_ACTIVE_STATUSES.contains(item.getStatus())
                 && item.getPaidBorrowFee() == null).toList();
-        BigDecimal amount = unpaid.stream().map(item -> item.getBorrowFee()).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal amount = unpaid.stream()
+                .map(item -> item.getBorrowFee().add(item.getDepositAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (amount.compareTo(loan.getPaymentAmount()) != 0 || amount.compareTo(request.confirmedAmount()) != 0) {
             throw invalidAmount();
         }
@@ -87,6 +94,7 @@ public class BorrowMockPaymentService {
         loan.setPaymentExpiresAt(null);
         unpaid.forEach(item -> {
             item.setPaidBorrowFee(item.getBorrowFee());
+            item.setPaidDepositAmount(item.getDepositAmount());
             item.setBorrowFeePaidAt(now);
             item.setBorrowFeeConfirmedByAccount(member.getAccount());
             auditService.append(item, item.getStatus(), LoanItemEventReason.MOCK_PAYMENT_CONFIRMED,

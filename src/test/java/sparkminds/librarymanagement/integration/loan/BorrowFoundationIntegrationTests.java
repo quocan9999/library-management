@@ -146,7 +146,7 @@ class BorrowFoundationIntegrationTests {
         assertThat(jdbc.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()
                 AND table_name NOT IN ('DATABASECHANGELOG', 'DATABASECHANGELOGLOCK')
-                """, Integer.class)).isEqualTo(16);
+                """, Integer.class)).isEqualTo(19);
         int itemId = createReservedItem();
         assertThat(jdbc.queryForMap("SELECT borrowed_at, due_date FROM loan_items WHERE id = ?", itemId))
                 .containsEntry("borrowed_at", null).containsEntry("due_date", null);

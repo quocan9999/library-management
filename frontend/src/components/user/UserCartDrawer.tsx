@@ -6,6 +6,7 @@ export interface UserCartItem {
   id: number | string;
   title: string;
   borrowFee?: number;
+  price?: number;
   coverImageUrl?: string | null;
   bookCode?: string;
   themeIndex?: number;
@@ -97,6 +98,8 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
   if (!open) return null;
 
   const totalFee = items.reduce((sum, item) => sum + (item.borrowFee ?? 0), 0);
+  const totalDeposit = items.reduce((sum, item) => sum + (item.price ?? 0), 0);
+  const totalPayment = totalFee + totalDeposit;
 
   const formatCurrency = (val: number) => {
     return `${val.toLocaleString('vi-VN')} đ`;
@@ -279,10 +282,14 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
                   >
                     {item.title}
                   </span>
-                  <span style={{ fontSize: '14px', color: '#4B4570' }}>
-                    {formatCurrency(item.borrowFee ?? 0)}{' '}
-                    <span style={{ fontSize: '12px' }}>/lượt</span>
-                  </span>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '13px' }}>
+                    <span style={{ color: '#4B4570' }}>
+                      Phí: {formatCurrency(item.borrowFee ?? 0)}
+                    </span>
+                    <span style={{ color: '#6C4DFF', fontWeight: 600 }}>
+                      · Cọc: {formatCurrency(item.price ?? 0)}
+                    </span>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -324,25 +331,43 @@ export const UserCartDrawer: React.FC<UserCartDrawerProps> = ({
         {items.length > 0 && (
           <div
             style={{
-              padding: '24px 28px 28px',
+              padding: '20px 28px 24px',
               borderTop: '2px solid #14112B',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '12px',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontSize: '16px', fontWeight: 600 }}>Tổng phí mượn</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', color: '#4B4570' }}>
+              <span>Tổng phí mượn</span>
+              <span style={{ fontWeight: 600, color: '#14112B' }}>{formatCurrency(totalFee)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', color: '#4B4570' }}>
+              <span>Tổng tiền cọc (hoàn 100% khi trả sách)</span>
+              <span style={{ fontWeight: 600, color: '#6C4DFF' }}>{formatCurrency(totalDeposit)}</span>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                paddingTop: '8px',
+                borderTop: '1px dashed #E2DDF5',
+              }}
+            >
+              <div>
+                <span style={{ fontSize: '16px', fontWeight: 700 }}>Tổng thanh toán</span>
+              </div>
               <span
                 style={{
                   fontFamily: 'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
                   fontWeight: 800,
-                  fontSize: '28px',
+                  fontSize: '26px',
                   letterSpacing: '-0.03em',
                   color: '#14112B',
                 }}
               >
-                {formatCurrency(totalFee)}
+                {formatCurrency(totalPayment)}
               </span>
             </div>
             <UserButton

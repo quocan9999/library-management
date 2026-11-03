@@ -20,7 +20,7 @@ import type { BorrowItem, BorrowRequestFilter, BorrowRequestSummary, LoanItemSta
 type LoanFilter = 'ALL' | 'PENDING' | 'READY' | 'BORROWED' | 'CANCELLED' | 'HISTORY';
 type LoanAction = { type: 'cancel' | 'renew'; loanCode: string; item: BorrowItem };
 
-const HISTORY_STATUSES: LoanItemStatus[] = ['RETURNED', 'CANCELLED', 'REJECTED', 'EXPIRED'];
+const HISTORY_STATUSES: LoanItemStatus[] = ['RETURNED', 'CANCELLED', 'REJECTED', 'EXPIRED', 'LOST'];
 const LOAN_FILTERS: FilterChipOption[] = [
   { value: 'ALL', label: 'Tất cả' },
   { value: 'PENDING', label: 'Chờ xử lý' },
@@ -49,6 +49,7 @@ function statusLabel(status: LoanItemStatus): string {
     CANCELLED: 'Đã hủy',
     REJECTED: 'Không tìm thấy sách',
     EXPIRED: 'Đã hết hạn nhận',
+    LOST: 'Báo mất sách',
   };
   return labels[status] ?? status;
 }
@@ -67,6 +68,7 @@ function getItemBadgeVariant(status: LoanItemStatus): UserBadgeVariant {
     case 'CANCELLED':
     case 'REJECTED':
     case 'EXPIRED':
+    case 'LOST':
       return 'error';
     default:
       return 'subtle';
@@ -328,6 +330,25 @@ export function MyLoansPage() {
                   </div>
                 )}
 
+                {/* Thông báo hoàn tiền tại quầy cho đơn đã thanh toán bị hủy/hết hạn */}
+                {request.paymentStatus === 'PAID' && request.items.length > 0 && request.items.every((i) => ['CANCELLED', 'EXPIRED', 'REJECTED'].includes(i.status)) && (
+                  request.refundedAt ? (
+                    <div className="user-loan-card__payment-reminder" style={{ backgroundColor: '#F6FFED', border: '1.5px solid #52C41A' }}>
+                      <UserBadge variant="success">Đã hoàn tiền</UserBadge>
+                      <span style={{ fontSize: '14px', color: '#135200', fontWeight: 500, flex: 1 }}>
+                        Đã nhận lại tiền hoàn {formatVnd(request.refundedAmount ?? request.paymentAmount ?? 0)} trực tiếp tại quầy thư viện vào {formatDateTime(request.refundedAt)}.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="user-loan-card__payment-reminder" style={{ backgroundColor: '#FFFBE6', border: '1.5px solid #FAAD14' }}>
+                      <UserBadge variant="warning">Hoàn tiền tại quầy</UserBadge>
+                      <span style={{ fontSize: '14px', color: '#D46B08', fontWeight: 500, flex: 1 }}>
+                        Yêu cầu đã hủy / hết hạn nhưng bạn đã thanh toán {formatVnd(request.paymentAmount ?? 0)}. Vui lòng đến quầy thư viện để nhận lại 100% số tiền hoàn trực tiếp (bao gồm phí mượn và tiền cọc).
+                      </span>
+                    </div>
+                  )
+                )}
+
                 {/* Danh sách sách trong yêu cầu */}
                 <div className="user-loan-card__items">
                   {request.items.map((loanItem, index) => (
@@ -420,6 +441,27 @@ export function MyLoansPage() {
                               {formatVnd(loanItem.borrowFee)}
                             </strong>
                           </span>
+                          <span>
+                            Tiền cọc:{' '}
+                            <strong style={{ color: '#6C4DFF', fontWeight: 600 }}>
+                              {formatVnd(loanItem.depositAmount)}
+                            </strong>
+                          </span>
+                          {loanItem.depositRefundedAt && (
+                            <UserBadge variant="success">
+                              Đã hoàn cọc {formatVnd(loanItem.depositRefundedAmount ?? loanItem.depositAmount)}
+                            </UserBadge>
+                          )}
+                          {(loanItem.depositForfeitedAt || loanItem.status === 'LOST') && (
+                            <UserBadge variant="error">
+                              Tịch thu cọc {formatVnd(loanItem.depositAmount)}
+                            </UserBadge>
+                          )}
+                          {!loanItem.depositRefundedAt && !loanItem.depositForfeitedAt && loanItem.status !== 'LOST' && loanItem.status === 'BORROWED' && (
+                            <UserBadge variant="neutral">
+                              Đang giữ cọc
+                            </UserBadge>
+                          )}
                           {loanItem.status === 'BORROWED' && (
                             <span>
                               Phí trễ / ngày:{' '}

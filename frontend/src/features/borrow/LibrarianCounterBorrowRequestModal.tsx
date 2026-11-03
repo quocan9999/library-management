@@ -27,6 +27,7 @@ export function LibrarianCounterBorrowRequestModal({ open, onClose, onCreated }:
   const [reloadKey, setReloadKey] = useState(0);
   const submitLock = useRef(false);
   const totalFee = useMemo(() => selectedBooks.reduce((total, book) => total + book.borrowFee, 0), [selectedBooks]);
+  const totalDeposit = useMemo(() => selectedBooks.reduce((total, book) => total + (book.price || 0), 0), [selectedBooks]);
 
   useEffect(() => {
     if (!open) return;
@@ -202,7 +203,10 @@ export function LibrarianCounterBorrowRequestModal({ open, onClose, onCreated }:
               <span className="librarian-counter-create__book-meta">
                 {book.availableQuantity < 1 ? <Typography.Text type="danger">Hết bản sẵn</Typography.Text>
                   : <Typography.Text type="secondary">Còn {book.availableQuantity} bản</Typography.Text>}
-                <Typography.Text strong>{formatVnd(book.borrowFee)}/cuốn</Typography.Text>
+                <span style={{ textAlign: 'right' }}>
+                  <Typography.Text strong>{formatVnd(book.borrowFee)}/phí</Typography.Text>
+                  <Typography.Text type="secondary" style={{ display: 'block', fontSize: '12px' }}>Cọc: {formatVnd(book.price)}</Typography.Text>
+                </span>
               </span>
               <Button
                 type={selected ? 'default' : 'primary'}
@@ -228,15 +232,25 @@ export function LibrarianCounterBorrowRequestModal({ open, onClose, onCreated }:
             </span>
             <span className="librarian-counter-create__book-meta">
               <Typography.Text type="secondary">Còn {book.availableQuantity} bản</Typography.Text>
-              <Typography.Text strong>{formatVnd(book.borrowFee)}/cuốn</Typography.Text>
+              <span style={{ textAlign: 'right' }}>
+                <Typography.Text strong>{formatVnd(book.borrowFee)}/phí</Typography.Text>
+                <Typography.Text type="secondary" style={{ display: 'block', fontSize: '12px' }}>Cọc: {formatVnd(book.price)}</Typography.Text>
+              </span>
             </span>
             <Button danger type="text" onClick={() => removeBook(book.id)}>Bỏ</Button>
           </List.Item>}
         />
       </div>
-      <div className="librarian-counter-create__summary">
+      <div className="librarian-counter-create__summary" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography.Text>{selectedBooks.length}/{MAX_BORROW_BOOKS} đầu sách đã chọn</Typography.Text>
-        <Typography.Text strong>Tổng phí dự kiến {formatVnd(totalFee)}</Typography.Text>
+        <div style={{ textAlign: 'right' }}>
+          <Typography.Text type="secondary" style={{ display: 'block', fontSize: '13px' }}>
+            Phí mượn: {formatVnd(totalFee)} · Tiền cọc: {formatVnd(totalDeposit)}
+          </Typography.Text>
+          <Typography.Text strong style={{ fontSize: '15px' }}>
+            Tổng thu dự kiến: {formatVnd(totalFee + totalDeposit)}
+          </Typography.Text>
+        </div>
       </div>
     </div>
   </Modal>;

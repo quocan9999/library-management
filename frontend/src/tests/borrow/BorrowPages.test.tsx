@@ -73,14 +73,14 @@ function catalogBook(id: number, title = 'Lập trình Java') {
   return {
     id, bookCode: `B${String(id).padStart(6, '0')}`, isbn: '9786041234567', title, author: 'Nguyễn An',
     publisher: 'Nhà xuất bản Trẻ', publishedDate: '2024-03-10', totalQuantity: 3, availableQuantity: 1,
-    borrowFee: 0, lateFeePerDay: 2000, coverImageUrl: null, 
+    borrowFee: 0, price: 150000, lateFeePerDay: 2000, coverImageUrl: null, 
   };
 }
 
 function item(id: number, status: LoanItemStatus, title: string): BorrowItem {
   return {
     id, bookId: id + 100, bookCode: `B${id}`, title, author: 'Nguyễn An', coverImageUrl: null, status,
-    borrowFee: id === 2 ? 0 : 15000, lateFeePerDay: 2000, paidBorrowFee: 0, lateFee: 0,
+    borrowFee: id === 2 ? 0 : 15000, depositAmount: 150000, lateFeePerDay: 2000, paidBorrowFee: 0, lateFee: 0,
     borrowedAt: null, dueDate: null, readyAt: status === 'READY_FOR_PICKUP' ? '2026-10-19T03:00:00Z' : null,
     pickupExpiresAt: status === 'READY_FOR_PICKUP' ? '2026-10-22T03:00:00Z' : null,
     renewalCount: 0, version: 4,

@@ -1,3 +1,5 @@
+import { isAxiosError } from 'axios';
+
 import { api, extractErrorMessage } from './api';
 
 export interface UserProfile {
@@ -12,6 +14,20 @@ export interface UserProfile {
   phone: string | null;
   address: string | null;
   version: number | null;
+}
+
+export type ProfileField = 'fullName' | 'dateOfBirth' | 'phone' | 'address';
+
+export class ProfileUpdateError extends Error {
+  readonly code?: string;
+  readonly fieldErrors?: Partial<Record<ProfileField, string>>;
+
+  constructor(message: string, code?: string, fieldErrors?: Record<string, string>) {
+    super(message);
+    this.name = 'ProfileUpdateError';
+    this.code = code;
+    this.fieldErrors = fieldErrors as Partial<Record<ProfileField, string>> | undefined;
+  }
 }
 
 export interface UpdateUserProfileRequest {
@@ -61,7 +77,17 @@ export const profileService = {
       }
       return response.data.data;
     } catch (error) {
-      throw new Error(extractErrorMessage(error, 'Cập nhật thông tin thất bại.'));
+      if (isAxiosError<{ code?: string; errors?: Record<string, string> }>(error)) {
+        const data = error.response?.data;
+        throw new ProfileUpdateError(
+          extractErrorMessage(error, 'Cập nhật thông tin thất bại.'),
+          data?.code,
+          data?.errors
+        );
+      }
+      throw new Error(
+        error instanceof Error ? error.message : 'Cập nhật thông tin thất bại.'
+      );
     }
   },
 

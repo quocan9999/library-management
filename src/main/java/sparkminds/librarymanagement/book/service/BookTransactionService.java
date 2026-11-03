@@ -26,8 +26,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.TreeSet;
 
+/**
+ * Service xử lý các thao tác ghi dữ liệu sách (tạo mới, cập nhật, xóa) trong transaction riêng biệt.
+ * Bắt buộc sử dụng Lombok để khởi tạo các dependency và tuân thủ Clean Code.
+ */
 @Service
 @RequiredArgsConstructor
 public class BookTransactionService {
@@ -77,6 +80,7 @@ public class BookTransactionService {
         book.setTotalQuantity(request.totalQuantity());
         book.setAvailableQuantity(request.totalQuantity());
         book.setBorrowFee(request.borrowFee());
+        book.setPrice(request.price());
         book.setLateFeePerDay(request.lateFeePerDay());
         if (cover != null) {
             book.setCoverImageUrl(cover.url());
@@ -139,6 +143,7 @@ public class BookTransactionService {
         book.setTotalQuantity(request.totalQuantity());
         book.setAvailableQuantity(request.totalQuantity() - unavailableQuantity);
         book.setBorrowFee(request.borrowFee());
+        book.setPrice(request.price());
         book.setLateFeePerDay(request.lateFeePerDay());
 
         if (cover != null) {

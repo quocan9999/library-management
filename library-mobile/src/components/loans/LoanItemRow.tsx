@@ -17,6 +17,7 @@ const STATUS_LABELS: Record<LoanItemStatus, string> = {
   READY_FOR_PICKUP: 'Sẵn sàng nhận',
   BORROWED: 'Đang mượn',
   RETURNED: 'Đã trả',
+  LOST: 'Báo mất sách',
   CANCELLED: 'Đã hủy',
   REJECTED: 'Không tìm thấy sách',
   EXPIRED: 'Đã hết hạn nhận',
@@ -36,6 +37,7 @@ export const LoanItemRow: React.FC<LoanItemRowProps> = ({ item, loanCode, onItem
         return { bg: '#EFEBFF', text: LibbyColors.accentViolet };
       case 'RETURNED':
         return { bg: '#E5F8ED', text: '#0A7A38' };
+      case 'LOST':
       case 'CANCELLED':
       case 'REJECTED':
       case 'EXPIRED':
@@ -110,8 +112,21 @@ export const LoanItemRow: React.FC<LoanItemRowProps> = ({ item, loanCode, onItem
     );
   };
 
-  const canCancel = item.status === 'RESERVED' || item.status === 'PREPARING';
+  const canCancel =
+    (item.status === 'RESERVED' || item.status === 'PREPARING') && !(item.paidBorrowFee > 0);
   const canRenew = item.status === 'BORROWED' && item.renewalCount < 2;
+
+  const formattedBorrowFee = (item.borrowFee || 0).toLocaleString('vi-VN');
+  const formattedDeposit = (item.depositAmount || 0).toLocaleString('vi-VN');
+  const formattedLateFeePerDay = (item.lateFeePerDay || 0).toLocaleString('vi-VN');
+  const formattedRefunded = (item.depositRefundedAmount ?? item.depositAmount ?? 0).toLocaleString(
+    'vi-VN'
+  );
+  const isLost = item.status === 'LOST';
+  const depositRefunded = !!item.depositRefundedAt;
+  const depositForfeited = !!item.depositForfeitedAt || isLost;
+  const depositHeld =
+    item.status === 'BORROWED' && !depositRefunded && !depositForfeited && item.depositAmount > 0;
 
   return (
     <View style={styles.container}>
@@ -141,6 +156,40 @@ export const LoanItemRow: React.FC<LoanItemRowProps> = ({ item, loanCode, onItem
           )}
         </View>
       </View>
+
+      <View style={styles.feeRow}>
+        <Text style={styles.feeText}>
+          Phí mượn <Text style={styles.feeValue}>{formattedBorrowFee} đ</Text>
+        </Text>
+        <Text style={styles.feeText}>
+          Cọc <Text style={styles.feeValue}>{formattedDeposit} đ</Text>
+        </Text>
+        {item.status === 'BORROWED' && (
+          <Text style={styles.feeText}>
+            Phí trễ/ngày <Text style={styles.feeValue}>{formattedLateFeePerDay} đ</Text>
+          </Text>
+        )}
+      </View>
+
+      {(depositRefunded || depositForfeited || depositHeld) && (
+        <View style={styles.depositRow}>
+          {depositRefunded && (
+            <View style={[styles.depositBadge, styles.depositRefundedBadge]}>
+              <Text style={styles.depositRefundedText}>Đã hoàn cọc {formattedRefunded} đ</Text>
+            </View>
+          )}
+          {depositForfeited && (
+            <View style={[styles.depositBadge, styles.depositForfeitedBadge]}>
+              <Text style={styles.depositForfeitedText}>Tịch thu cọc {formattedDeposit} đ</Text>
+            </View>
+          )}
+          {depositHeld && (
+            <View style={[styles.depositBadge, styles.depositHeldBadge]}>
+              <Text style={styles.depositHeldText}>Đang giữ cọc</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       <View style={styles.bottomRow}>
         <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
@@ -201,6 +250,56 @@ const styles = StyleSheet.create({
     fontFamily: LibbyFonts.regular,
     fontSize: 13,
     color: LibbyColors.textMuted,
+  },
+  feeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+    paddingLeft: 56,
+  },
+  feeText: {
+    fontFamily: LibbyFonts.regular,
+    fontSize: 12,
+    color: LibbyColors.textMuted,
+  },
+  feeValue: {
+    fontFamily: LibbyFonts.semiBold,
+    color: LibbyColors.ink,
+  },
+  depositRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingLeft: 56,
+  },
+  depositBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  depositRefundedBadge: {
+    backgroundColor: '#E5F8ED',
+  },
+  depositRefundedText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 12,
+    color: '#0A7A38',
+  },
+  depositForfeitedBadge: {
+    backgroundColor: '#FFE4E8',
+  },
+  depositForfeitedText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 12,
+    color: '#9B1C31',
+  },
+  depositHeldBadge: {
+    backgroundColor: '#EFEBFF',
+  },
+  depositHeldText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 12,
+    color: LibbyColors.accentViolet,
   },
   deadlineText: {
     fontFamily: LibbyFonts.medium,

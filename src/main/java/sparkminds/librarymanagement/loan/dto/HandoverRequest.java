@@ -11,11 +11,30 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
 
-public record HandoverRequest(@NotNull Boolean identityVerified,
-                              @NotNull @PositiveOrZero Long expectedLoanVersion,
-                              @NotNull @Size(max = 3) List<@NotNull @Valid PaymentItem> items) {
-    public record PaymentItem(@NotNull @Positive Integer loanItemId,
-                               @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2)
-                               BigDecimal collectedBorrowFee) {
+/**
+ * Yêu cầu bàn giao sách cho độc giả tại quầy.
+ * Đối với đơn tại quầy (COUNTER), danh sách items phải chứa khoản thu phí mượn và tiền cọc.
+ */
+public record HandoverRequest(
+        @NotNull Boolean identityVerified,
+        @NotNull @PositiveOrZero Long expectedLoanVersion,
+        @NotNull @Size(max = 3) List<@NotNull @Valid PaymentItem> items
+) {
+    public record PaymentItem(
+            @NotNull @Positive Integer loanItemId,
+            @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2)
+            BigDecimal collectedBorrowFee,
+            @DecimalMin("0.00") @Digits(integer = 10, fraction = 2)
+            BigDecimal collectedDepositAmount
+    ) {
+        public PaymentItem {
+            if (collectedDepositAmount == null) {
+                collectedDepositAmount = BigDecimal.ZERO;
+            }
+        }
+
+        public PaymentItem(Integer loanItemId, BigDecimal collectedBorrowFee) {
+            this(loanItemId, collectedBorrowFee, BigDecimal.ZERO);
+        }
     }
 }

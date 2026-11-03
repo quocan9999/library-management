@@ -35,6 +35,8 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const inCart = isInCart(book.id);
   const isAvailable = book.availableQuantity > 0;
   const formattedFee = (book.borrowFee || 0).toLocaleString('vi-VN');
+  const formattedDeposit = (book.price || 0).toLocaleString('vi-VN');
+  const totalPayment = (book.borrowFee || 0) + (book.price || 0);
   const imageUri = (!imageError && (book.coverImageUrl || DEFAULT_BOOK_COVER_URL)) || null;
 
   const handleAddToCart = () => {
@@ -104,11 +106,26 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
               {book.publisher && (
                 <Text style={styles.publisherText}>NXB: {book.publisher}</Text>
               )}
-              <View style={styles.feeContainer}>
-                <Text style={styles.feeVal}>{formattedFee} đ </Text>
-                <Text style={styles.feeSub}>/lượt mượn</Text>
-              </View>
             </View>
+          </View>
+
+          {/* Fee & deposit summary */}
+          <View style={styles.feeSummary}>
+            <View style={styles.feeLine}>
+              <Text style={styles.feeLabel}>Phí mượn</Text>
+              <Text style={styles.feeValue}>{formattedFee} đ</Text>
+            </View>
+            <View style={styles.feeLine}>
+              <Text style={styles.feeLabel}>Tiền cọc</Text>
+              <Text style={styles.feeValue}>{formattedDeposit} đ</Text>
+            </View>
+            <View style={[styles.feeLine, styles.feeTotalLine]}>
+              <Text style={styles.feeTotalLabel}>Tổng thanh toán</Text>
+              <Text style={styles.feeTotalValue}>{totalPayment.toLocaleString('vi-VN')} đ</Text>
+            </View>
+            <Text style={styles.depositNote}>
+              Tiền cọc được hoàn trả 100% khi trả sách nguyên vẹn tại quầy.
+            </Text>
           </View>
 
           {/* Status Row */}
@@ -243,20 +260,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: LibbyColors.textMuted,
   },
-  feeContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 4,
+  feeSummary: {
+    backgroundColor: LibbyColors.subtleBg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: LibbyColors.borderSubtle,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 6,
   },
-  feeVal: {
-    fontFamily: LibbyFonts.display,
-    fontSize: 18,
+  feeLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  feeLabel: {
+    fontFamily: LibbyFonts.regular,
+    fontSize: 14,
+    color: LibbyColors.textMuted,
+  },
+  feeValue: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 14,
     color: LibbyColors.ink,
   },
-  feeSub: {
+  feeTotalLine: {
+    borderTopWidth: 1,
+    borderTopColor: LibbyColors.borderSubtle,
+    paddingTop: 8,
+    marginTop: 2,
+  },
+  feeTotalLabel: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 15,
+    color: LibbyColors.ink,
+  },
+  feeTotalValue: {
+    fontFamily: LibbyFonts.display,
+    fontSize: 18,
+    color: LibbyColors.accentViolet,
+  },
+  depositNote: {
     fontFamily: LibbyFonts.regular,
-    fontSize: 13,
+    fontSize: 12,
     color: LibbyColors.textMuted,
+    lineHeight: 17,
   },
   statusRow: {
     flexDirection: 'row',

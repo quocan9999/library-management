@@ -7,18 +7,46 @@ export function formatVnd(value: number): string {
   return `${formatVndInput(value)} ₫`;
 }
 
-/** Giữ dấu phẩy đang nhập, số 0 cuối phần lẻ và input sai để form báo lỗi thay vì âm thầm sửa giá trị. */
+/**
+ * Định dạng tiền tệ VND khi người dùng nhập hoặc hiển thị từ API.
+ * Tự động nhóm dấu chấm (.) sau mỗi 3 chữ số khi gõ số tiền (ví dụ: 1000 -> 1.000, 20000 -> 20.000, 150000 -> 150.000).
+ * Giữ nguyên phần dấu phẩy (,) thập phân đang gõ và các ký tự không hợp lệ để form báo lỗi thay vì âm thầm xóa.
+ */
 export function formatVndInput(value: number | string | null | undefined): string {
-  if (typeof value === 'string') {
-    const text = value.trim();
-    const [whole, fraction] = text.split(',');
-    const completeText = text.endsWith(',') ? text.slice(0, -1) : text;
-    if (parseVndInput(completeText) === null) return value;
-    const grouped = vndFormatter.format(Number(whole.replace(/\./g, '')));
-    return fraction === undefined ? grouped : `${grouped},${fraction}`;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return '';
+    return vndFormatter.format(value);
   }
-  if (value === null || value === undefined || !Number.isFinite(value)) return '';
-  return vndFormatter.format(value);
+  if (typeof value !== 'string') return '';
+
+  const text = value.trim();
+  if (!text) return '';
+
+  // Nếu có nhiều hơn 1 dấu phẩy thì chuỗi không hợp lệ -> giữ nguyên để validator xử lý
+  const parts = text.split(',');
+  if (parts.length > 2) return value;
+
+  const [whole, fraction] = parts;
+  // Loại bỏ tất cả dấu chấm phân cách hàng nghìn cũ trước khi nhóm lại
+  const rawWhole = whole.replace(/\./g, '');
+
+  // Nếu phần nguyên có ký tự không phải số (ví dụ dấu trừ, chữ cái) -> giữ nguyên để validator báo lỗi
+  if (!/^\d*$/.test(rawWhole)) return value;
+
+  // Nếu có phần thập phân mà chứa ký tự không phải số -> giữ nguyên để validator báo lỗi
+  if (fraction !== undefined && !/^\d*$/.test(fraction)) return value;
+
+  // Định dạng lại phần nguyên theo chuẩn tiếng Việt với dấu chấm phân cách hàng nghìn
+  let grouped = '';
+  if (rawWhole !== '') {
+    const num = Number(rawWhole);
+    if (!Number.isSafeInteger(num)) return value;
+    grouped = vndFormatter.format(num);
+  } else if (fraction !== undefined) {
+    grouped = '0';
+  }
+
+  return fraction === undefined ? grouped : `${grouped},${fraction}`;
 }
 
 export function parseVndInput(value: string): number | null {

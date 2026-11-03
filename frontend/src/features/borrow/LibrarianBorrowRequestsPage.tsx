@@ -190,7 +190,8 @@ export function LibrarianBorrowRequestsPage() {
     request: StaffBorrowRequest,
     itemIds: number[],
     physicalBookReceived: boolean,
-    lateFeeCollected: boolean
+    lateFeeCollected: boolean,
+    depositRefunded: boolean
   ) => {
     if (itemIds.length === 0 || !canReturn || actionLock.current) return;
 
@@ -201,6 +202,7 @@ export function LibrarianBorrowRequestsPage() {
         itemIds,
         physicalBookReceived,
         lateFeeCollected,
+        depositRefunded,
       });
       setDrawerRequestState((current) => current?.request?.loanCode === request.loanCode
         ? { ...current, status: 'ready', request: updatedRequest }
@@ -208,12 +210,64 @@ export function LibrarianBorrowRequestsPage() {
       setReloadKey((key) => key + 1);
       notify('success', {
         title: 'Tiếp nhận trả sách thành công',
-        description: `Đã hoàn tất tiếp nhận ${itemIds.length} cuốn sách vào kho.`,
+        description: `Đã hoàn tất tiếp nhận ${itemIds.length} cuốn sách vào kho và hoàn tiền cọc.`,
       });
     } catch (error: unknown) {
       refreshAfterConflict(error, request);
       notify(borrowErrorNotificationType(error), {
         title: 'Không thể tiếp nhận trả sách',
+        description: borrowErrorMessage(error),
+      });
+    } finally {
+      actionLock.current = false;
+      setPendingKey(null);
+    }
+  };
+
+  const reportLostBook = async (request: StaffBorrowRequest, item: BorrowItem) => {
+    if (!canReturn || actionLock.current) return;
+    actionLock.current = true;
+    setPendingKey(`${request.loanCode}:lost-${item.id}`);
+    try {
+      const updated = await borrowApi.reportLost(request.loanCode, { itemIds: [item.id] });
+      setDrawerRequestState((current) => current?.request?.loanCode === request.loanCode
+        ? { ...current, status: 'ready', request: updated }
+        : current);
+      setReloadKey((k) => k + 1);
+      notify('success', {
+        title: 'Đã báo mất sách',
+        description: `Đã xác nhận mất cuốn "${item.title}". Tiền cọc đã được tịch thu và tổng kho thư viện đã giảm 1.`,
+      });
+    } catch (error: unknown) {
+      refreshAfterConflict(error, request);
+      notify(borrowErrorNotificationType(error), {
+        title: 'Không thể báo mất sách',
+        description: borrowErrorMessage(error),
+      });
+    } finally {
+      actionLock.current = false;
+      setPendingKey(null);
+    }
+  };
+
+  const confirmOfflineRefund = async (request: StaffBorrowRequest) => {
+    if (!canReturn || actionLock.current) return;
+    actionLock.current = true;
+    setPendingKey(`${request.loanCode}:confirm-refund`);
+    try {
+      const updated = await borrowApi.confirmRefund(request.loanCode);
+      setDrawerRequestState((current) => current?.request?.loanCode === request.loanCode
+        ? { ...current, status: 'ready', request: updated }
+        : current);
+      setReloadKey((k) => k + 1);
+      notify('success', {
+        title: 'Đã xác nhận hoàn tiền tại quầy',
+        description: `Đã ghi nhận hoàn trả số tiền ${formatVnd(request.paymentAmount || 0)} cho độc giả ${request.member.fullName}.`,
+      });
+    } catch (error: unknown) {
+      refreshAfterConflict(error, request);
+      notify(borrowErrorNotificationType(error), {
+        title: 'Không thể xác nhận hoàn tiền',
         description: borrowErrorMessage(error),
       });
     } finally {
@@ -284,7 +338,11 @@ export function LibrarianBorrowRequestsPage() {
       identityVerified: true,
       expectedLoanVersion: handoverRequest.version,
       items: handoverRequest.origin === 'COUNTER'
-        ? readyItems.map((item) => ({ loanItemId: item.id, collectedBorrowFee: item.borrowFee }))
+        ? readyItems.map((item) => ({
+            loanItemId: item.id,
+            collectedBorrowFee: item.borrowFee,
+            collectedDepositAmount: item.depositAmount ?? 0,
+          }))
         : [],
     };
     try {
@@ -333,14 +391,19 @@ export function LibrarianBorrowRequestsPage() {
     ? { title: 'Chưa có yêu cầu mượn', description: 'Quét mã QR để tra cứu hoặc đổi bộ lọc trạng thái.' }
     : { title: 'Không có yêu cầu phù hợp', description: 'Kiểm tra lại từ khóa hoặc xóa bộ lọc để xem tất cả yêu cầu.' }, [filter, searchQuery]);
   const modalHandoverFee = handoverRequest ? getRequestFeeTotal(handoverRequest) : 0;
+  const modalHandoverDeposit = handoverRequest
+    ? getReadyItems(handoverRequest).reduce((sum, item) => sum + (item.depositAmount ?? 0), 0)
+    : 0;
+  const totalHandoverPayment = modalHandoverFee + modalHandoverDeposit;
   const handoverBooks = handoverRequest
     ? Array.from(getReadyItems(handoverRequest).reduce((groups, item) => {
-      const current = groups.get(item.bookId) ?? { id: item.bookId, title: item.title, quantity: 0, fee: 0 };
+      const current = groups.get(item.bookId) ?? { id: item.bookId, title: item.title, quantity: 0, fee: 0, deposit: 0 };
       current.quantity += 1;
       current.fee += item.borrowFee;
+      current.deposit += (item.depositAmount ?? 0);
       groups.set(item.bookId, current);
       return groups;
-    }, new Map<number, { id: number; title: string; quantity: number; fee: number }>()).values())
+    }, new Map<number, { id: number; title: string; quantity: number; fee: number; deposit: number }>()).values())
     : [];
 
   return <main className="role-stage member-stage">
@@ -405,7 +468,9 @@ export function LibrarianBorrowRequestsPage() {
       onCancelReady={(request, item) => setCancelAction({ request, item })}
       onReject={(request, item) => setRejectAction({ request, item })}
       onHandover={setHandoverRequest}
-      onReturn={(request, itemIds, physical, late) => { void returnSelectedBooks(request, itemIds, physical, late); }}
+      onReturn={(request, itemIds, physical, late, deposit) => { void returnSelectedBooks(request, itemIds, physical, late, deposit); }}
+      onReportLost={(request, item) => { void reportLostBook(request, item); }}
+      onConfirmRefund={(request) => { void confirmOfflineRefund(request); }}
       onCopyReference={(reference) => { void copyReference(reference); }}
     />
 
@@ -473,11 +538,11 @@ export function LibrarianBorrowRequestsPage() {
           {handoverBooks.map((book) => <li key={book.id}>
             <span>{book.title}</span>
             <strong>{book.quantity} cuốn</strong>
-            {handoverRequest.origin === 'COUNTER' && <span>{book.fee > 0 ? formatVnd(book.fee) : 'Miễn phí'}</span>}
+            {handoverRequest.origin === 'COUNTER' && <span>Phí: {book.fee > 0 ? formatVnd(book.fee) : 'Miễn phí'} · Cọc: {formatVnd(book.deposit)}</span>}
           </li>)}
         </ul>
         {handoverRequest.origin === 'COUNTER' && <>
-          <p>Tổng phí cần thu trực tiếp tại quầy: <strong>{formatVnd(modalHandoverFee)}</strong>.</p>
+          <p>Tổng thu trực tiếp tại quầy: <strong>{formatVnd(totalHandoverPayment)}</strong> (Phí mượn: {formatVnd(modalHandoverFee)} + Tiền cọc: {formatVnd(modalHandoverDeposit)}).</p>
           <Checkbox
             checked={counterFeesCollected.has(handoverRequest.loanCode)}
             disabled={pendingKey !== null}
@@ -487,7 +552,7 @@ export function LibrarianBorrowRequestsPage() {
               else next.delete(handoverRequest.loanCode);
               return next;
             })}
-          >Đã thu đủ phí mượn tại quầy</Checkbox>
+          >Đã thu đủ phí mượn và tiền cọc tại quầy ({formatVnd(totalHandoverPayment)})</Checkbox>
         </>}
       </>}
     </Modal>

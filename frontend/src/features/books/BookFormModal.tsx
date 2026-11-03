@@ -17,6 +17,7 @@ interface BookFormValues {
   publishedDate: Dayjs | null;
   totalQuantity: number | null;
   borrowFee: string;
+  price: string;
   lateFeePerDay: string;
 }
 
@@ -29,6 +30,7 @@ function toFormValues(book?: BookDetail): BookFormValues {
     publishedDate: book?.publishedDate ? dayjs(book.publishedDate) : null,
     totalQuantity: book?.totalQuantity ?? 0,
     borrowFee: formatVndInput(book?.borrowFee ?? 0),
+    price: formatVndInput(book?.price ?? 0),
     lateFeePerDay: formatVndInput(book?.lateFeePerDay ?? 0),
   };
 }
@@ -54,9 +56,10 @@ function errorMessage(error: unknown): string {
 
 function buildInput(values: BookFormValues): BookWriteInput {
   const borrowFee = parseVndInput(values.borrowFee);
+  const price = parseVndInput(values.price);
   const lateFeePerDay = parseVndInput(values.lateFeePerDay);
-  if (borrowFee === null || lateFeePerDay === null) {
-    throw new Error('Phí phải được validation thành công trước khi tạo request.');
+  if (borrowFee === null || price === null || lateFeePerDay === null) {
+    throw new Error('Phí và giá sách phải được validation thành công trước khi tạo request.');
   }
   return {
     title: values.title.trim(),
@@ -66,6 +69,7 @@ function buildInput(values: BookFormValues): BookWriteInput {
     publishedDate: values.publishedDate?.format('YYYY-MM-DD') ?? null,
     totalQuantity: values.totalQuantity ?? 0,
     borrowFee,
+    price,
     lateFeePerDay,
   };
 }
@@ -258,6 +262,14 @@ export function BookFormModal({
             rules={[{ required: true, message: 'Phí mượn phải từ 0 VND trở lên.' }, { validator: validateFeeInput }]}
           >
             <Input inputMode="decimal" aria-label="Phí mượn (VND)" />
+          </Form.Item>
+          <Form.Item
+            label="Giá gốc sách (VND)"
+            name="price"
+            getValueFromEvent={(event: ChangeEvent<HTMLInputElement>) => formatVndInput(event.target.value)}
+            rules={[{ required: true, message: 'Giá gốc sách phải từ 0 VND trở lên.' }, { validator: validateFeeInput }]}
+          >
+            <Input inputMode="decimal" aria-label="Giá gốc sách (VND)" />
           </Form.Item>
           <Form.Item
             label="Phí trễ mỗi ngày (VND)"

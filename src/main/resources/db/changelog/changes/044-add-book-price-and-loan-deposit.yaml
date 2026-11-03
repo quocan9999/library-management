@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: 044-add-book-price-and-loan-deposit
+      author: quocan9999
+      comment: "Thêm giá gốc sách, tiền cọc mượn sách, trạng thái mất sách và hoàn tiền quầy"
+      changes:
+        - sql:
+            dbms: mysql
+            sql: |
+              -- 1. Bổ sung giá gốc cho sách (mặc định schema là 0.00, sách cũ trong DB update 150.000đ)
+              ALTER TABLE books
+                ADD COLUMN price DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+                ADD CONSTRAINT chk_books_price CHECK (price >= 0);
+
+              UPDATE books SET price = 150000.00 WHERE price = 0.00;
+
+              -- 2. Bổ sung các cột theo dõi tiền cọc cho từng sách mượn
+              ALTER TABLE loan_items
+                ADD COLUMN deposit_amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+                ADD COLUMN paid_deposit_amount DECIMAL(12, 2) NULL,
+                ADD COLUMN deposit_refunded_amount DECIMAL(12, 2) NULL,
+                ADD COLUMN deposit_refunded_at DATETIME(6) NULL,
+                ADD COLUMN deposit_refunded_by_account_id INT NULL,
+                ADD COLUMN deposit_forfeited_at DATETIME(6) NULL,
+                ADD CONSTRAINT fk_loan_items_deposit_refunded_by FOREIGN KEY (deposit_refunded_by_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+                ADD CONSTRAINT chk_loan_items_deposit_amount CHECK (deposit_amount >= 0);
+
+              -- Mở rộng trạng thái sách mượn: bổ sung trạng thái LOST
+              ALTER TABLE loan_items DROP CHECK chk_loan_items_status;
+              ALTER TABLE loan_items ADD CONSTRAINT chk_loan_items_status CHECK (status IN (
+                'RESERVED', 'PREPARING', 'READY_FOR_PICKUP', 'BORROWED', 'RETURNED', 'LOST', 'CANCELLED', 'EXPIRED', 'REJECTED'));
+
+              -- Mở rộng trạng thái trong bảng lịch sử: bổ sung trạng thái LOST
+              ALTER TABLE loan_item_status_history DROP CHECK chk_loan_item_history_to;
+              ALTER TABLE loan_item_status_history ADD CONSTRAINT chk_loan_item_history_to CHECK (to_status IN (
+                'WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP', 'BORROWED', 'RETURNED', 'LOST', 'CANCELLED', 'EXPIRED', 'REJECTED'));
+              ALTER TABLE loan_item_status_history DROP CHECK chk_loan_item_history_from;
+              ALTER TABLE loan_item_status_history ADD CONSTRAINT chk_loan_item_history_from CHECK (from_status IN (
+                'WAITLISTED', 'RESERVED', 'PREPARING', 'READY_FOR_PICKUP', 'BORROWED', 'RETURNED', 'LOST', 'CANCELLED', 'EXPIRED', 'REJECTED'));
+
+              -- Mở rộng lý do biến động trạng thái sách trong bảng lịch sử
+              ALTER TABLE loan_item_status_history DROP CHECK chk_loan_item_history_reason;
+              ALTER TABLE loan_item_status_history ADD CONSTRAINT chk_loan_item_history_reason CHECK (reason_code IN (
+                'REQUEST_CREATED', 'QUEUE_PROMOTED', 'PREPARATION_STARTED', 'READY_CONFIRMED', 'USER_CANCELLED',
+                'COUNTER_CANCELLED', 'PICKUP_EXPIRED', 'PHYSICAL_COPY_UNAVAILABLE', 'HANDOVER_COMPLETED',
+                'MOCK_PAYMENT_CONFIRMED', 'PAYMENT_EXPIRED', 'RENEWAL_COMPLETED', 'RETURN_COMPLETED',
+                'LEGACY_IMPORTED', 'DUE_REMINDER_THREE_DAYS', 'DUE_REMINDER_TODAY', 'OVERDUE_REMINDER_FIRST_DAY',
+                'LOST_REPORTED', 'OFFLINE_REFUND_CONFIRMED'));
+
+              -- 3. Bổ sung theo dõi hoàn tiền đơn mượn bị hủy/hết hạn tại quầy
+              ALTER TABLE loans
+                ADD COLUMN refunded_amount DECIMAL(12, 2) NULL,
+                ADD COLUMN refunded_at DATETIME(6) NULL,
+                ADD COLUMN refunded_by_account_id INT NULL,
+                ADD CONSTRAINT fk_loans_refunded_by FOREIGN KEY (refunded_by_account_id) REFERENCES accounts(id) ON DELETE RESTRICT;

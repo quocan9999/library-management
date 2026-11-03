@@ -203,6 +203,8 @@ export function BorrowPaymentPage() {
   const paymentStatus = request.paymentStatus ?? 'PENDING';
   const paid = paymentStatus === 'PAID' || paymentStatus === 'NOT_REQUIRED';
   const amount = request.paymentAmount ?? 0;
+  const totalBorrowFee = request.items.reduce((sum, item) => sum + item.borrowFee, 0);
+  const totalDeposit = request.items.reduce((sum, item) => sum + (item.depositAmount ?? 0), 0);
   const isCloseToExpiry =
     request.paymentExpiresAt && now !== null && Date.parse(request.paymentExpiresAt) - now < 300000;
 
@@ -381,23 +383,33 @@ export function BorrowPaymentPage() {
 
             {/* Danh sách thông tin */}
             <div className="user-payment-info-list">
-              {/* Số tiền cần thanh toán */}
-              <div className="user-payment-amount-row">
-                <span style={{ fontSize: '14px', color: '#4B4570', fontWeight: 600 }}>
-                  Số tiền cần thanh toán
-                </span>
-                <span
-                  style={{
-                    fontFamily:
-                      'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
-                    fontWeight: 800,
-                    fontSize: '28px',
-                    letterSpacing: '-0.03em',
-                    color: 'var(--user-ink)',
-                  }}
-                >
-                  {formatVnd(amount)}
-                </span>
+              {/* Số tiền cần thanh toán & Chi tiết */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px 0', borderBottom: '1.5px solid #14112B' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#4B4570' }}>
+                  <span>Tổng phí mượn:</span>
+                  <strong>{formatVnd(totalBorrowFee)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#4B4570' }}>
+                  <span>Tổng tiền cọc (hoàn 100% khi trả sách):</span>
+                  <strong>{formatVnd(totalDeposit)}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '6px' }}>
+                  <span style={{ fontSize: '15px', color: 'var(--user-ink)', fontWeight: 700 }}>
+                    Số tiền cần thanh toán:
+                  </span>
+                  <span
+                    style={{
+                      fontFamily:
+                        'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
+                      fontWeight: 800,
+                      fontSize: '28px',
+                      letterSpacing: '-0.03em',
+                      color: 'var(--user-ink)',
+                    }}
+                  >
+                    {formatVnd(amount)}
+                  </span>
+                </div>
               </div>
 
               {/* Ngân hàng */}
@@ -485,12 +497,6 @@ export function BorrowPaymentPage() {
           <h2 className="user-title-22" style={{ margin: 0, color: 'var(--user-ink)' }}>
             Sách trong yêu cầu ({request.items.length})
           </h2>
-          <span style={{ fontSize: '14px', color: '#4B4570' }}>
-            Tổng phí mượn:{' '}
-            <strong style={{ color: 'var(--user-ink)', fontWeight: 700 }}>
-              {formatVnd(amount)}
-            </strong>
-          </span>
         </div>
 
         <div className="user-payment-books-list">
@@ -537,11 +543,15 @@ export function BorrowPaymentPage() {
                     fontFamily:
                       'var(--user-font-display, "Bricolage Grotesque", "Be Vietnam Pro", sans-serif)',
                     fontWeight: 800,
-                    fontSize: '17px',
+                    fontSize: '16px',
                     color: 'var(--user-ink)',
+                    display: 'block',
                   }}
                 >
-                  {formatVnd(item.borrowFee)}
+                  {formatVnd(item.borrowFee + (item.depositAmount ?? 0))}
+                </span>
+                <span style={{ fontSize: '12px', color: '#4B4570', display: 'block' }}>
+                  Phí: {formatVnd(item.borrowFee)} · Cọc: {formatVnd(item.depositAmount ?? 0)}
                 </span>
               </div>
             </div>

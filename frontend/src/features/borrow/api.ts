@@ -7,9 +7,11 @@ import type {
   BorrowRequestSummary,
   CatalogBook,
   ConfirmMockPayment,
+  ConfirmOfflineRefundRequest,
   CounterMemberOption,
   HandoverRequest,
   PageResponse,
+  ReportLostItemsRequest,
   ReturnBorrowItemsRequest,
   StaffBorrowRequest,
 } from './types';
@@ -147,6 +149,22 @@ export const borrowApi = {
       body,
     );
     return readRequiredData(response.data, 'BORROW_RETURN_SUCCESS');
+  },
+
+  async reportLost(loanCode: string, body: ReportLostItemsRequest): Promise<StaffBorrowRequest> {
+    const response = await apiClient.post<ApiEnvelope<StaffBorrowRequest>>(
+      `/api/v1/librarian/borrow-requests/${encodeURIComponent(loanCode)}/report-lost`,
+      body,
+    );
+    return readRequiredData(response.data, 'BORROW_REPORT_LOST_SUCCESS');
+  },
+
+  async confirmRefund(loanCode: string, body: ConfirmOfflineRefundRequest = {}): Promise<StaffBorrowRequest> {
+    const response = await apiClient.post<ApiEnvelope<StaffBorrowRequest>>(
+      `/api/v1/librarian/borrow-requests/${encodeURIComponent(loanCode)}/confirm-refund`,
+      body,
+    );
+    return readRequiredData(response.data, 'BORROW_REFUND_SUCCESS');
   },
 
   async postStaffItem(loanCode: string, itemId: number, action: string, expectedCode: string): Promise<StaffBorrowRequest> {

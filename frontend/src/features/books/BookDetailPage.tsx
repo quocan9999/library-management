@@ -124,6 +124,7 @@ export function BookDetailPage() {
             <Descriptions.Item label="Ngày xuất bản">{formatDate(book.publishedDate)}</Descriptions.Item>
             <Descriptions.Item label="Sẵn có / Tổng">{book.availableQuantity} / {book.totalQuantity}</Descriptions.Item>
             <Descriptions.Item label="Phí mượn">{formatVnd(book.borrowFee)}</Descriptions.Item>
+            <Descriptions.Item label="Giá gốc (tiền cọc)">{formatVnd(book.price)}</Descriptions.Item>
             <Descriptions.Item label="Phí trễ mỗi ngày">{formatVnd(book.lateFeePerDay)}</Descriptions.Item>
             <Descriptions.Item label="Ngày tạo">{formatDateTime(book.createdAt)}</Descriptions.Item>
             <Descriptions.Item label="Cập nhật lần cuối">{formatDateTime(book.updatedAt)}</Descriptions.Item>

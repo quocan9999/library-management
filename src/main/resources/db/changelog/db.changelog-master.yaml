@@ -170,3 +170,7 @@ databaseChangeLog:
   - include:
       file: changes/043-create-staffs.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/044-add-book-price-and-loan-deposit.yaml
+      relativeToChangelogFile: true
