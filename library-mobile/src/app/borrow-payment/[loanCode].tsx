@@ -118,10 +118,6 @@ export default function BorrowPaymentScreen() {
         request.paymentAmount ?? 0
       );
       setRequest(updated);
-      Alert.alert(
-        'Đã ghi nhận thanh toán',
-        `Yêu cầu ${updated.loanCode} đã sẵn sàng để thư viện xử lý.`
-      );
     } catch (error) {
       Alert.alert(
         'Không thể xác nhận thanh toán',
@@ -376,12 +372,6 @@ export default function BorrowPaymentScreen() {
             disabled={submitting}
             loading={submitting}
             onPress={handleConfirm}
-          />
-          <LibbyButton
-            title="Thanh toán sau"
-            variant="outline"
-            disabled={submitting}
-            onPress={() => router.replace('/(tabs)/my-books')}
           />
         </View>
       </ScrollView>

@@ -45,14 +45,6 @@ export const CartDrawerModal: React.FC<CartDrawerModalProps> = ({ onCheckoutSucc
       const res = await borrowService.createRequest(bookIds);
       clearCart();
       closeCart();
-      Alert.alert(
-        'Đặt mượn thành công!',
-        `Yêu cầu mã ${res.loanCode} đã được ghi nhận. ${
-          res.paymentStatus === 'PENDING'
-            ? 'Vui lòng hoàn tất thanh toán để thư viện chuẩn bị sách.'
-            : 'Vui lòng kiểm tra mã QR trong mục Sách của tôi để nhận sách.'
-        }`
-      );
       onCheckoutSuccess?.(res.loanCode, res.paymentStatus);
     } catch (err: any) {
       Alert.alert('Không thể đặt mượn', err.message || 'Đã có lỗi xảy ra.');
