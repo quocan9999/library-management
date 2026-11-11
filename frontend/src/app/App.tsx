@@ -24,6 +24,7 @@ import { MemberDetailPage } from '../features/members/MemberDetailPage';
 import { MemberListPage } from '../features/members/MemberListPage';
 import { BookDetailPage } from '../features/books/BookDetailPage';
 import { BookListPage } from '../features/books/BookListPage';
+import { CategoryListPage } from '../features/categories/CategoryListPage';
 import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import { ProfilePage } from '../profile/ProfilePage';
@@ -269,6 +270,14 @@ export function App() {
             element={
               <RequirePermission permission="book:read" deniedRoles={['USER']}>
                 <BookListPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="admin/categories"
+            element={
+              <RequirePermission permission="category:read" deniedRoles={['USER']}>
+                <CategoryListPage />
               </RequirePermission>
             }
           />

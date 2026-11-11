@@ -1,4 +1,4 @@
-import { Alert, Button, Collapse, DatePicker, Input, Pagination, Select, Spin, Table } from 'antd';
+import { Alert, Button, Collapse, DatePicker, Input, Pagination, Select, Spin, Table, Tag } from 'antd';
 import type { TableColumnsType, TableProps } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -169,6 +169,9 @@ export function BookListPage() {
     { title: 'Tác giả', dataIndex: 'author', key: 'author', sorter: true, sortOrder: sortOrder('author'), width: 180 },
     { title: 'Nhà xuất bản', dataIndex: 'publisher', key: 'publisher', sorter: true, sortOrder: sortOrder('publisher'), render: (value: string | null) => value || '—', width: 180 },
     { title: 'ISBN', dataIndex: 'isbn', key: 'isbn', sorter: true, sortOrder: sortOrder('isbn'), render: (value: string | null) => value || '—', width: 155 },
+    { title: 'Danh mục', key: 'categories', width: 200, render: (_value, book) => book.categories.length === 0
+      ? '—'
+      : <div className="category-tags">{book.categories.map((category) => <Tag key={category.id}>{category.name}</Tag>)}</div> },
     { title: 'Sẵn có / Tổng', key: 'quantity', render: (_value, book) => `${book.availableQuantity} / ${book.totalQuantity}`, width: 130 },
     { title: 'Phí mượn', dataIndex: 'borrowFee', key: 'borrowFee', sorter: true, sortOrder: sortOrder('borrowFee'), align: 'right', render: formatVnd, width: 135 },
     { title: 'Giá gốc', dataIndex: 'price', key: 'price', sorter: true, sortOrder: sortOrder('price'), align: 'right', render: formatVnd, width: 135 },

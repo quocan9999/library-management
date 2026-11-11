@@ -210,6 +210,16 @@ export function AdminLayout() {
               <span>Quản lý sách</span>
             </NavLink>
           </PermissionGate>
+          <PermissionGate permission="category:read" deniedRoles={['USER']} fallback={null}>
+            <NavLink
+              to="/admin/categories"
+              className={({ isActive }) => `admin-shell__nav-link${isActive ? ' is-active' : ''}`}
+              onClick={closeMobileMenu}
+            >
+              <BooksIcon />
+              <span>Quản lý danh mục</span>
+            </NavLink>
+          </PermissionGate>
           <PermissionGate permission="member:read" deniedRoles={['USER']} fallback={null}>
             <NavLink
               to="/admin/members"

@@ -34,6 +34,7 @@ function detail(version = 0, title = 'Lập trình Java'): BookDetail {
   return {
     id: 12, bookCode: 'B000012', isbn: '9786041234567', title, author: 'Nguyễn An', publisher: 'NXB Trẻ',
     publishedDate: '2024-03-10', totalQuantity: 8, availableQuantity: 5, borrowFee: 150000, price: 150000, lateFeePerDay: 0,
+    categories: [],
     createdAt: '2026-10-01T08:30:00', updatedAt: '2026-10-02T08:30:00', version,
   };
 }
@@ -128,6 +129,9 @@ describe('BookDetailPage', () => {
       if (config.method === 'put') {
         submitted = JSON.parse(String(config.data)) as Record<string, unknown>;
         throw axiosFailure(config, 409, 'BOOK_VERSION_CONFLICT');
+      }
+      if (String(config.url).includes('/categories/options')) {
+        return response(config, success('CATEGORY_OPTIONS_SUCCESS', []));
       }
       detailReads += 1;
       return response(config, success('BOOK_DETAIL_SUCCESS', detail(detailReads > 1 ? 1 : 0, detailReads > 1 ? 'Tên mới nhất từ máy chủ' : 'Lập trình Java')));

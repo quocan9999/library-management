@@ -49,7 +49,8 @@ function book(id: number, title = 'Lập trình Java'): BookDetail {
   return {
     id, bookCode: `B${String(id).padStart(6, '0')}`, isbn: '9786041234567', title, author: 'Nguyễn An',
     publisher: 'Nhà xuất bản Trẻ', publishedDate: '2024-03-10', totalQuantity: 0, availableQuantity: 0,
-    borrowFee: 150000, price: 150000, lateFeePerDay: 0, createdAt: '2026-10-01T08:30:00', updatedAt: '2026-10-02T08:30:00', version: 0,
+    borrowFee: 150000, price: 150000, lateFeePerDay: 0, categories: [],
+    createdAt: '2026-10-01T08:30:00', updatedAt: '2026-10-02T08:30:00', version: 0,
   };
 }
 
@@ -216,6 +217,9 @@ describe('BookListPage', () => {
       if (config.method === 'post') {
         submitted = JSON.parse(String(config.data)) as Record<string, unknown>;
         return response(config, success('BOOK_CREATED', book(12)));
+      }
+      if (String(config.url).includes('/categories/options')) {
+        return response(config, success('CATEGORY_OPTIONS_SUCCESS', []));
       }
       listReads += 1;
       return response(config, success('BOOK_LIST_SUCCESS', page()));

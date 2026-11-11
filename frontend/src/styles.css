@@ -2651,6 +2651,18 @@ input:focus-visible,
   max-width: 620px;
 }
 
+.category-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .book-toolbar-actions,
 .book-filter-actions {
   display: flex;
