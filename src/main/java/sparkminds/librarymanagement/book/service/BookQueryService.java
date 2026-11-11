@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.book.dto.BookListItemResponse;
 import sparkminds.librarymanagement.book.logging.BookOperationLog;
 import sparkminds.librarymanagement.book.repository.BookRepository;
+import sparkminds.librarymanagement.book.entity.Book;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.common.api.PagedResponse;
 
@@ -82,9 +83,12 @@ public class BookQueryService {
                 parseAvailability(availability)
         );
         PageRequest pageRequest = PageRequest.of(parsePage(page), parseSize(size), parseSort(sort));
-        Page<BookListItemResponse> result = bookRepository.findAll(BookSpecifications.search(criteria), pageRequest)
-                .map(BookMapper::toListItem);
-        return PagedResponse.of(result.getContent(), result.getNumber(), result.getSize(), result.getTotalElements());
+        Page<Book> result = bookRepository.findAll(BookSpecifications.search(criteria), pageRequest);
+        // Nạp trước danh mục cho toàn trang trong một query duy nhất (EntityGraph) để tránh N+1.
+        List<Integer> bookIds = result.getContent().stream().map(Book::getId).toList();
+        bookRepository.findAllByIdIn(bookIds);
+        Page<BookListItemResponse> mapped = result.map(BookMapper::toListItem);
+        return PagedResponse.of(mapped.getContent(), mapped.getNumber(), mapped.getSize(), mapped.getTotalElements());
     }
 
     private static String normalizeIsbnQuery(String query) {

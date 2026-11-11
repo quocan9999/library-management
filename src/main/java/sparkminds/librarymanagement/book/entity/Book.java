@@ -10,6 +10,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+import sparkminds.librarymanagement.category.entity.Category;
 
 /**
  * Entity đại diện cho thông tin một đầu sách trong hệ thống thư viện.
@@ -77,4 +81,17 @@ public class Book {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * Danh mục phân loại của sách, quan hệ nhiều–nhiều qua bảng book_categories.
+     * Book là owning side để JPA tự đồng bộ bảng nối khi tạo, cập nhật và xóa sách.
+     * Fetch LAZY; các query trả DTO cần book dùng {@code @EntityGraph} nạp trước.
+     */
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "book_categories",
+            joinColumns = @JoinColumn(name = "book_id"),
+            inverseJoinColumns = @JoinColumn(name = "category_id")
+    )
+    private Set<Category> categories = new HashSet<>();
 }

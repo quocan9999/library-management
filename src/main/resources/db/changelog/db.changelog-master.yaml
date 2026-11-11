@@ -174,3 +174,15 @@ databaseChangeLog:
   - include:
       file: changes/044-add-book-price-and-loan-deposit.yaml
       relativeToChangelogFile: true
+
+  - include:
+      file: changes/045-create-categories.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/046-create-book-categories.yaml
+      relativeToChangelogFile: true
+
+  - include:
+      file: changes/047-seed-category-permissions.yaml
+      relativeToChangelogFile: true
