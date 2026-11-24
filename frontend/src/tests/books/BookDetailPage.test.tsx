@@ -34,6 +34,7 @@ function detail(version = 0, title = 'Lập trình Java'): BookDetail {
   return {
     id: 12, bookCode: 'B000012', isbn: '9786041234567', title, author: 'Nguyễn An', publisher: 'NXB Trẻ',
     publishedDate: '2024-03-10', totalQuantity: 8, availableQuantity: 5, borrowFee: 150000, price: 150000, lateFeePerDay: 0,
+    categories: [],
     createdAt: '2026-10-01T08:30:00', updatedAt: '2026-10-02T08:30:00', version,
   };
 }
@@ -129,6 +130,9 @@ describe('BookDetailPage', () => {
         submitted = JSON.parse(String(config.data)) as Record<string, unknown>;
         throw axiosFailure(config, 409, 'BOOK_VERSION_CONFLICT');
       }
+      if (String(config.url).includes('/categories/options')) {
+        return response(config, success('CATEGORY_OPTIONS_SUCCESS', []));
+      }
       detailReads += 1;
       return response(config, success('BOOK_DETAIL_SUCCESS', detail(detailReads > 1 ? 1 : 0, detailReads > 1 ? 'Tên mới nhất từ máy chủ' : 'Lập trình Java')));
     }) satisfies AxiosAdapter;
@@ -161,5 +165,29 @@ describe('BookDetailPage', () => {
     expect(await screen.findByText('Không thể xóa sách đã có lịch sử mượn. Thông tin sách vẫn được giữ nguyên.')).toBeTruthy();
     expect(screen.getByLabelText('current path').textContent).toBe('/admin/books/12');
     expect(screen.getByText('Lập trình Java')).toBeTruthy();
+  });
+
+  it('displays book categories as tags and falls back to dash when empty', async () => {
+    const bookWithCategories: BookDetail = {
+      ...detail(),
+      categories: [
+        { id: 1, name: 'Kỹ thuật' },
+        { id: 2, name: 'Lập trình' },
+      ],
+    };
+    let reads = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      reads += 1;
+      return response(config, success('BOOK_DETAIL_SUCCESS', reads === 1 ? bookWithCategories : detail()));
+    }) satisfies AxiosAdapter;
+
+    renderDetail();
+    expect(await screen.findByText('Kỹ thuật')).toBeTruthy();
+    expect(screen.getByText('Lập trình')).toBeTruthy();
+
+    cleanup();
+    renderDetail();
+    expect(await screen.findByText('Lập trình Java')).toBeTruthy();
+    expect(screen.queryByText('Kỹ thuật')).toBeNull();
   });
 });

@@ -18,6 +18,8 @@ import sparkminds.librarymanagement.book.cover.BookCoverObsolete;
 import sparkminds.librarymanagement.book.cover.UploadedBookCover;
 import sparkminds.librarymanagement.book.repository.BookRepository;
 import sparkminds.librarymanagement.book.repository.BookSimilarityRepository;
+import sparkminds.librarymanagement.category.entity.Category;
+import sparkminds.librarymanagement.category.service.CategoryService;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.common.api.FieldValidationException;
 import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
@@ -25,6 +27,7 @@ import sparkminds.librarymanagement.loan.repository.LoanItemRepository;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -40,6 +43,7 @@ public class BookTransactionService {
     private final LoanItemRepository loanItemRepository;
     private final ApplicationEventPublisher events;
     private final EntityManager entityManager;
+    private final CategoryService categoryService;
 
     /**
      * Tạo một đầu sách sau khi chuẩn hóa thông tin và kiểm tra ISBN/sách tương tự.
@@ -86,6 +90,7 @@ public class BookTransactionService {
             book.setCoverImageUrl(cover.url());
             book.setCoverImagePublicId(cover.publicId());
         }
+        book.setCategories(resolveCategories(request.categoryIds()));
 
         bookRepository.saveAndFlush(book);
         book.setBookCode(formatBookCode(book.getId()));
@@ -153,6 +158,9 @@ public class BookTransactionService {
             if (oldPublicId != null) events.publishEvent(new BookCoverObsolete(oldPublicId));
         }
 
+        // Thay thế toàn bộ danh mục bằng tập client gửi lên; giao cũ trừ đi tập còn lại.
+        book.setCategories(resolveCategories(request.categoryIds()));
+
         try {
             bookRepository.saveAndFlush(book);
         } catch (OptimisticLockingFailureException | OptimisticLockException exception) {
@@ -196,6 +204,11 @@ public class BookTransactionService {
                     Map.of("isbn", exception.getMessage())
             );
         }
+    }
+
+    /** Tra cứu và kiểm tra danh mục client gửi lên trước khi gán cho sách. */
+    private Set<Category> resolveCategories(java.util.Collection<Integer> categoryIds) {
+        return categoryService.resolveValidCategories(categoryIds);
     }
 
     private static String temporaryBookCode() {

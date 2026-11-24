@@ -46,7 +46,7 @@ public class BookController {
     private final BookQueryService bookQueryService;
 
     @GetMapping
-    @Operation(summary = "Tìm kiếm và phân trang sách", description = "Quick search, bộ lọc nâng cao, sort whitelist và phân trang tối đa 10 sách mỗi trang.")
+    @Operation(summary = "Tìm kiếm và phân trang sách", description = "Quick search, bộ lọc nâng cao (bao gồm categoryId), sort whitelist và phân trang tối đa 10 sách mỗi trang.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Trang sách đã lọc",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class))),
@@ -62,6 +62,7 @@ public class BookController {
             @RequestParam(required = false) String publishedFrom,
             @RequestParam(required = false) String publishedTo,
             @RequestParam(required = false) String availability,
+            @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String page,
             @RequestParam(required = false) String size,
             @RequestParam(required = false) String sort
@@ -70,7 +71,7 @@ public class BookController {
                 HttpStatus.OK.value(),
                 "BOOK_LIST_SUCCESS",
                 "Lấy danh sách sách thành công",
-                bookQueryService.search(q, publisher, publishedFrom, publishedTo, availability, page, size, sort)
+                bookQueryService.search(q, publisher, publishedFrom, publishedTo, availability, categoryId, page, size, sort)
         ));
     }
 

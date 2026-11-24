@@ -1,4 +1,7 @@
 import { api, extractErrorMessage } from './api';
+import { CategorySummary } from './categoryService';
+
+export type { CategorySummary };
 
 export interface PageResponse<T> {
   content: T[];
@@ -23,6 +26,7 @@ export interface CatalogBook {
   borrowFee: number;
   price: number;
   lateFeePerDay: number;
+  categories?: CategorySummary[];
   coverImageUrl: string | null;
 }
 

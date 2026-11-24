@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Modal, Spin } from 'antd';
+import { Alert, Button, Descriptions, Modal, Spin, Tag } from 'antd';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
@@ -122,6 +122,11 @@ export function BookDetailPage() {
             <Descriptions.Item label="ISBN">{book.isbn || '—'}</Descriptions.Item>
             <Descriptions.Item label="Nhà xuất bản">{book.publisher || '—'}</Descriptions.Item>
             <Descriptions.Item label="Ngày xuất bản">{formatDate(book.publishedDate)}</Descriptions.Item>
+            <Descriptions.Item label="Danh mục">
+              {book.categories && book.categories.length > 0
+                ? <div className="category-tags">{book.categories.map((category) => <Tag key={category.id}>{category.name}</Tag>)}</div>
+                : '—'}
+            </Descriptions.Item>
             <Descriptions.Item label="Sẵn có / Tổng">{book.availableQuantity} / {book.totalQuantity}</Descriptions.Item>
             <Descriptions.Item label="Phí mượn">{formatVnd(book.borrowFee)}</Descriptions.Item>
             <Descriptions.Item label="Giá gốc (tiền cọc)">{formatVnd(book.price)}</Descriptions.Item>

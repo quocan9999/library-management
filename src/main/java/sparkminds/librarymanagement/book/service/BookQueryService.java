@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import sparkminds.librarymanagement.book.dto.BookListItemResponse;
 import sparkminds.librarymanagement.book.logging.BookOperationLog;
 import sparkminds.librarymanagement.book.repository.BookRepository;
+import sparkminds.librarymanagement.book.entity.Book;
 import sparkminds.librarymanagement.common.api.BusinessException;
 import sparkminds.librarymanagement.common.api.PagedResponse;
 
@@ -66,6 +67,35 @@ public class BookQueryService {
             String size,
             String sort
     ) {
+        return search(q, publisher, publishedFrom, publishedTo, availability, null, page, size, sort);
+    }
+
+    /**
+     * Tìm sách theo bộ lọc đầy đủ bao gồm tùy chọn lọc theo danh mục {@code categoryId}.
+     *
+     * @param q cụm tìm trong mã, ISBN, tên hoặc tác giả
+     * @param publisher một phần tên nhà xuất bản
+     * @param publishedFrom ngày xuất bản bắt đầu
+     * @param publishedTo ngày xuất bản kết thúc
+     * @param availability ALL, AVAILABLE hoặc UNAVAILABLE
+     * @param categoryId ID danh mục cần lọc (số nguyên &ge; 1), null nếu không lọc
+     * @param page chỉ số trang bắt đầu từ 0
+     * @param size số kết quả trong trang, tối đa 10
+     * @param sort field và hướng sort dạng field,asc|desc
+     * @return trang BookListItem đã lọc và sắp xếp ổn định
+     */
+    @BookOperationLog("book.search")
+    public PagedResponse<BookListItemResponse> search(
+            String q,
+            String publisher,
+            String publishedFrom,
+            String publishedTo,
+            String availability,
+            String categoryId,
+            String page,
+            String size,
+            String sort
+    ) {
         String query = optionalText(q);
         LocalDate from = parseDate(publishedFrom, "publishedFrom");
         LocalDate to = parseDate(publishedTo, "publishedTo");
@@ -79,12 +109,18 @@ public class BookQueryService {
                 optionalText(publisher),
                 from,
                 to,
-                parseAvailability(availability)
+                parseAvailability(availability),
+                parseCategoryId(categoryId)
         );
         PageRequest pageRequest = PageRequest.of(parsePage(page), parseSize(size), parseSort(sort));
-        Page<BookListItemResponse> result = bookRepository.findAll(BookSpecifications.search(criteria), pageRequest)
-                .map(BookMapper::toListItem);
-        return PagedResponse.of(result.getContent(), result.getNumber(), result.getSize(), result.getTotalElements());
+        Page<Book> result = bookRepository.findAll(BookSpecifications.search(criteria), pageRequest);
+        // Nạp trước danh mục cho toàn trang trong một query duy nhất (EntityGraph) để tránh N+1.
+        List<Integer> bookIds = result.getContent().stream().map(Book::getId).toList();
+        if (!bookIds.isEmpty()) {
+            bookRepository.findAllByIdIn(bookIds);
+        }
+        Page<BookListItemResponse> mapped = result.map(BookMapper::toListItem);
+        return PagedResponse.of(mapped.getContent(), mapped.getNumber(), mapped.getSize(), mapped.getTotalElements());
     }
 
     private static String normalizeIsbnQuery(String query) {
@@ -144,6 +180,18 @@ public class BookQueryService {
             throw invalid("size phải nằm trong khoảng 1 đến 10");
         }
         return size;
+    }
+
+    private static Integer parseCategoryId(String value) {
+        String text = optionalText(value);
+        if (text == null) {
+            return null;
+        }
+        int categoryId = parseInteger(text, 0, "categoryId");
+        if (categoryId < 1) {
+            throw invalid("categoryId phải lớn hơn hoặc bằng 1");
+        }
+        return categoryId;
     }
 
     private static int parseInteger(String value, int defaultValue, String field) {

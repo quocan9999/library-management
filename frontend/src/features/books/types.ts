@@ -1,3 +1,5 @@
+import type { CategorySummary } from '../categories/types';
+
 export interface BookListItem {
   id: number;
   bookCode: string;
@@ -12,6 +14,7 @@ export interface BookListItem {
   borrowFee: number;
   price: number;
   lateFeePerDay: number;
+  categories: CategorySummary[];
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +33,7 @@ export interface BookWriteInput {
   borrowFee: number;
   price: number;
   lateFeePerDay: number;
+  categoryIds: number[];
   confirmSimilar?: boolean;
 }
 
@@ -43,6 +47,7 @@ export interface BookListQuery {
   publishedFrom?: string;
   publishedTo?: string;
   availability?: 'ALL' | 'AVAILABLE' | 'UNAVAILABLE';
+  categoryId?: number;
   page: number;
   size: number;
   sort: string;

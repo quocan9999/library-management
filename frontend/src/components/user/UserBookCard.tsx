@@ -14,6 +14,7 @@ export interface UserBookCardItem {
   lateFeePerDay?: number;
   availableQuantity?: number;
   totalQuantity?: number;
+  categories?: { id: number; name: string }[];
 }
 
 export interface UserBookCardProps {
@@ -42,6 +43,7 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
   const available = book.availableQuantity ?? 0;
   const total = book.totalQuantity ?? 0;
   const isAvailable = available > 0;
+  const categories = book.categories ?? [];
 
   const formatCurrency = (val?: number) => {
     if (typeof val !== 'number') return '0 đ';
@@ -180,6 +182,29 @@ export const UserBookCard: React.FC<UserBookCardProps> = ({
             )}
           </div>
         </div>
+
+        {categories.length > 0 && (
+          <span
+            style={{
+              alignSelf: 'flex-start',
+              maxWidth: '100%',
+              backgroundColor: '#EFEBFF',
+              color: '#14112B',
+              borderRadius: '12px',
+              padding: '3px 10px',
+              fontSize: '12px',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+            title={categories.map((c) => c.name).join(', ')}
+          >
+            {categories.length > 1
+              ? `${categories[0].name} +${categories.length - 1}`
+              : categories[0].name}
+          </span>
+        )}
 
         <h3
           style={{

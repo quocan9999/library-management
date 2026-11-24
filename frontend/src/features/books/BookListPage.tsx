@@ -1,4 +1,4 @@
-import { Alert, Button, Collapse, DatePicker, Input, Pagination, Select, Spin, Table } from 'antd';
+import { Alert, Button, Collapse, DatePicker, Input, Pagination, Select, Spin, Table, Tag } from 'antd';
 import type { TableColumnsType, TableProps } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -11,6 +11,8 @@ import { BookCoverImage } from './BookCoverImage';
 import { BookImportModal } from './BookImportModal';
 import { formatVnd } from './formatting';
 import type { BookListItem, BookListQuery, PageResponse } from './types';
+import { categoryApi } from '../categories/api';
+import type { CategorySummary } from '../categories/types';
 
 const PAGE_SIZE = 10;
 const DEFAULT_SORT = 'createdAt,desc';
@@ -21,6 +23,7 @@ interface BookFilters {
   publishedFrom: string;
   publishedTo: string;
   availability: 'ALL' | 'AVAILABLE' | 'UNAVAILABLE';
+  categoryId: number | null;
 }
 
 const EMPTY_FILTERS: BookFilters = {
@@ -28,6 +31,7 @@ const EMPTY_FILTERS: BookFilters = {
   publishedFrom: '',
   publishedTo: '',
   availability: 'ALL',
+  categoryId: null,
 };
 
 function asDayjs(value: string): Dayjs | null {
@@ -49,6 +53,7 @@ function buildQuery(q: string, filters: BookFilters, page: number, sort: string)
     ...(filters.publishedFrom ? { publishedFrom: filters.publishedFrom } : {}),
     ...(filters.publishedTo ? { publishedTo: filters.publishedTo } : {}),
     ...(filters.availability !== 'ALL' ? { availability: filters.availability } : {}),
+    ...(filters.categoryId !== null ? { categoryId: filters.categoryId } : {}),
     page: page - 1,
     size: PAGE_SIZE,
     sort,
@@ -58,8 +63,10 @@ function buildQuery(q: string, filters: BookFilters, page: number, sort: string)
 export function BookListPage() {
   const canCreate = usePermission('book:create');
   const canImport = usePermission('book:import');
+  const canReadCategories = usePermission('category:read');
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<CategorySummary[]>([]);
   const [draftQ, setDraftQ] = useState('');
   const [appliedQ, setAppliedQ] = useState('');
   const [draftFilters, setDraftFilters] = useState<BookFilters>(EMPTY_FILTERS);
@@ -83,6 +90,23 @@ export function BookListPage() {
     if (debounceTimer.current !== undefined) window.clearTimeout(debounceTimer.current);
     if (publisherTimer.current !== undefined) window.clearTimeout(publisherTimer.current);
   }, []);
+
+  useEffect(() => {
+    if (!canReadCategories) return undefined;
+    const controller = new AbortController();
+    let current = true;
+    void categoryApi.getOptions({}, controller.signal)
+      .then((options) => {
+        if (current) setCategoryOptions(options);
+      })
+      .catch(() => {
+        if (current) setCategoryOptions([]);
+      });
+    return () => {
+      current = false;
+      controller.abort();
+    };
+  }, [canReadCategories]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -169,6 +193,9 @@ export function BookListPage() {
     { title: 'Tác giả', dataIndex: 'author', key: 'author', sorter: true, sortOrder: sortOrder('author'), width: 180 },
     { title: 'Nhà xuất bản', dataIndex: 'publisher', key: 'publisher', sorter: true, sortOrder: sortOrder('publisher'), render: (value: string | null) => value || '—', width: 180 },
     { title: 'ISBN', dataIndex: 'isbn', key: 'isbn', sorter: true, sortOrder: sortOrder('isbn'), render: (value: string | null) => value || '—', width: 155 },
+    { title: 'Danh mục', key: 'categories', width: 200, render: (_value, book) => book.categories.length === 0
+      ? '—'
+      : <div className="category-tags">{book.categories.map((category) => <Tag key={category.id}>{category.name}</Tag>)}</div> },
     { title: 'Sẵn có / Tổng', key: 'quantity', render: (_value, book) => `${book.availableQuantity} / ${book.totalQuantity}`, width: 130 },
     { title: 'Phí mượn', dataIndex: 'borrowFee', key: 'borrowFee', sorter: true, sortOrder: sortOrder('borrowFee'), align: 'right', render: formatVnd, width: 135 },
     { title: 'Giá gốc', dataIndex: 'price', key: 'price', sorter: true, sortOrder: sortOrder('price'), align: 'right', render: formatVnd, width: 135 },
@@ -236,6 +263,22 @@ export function BookListPage() {
                 ]}
                 onChange={(availability: BookFilters['availability']) => changeFilters({ availability })}
               />
+              {canReadCategories && (
+                <div className="member-filter-field">
+                  <label htmlFor="book-category-filter">Danh mục</label>
+                  <Select
+                    id="book-category-filter"
+                    aria-label="Danh mục"
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Tất cả danh mục"
+                    value={draftFilters.categoryId ?? undefined}
+                    options={categoryOptions.map((category) => ({ value: category.id, label: category.name }))}
+                    onChange={(categoryId?: number) => changeFilters({ categoryId: categoryId ?? null })}
+                  />
+                </div>
+              )}
               <div className="book-filter-actions">
                 <Button onClick={clearFilters}>Xóa bộ lọc</Button>
               </div>

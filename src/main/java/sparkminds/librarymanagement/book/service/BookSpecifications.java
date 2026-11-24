@@ -54,6 +54,12 @@ public final class BookSpecifications {
             } else if (criteria.availability() == BookSearchCriteria.Availability.UNAVAILABLE) {
                 filters.add(builder.equal(root.get("availableQuantity"), 0));
             }
+            if (criteria.categoryId() != null) {
+                if (query != null) {
+                    query.distinct(true);
+                }
+                filters.add(builder.equal(root.join("categories").get("id"), criteria.categoryId()));
+            }
 
             return builder.and(filters.toArray(Predicate[]::new));
         };

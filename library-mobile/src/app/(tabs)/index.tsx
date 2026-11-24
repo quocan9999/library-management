@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,22 +16,25 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { BookCatalogCard } from '@/components/books/BookCatalogCard';
 import { BookDetailModal } from '@/components/books/BookDetailModal';
+import {
+  AvailabilityFilter,
+  CATALOG_SORT_OPTIONS,
+  CatalogFilterModal,
+  CatalogSortOption,
+  DEFAULT_CATALOG_SORT,
+} from '@/components/books/CatalogFilterModal';
 import { FilterChipGroup, FilterChipOption } from '@/components/books/FilterChipGroup';
 import { CartDrawerModal } from '@/components/cart/CartDrawerModal';
 import { LoanQrModal } from '@/components/loans/LoanQrModal';
 import { ReadyPickupCard } from '@/components/loans/ReadyPickupCard';
+import { LibbyButton } from '@/components/ui';
 import { ToastMessage } from '@/components/ui/ToastMessage';
 import { LibbyColors, LibbyFonts } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { bookCatalogService, CatalogBook } from '@/services/bookCatalogService';
 import { borrowService, BorrowRequestSummary } from '@/services/borrowService';
-
-const FILTER_OPTIONS: FilterChipOption[] = [
-  { value: 'ALL', label: 'Tất cả' },
-  { value: 'AVAILABLE', label: 'Còn sách' },
-  { value: 'UNAVAILABLE', label: 'Hết sách' },
-];
+import { categoryService, CategorySummary } from '@/services/categoryService';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -41,13 +44,23 @@ export default function HomeScreen() {
   const cardWidth = Math.floor((windowWidth - 40 - 14) / 2);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterAvailability, setFilterAvailability] = useState('ALL');
+  const [filterAvailability, setFilterAvailability] = useState<AvailabilityFilter>('ALL');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<CatalogSortOption>(DEFAULT_CATALOG_SORT);
+  const [categoryOptions, setCategoryOptions] = useState<CategorySummary[]>([]);
+
   const [books, setBooks] = useState<CatalogBook[]>([]);
+  const [totalElements, setTotalElements] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const [readyLoans, setReadyLoans] = useState<BorrowRequestSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Modals & toast states
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [showLoginToast, setShowLoginToast] = useState(true);
   const [selectedBook, setSelectedBook] = useState<CatalogBook | null>(null);
   const [qrRequest, setQrRequest] = useState<BorrowRequestSummary | null>(null);
@@ -57,51 +70,187 @@ export default function HomeScreen() {
     user?.fullName || user?.username || (user?.email ? user.email.split('@')[0] : 'Độc giả');
   const userInitial = displayName.charAt(0).toUpperCase();
 
-  const loadData = useCallback(async () => {
-    try {
-      const [booksRes, loansRes] = await Promise.allSettled([
-        bookCatalogService.listBooks({
+  const loadCategories = useCallback(async () => {
+    const options = await categoryService.getOptions();
+    setCategoryOptions(options);
+    setSelectedCategoryId((prev) =>
+      prev !== null && !options.some((cat) => cat.id === prev) ? null : prev
+    );
+  }, []);
+
+  const loadData = useCallback(
+    async (targetPage = 0, append = false) => {
+      if (append) {
+        setLoadingMore(true);
+      }
+      try {
+        const queryParams = {
           q: searchQuery.trim() || undefined,
           availability:
             filterAvailability === 'ALL'
               ? undefined
               : (filterAvailability as 'AVAILABLE' | 'UNAVAILABLE'),
+          categoryId: selectedCategoryId ?? undefined,
+          sort: sortBy,
+          page: targetPage,
           size: 10,
-        }),
-        borrowService.listMine(0, 'READY_FOR_PICKUP', 10),
-      ]);
+        };
 
-      if (booksRes.status === 'fulfilled') {
-        setBooks(booksRes.value.content);
-      } else {
-        console.warn('Lỗi tải danh mục sách:', booksRes.reason);
+        if (append) {
+          const nextPageData = await bookCatalogService.listBooks(queryParams);
+          setBooks((prev) => [...prev, ...nextPageData.content]);
+          setTotalElements(nextPageData.totalElements);
+          setCurrentPage(nextPageData.page);
+          setHasMore(!nextPageData.last);
+          return;
+        }
+
+        const [booksRes, loansRes] = await Promise.allSettled([
+          bookCatalogService.listBooks(queryParams),
+          borrowService.listMine(0, 'READY_FOR_PICKUP', 10),
+        ]);
+
+        if (booksRes.status === 'fulfilled') {
+          setBooks(booksRes.value.content);
+          setTotalElements(booksRes.value.totalElements);
+          setCurrentPage(booksRes.value.page);
+          setHasMore(!booksRes.value.last);
+        } else {
+          console.warn('Lỗi tải danh mục sách:', booksRes.reason);
+        }
+        if (loansRes.status === 'fulfilled') {
+          setReadyLoans(loansRes.value.content);
+        } else {
+          console.warn('Lỗi tải sách chờ nhận:', loansRes.reason);
+        }
+      } catch (err) {
+        console.warn('Lỗi loadData:', err);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
       }
-      if (loansRes.status === 'fulfilled') {
-        setReadyLoans(loansRes.value.content);
-      } else {
-        console.warn('Lỗi tải sách chờ nhận:', loansRes.reason);
-      }
-    } catch (err) {
-      console.warn('Lỗi loadData:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [searchQuery, filterAvailability]);
+    },
+    [searchQuery, filterAvailability, selectedCategoryId, sortBy]
+  );
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    let cancelled = false;
+    categoryService.getOptions().then((options) => {
+      if (cancelled) return;
+      setCategoryOptions(options);
+      setSelectedCategoryId((prev) =>
+        prev !== null && !options.some((cat) => cat.id === prev) ? null : prev
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const queryParams = {
+      q: searchQuery.trim() || undefined,
+      availability:
+        filterAvailability === 'ALL'
+          ? undefined
+          : (filterAvailability as 'AVAILABLE' | 'UNAVAILABLE'),
+      categoryId: selectedCategoryId ?? undefined,
+      sort: sortBy,
+      page: 0,
+      size: 10,
+    };
+
+    Promise.allSettled([
+      bookCatalogService.listBooks(queryParams),
+      borrowService.listMine(0, 'READY_FOR_PICKUP', 10),
+    ])
+      .then(([booksRes, loansRes]) => {
+        if (cancelled) return;
+        if (booksRes.status === 'fulfilled') {
+          setBooks(booksRes.value.content);
+          setTotalElements(booksRes.value.totalElements);
+          setCurrentPage(booksRes.value.page);
+          setHasMore(!booksRes.value.last);
+        } else {
+          console.warn('Lỗi tải danh mục sách:', booksRes.reason);
+        }
+        if (loansRes.status === 'fulfilled') {
+          setReadyLoans(loansRes.value.content);
+        } else {
+          console.warn('Lỗi tải sách chờ nhận:', loansRes.reason);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery, filterAvailability, selectedCategoryId, sortBy]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadData();
+    loadCategories();
+    loadData(0, false);
+  };
+
+  const handleLoadMore = () => {
+    if (loading || loadingMore || !hasMore) return;
+    loadData(currentPage + 1, true);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedCategoryId(null);
+    setFilterAvailability('ALL');
+    setSortBy(DEFAULT_CATALOG_SORT);
   };
 
   const handleBookAddedSuccess = (msg: string) => {
     setToastText(msg);
     setShowLoginToast(true);
   };
+
+  const categoryChipOptions = useMemo<FilterChipOption[]>(
+    () => [
+      { value: 'ALL', label: 'Tất cả' },
+      ...categoryOptions.map((cat) => ({
+        value: String(cat.id),
+        label: cat.name,
+      })),
+    ],
+    [categoryOptions]
+  );
+
+  const selectedCategoryName = useMemo(
+    () => categoryOptions.find((cat) => cat.id === selectedCategoryId)?.name ?? null,
+    [categoryOptions, selectedCategoryId]
+  );
+
+  const activeAvailabilityLabel =
+    filterAvailability === 'AVAILABLE'
+      ? 'Còn sách'
+      : filterAvailability === 'UNAVAILABLE'
+      ? 'Hết sách'
+      : null;
+
+  const activeSortLabel =
+    sortBy === DEFAULT_CATALOG_SORT
+      ? null
+      : CATALOG_SORT_OPTIONS.find((opt) => opt.value === sortBy)?.label ?? null;
+
+  const activeFilterCount =
+    (selectedCategoryId !== null ? 1 : 0) +
+    (filterAvailability !== 'ALL' ? 1 : 0) +
+    (sortBy !== DEFAULT_CATALOG_SORT ? 1 : 0);
+
+  const hasAnyFilterOrSearch = activeFilterCount > 0 || searchQuery.trim().length > 0;
 
   return (
     <View style={styles.container}>
@@ -158,37 +307,63 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {/* Search Pill Input */}
-          <View style={styles.searchBar}>
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-              <Circle cx={11} cy={11} r={7} stroke={LibbyColors.textMuted} strokeWidth={2} />
-              <Path
-                d="M20 20l-3.5-3.5"
-                stroke={LibbyColors.textMuted}
-                strokeWidth={2}
-                strokeLinecap="round"
+          {/* Search Pill + Integrated Filter Trigger */}
+          <View style={styles.searchRow}>
+            <View style={styles.searchBar}>
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <Circle cx={11} cy={11} r={7} stroke={LibbyColors.textMuted} strokeWidth={2} />
+                <Path
+                  d="M20 20l-3.5-3.5"
+                  stroke={LibbyColors.textMuted}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                />
+              </Svg>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Tìm sách, tác giả hoặc mã sách"
+                placeholderTextColor={LibbyColors.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
               />
-            </Svg>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Tìm sách, tác giả hoặc mã sách"
-              placeholderTextColor={LibbyColors.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              returnKeyType="search"
-            />
-            {searchQuery.length > 0 && (
-              <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                  <Path
-                    d="M6 6l12 12M18 6L6 18"
-                    stroke={LibbyColors.textMuted}
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                  />
-                </Svg>
-              </Pressable>
-            )}
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                  <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                    <Path
+                      d="M6 6l12 12M18 6L6 18"
+                      stroke={LibbyColors.textMuted}
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                    />
+                  </Svg>
+                </Pressable>
+              )}
+            </View>
+
+            <Pressable
+              onPress={() => setFilterModalVisible(true)}
+              style={[
+                styles.filterButton,
+                activeFilterCount > 0 ? styles.filterButtonActive : styles.filterButtonIdle,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Bộ lọc thư viện, đang bật ${activeFilterCount} bộ lọc`}
+            >
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M4 7h16M7 12h10M10 17h4"
+                  stroke={LibbyColors.ink}
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                />
+              </Svg>
+              {activeFilterCount > 0 && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </Pressable>
           </View>
         </SafeAreaView>
       </View>
@@ -240,19 +415,89 @@ export default function HomeScreen() {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Khám phá</Text>
               <Pressable
-                onPress={() => router.push('/(tabs)/my-books')}
+                onPress={
+                  hasAnyFilterOrSearch
+                    ? handleResetFilters
+                    : () => setFilterModalVisible(true)
+                }
                 accessibilityRole="button"
               >
-                <Text style={styles.viewAllText}>Xem tất cả</Text>
+                <Text style={styles.viewAllText}>
+                  {hasAnyFilterOrSearch ? 'Xóa lọc' : 'Bộ lọc'}
+                </Text>
               </Pressable>
             </View>
 
-            {/* Filter Chips */}
-            <FilterChipGroup
-              options={FILTER_OPTIONS}
-              selectedValue={filterAvailability}
-              onSelect={setFilterAvailability}
-            />
+            {/* Quick Category Strip */}
+            {categoryOptions.length > 0 && (
+              <FilterChipGroup
+                options={categoryChipOptions}
+                selectedValue={selectedCategoryId === null ? 'ALL' : String(selectedCategoryId)}
+                onSelect={(value) =>
+                  setSelectedCategoryId(value === 'ALL' ? null : Number(value))
+                }
+              />
+            )}
+
+            {/* Result Summary & Active Filter Chips */}
+            <View style={styles.resultMetaRow}>
+              <Text style={styles.resultCountText}>
+                {loading ? 'Đang tải sách...' : `${totalElements} đầu sách`}
+              </Text>
+              <Pressable
+                onPress={() => setFilterModalVisible(true)}
+                style={styles.sortTrigger}
+                accessibilityRole="button"
+              >
+                <Text style={styles.sortTriggerText}>
+                  {activeSortLabel || 'Sắp xếp & lọc'}
+                </Text>
+              </Pressable>
+            </View>
+
+            {activeFilterCount > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.activeFiltersRow}
+              >
+                {selectedCategoryName && (
+                  <Pressable
+                    onPress={() => setSelectedCategoryId(null)}
+                    style={styles.activeFilterPill}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.activeFilterPillText}>
+                      Thể loại: {selectedCategoryName} ×
+                    </Text>
+                  </Pressable>
+                )}
+
+                {activeAvailabilityLabel && (
+                  <Pressable
+                    onPress={() => setFilterAvailability('ALL')}
+                    style={styles.activeFilterPill}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.activeFilterPillText}>
+                      {activeAvailabilityLabel} ×
+                    </Text>
+                  </Pressable>
+                )}
+
+                {activeSortLabel && (
+                  <Pressable
+                    onPress={() => setSortBy(DEFAULT_CATALOG_SORT)}
+                    style={styles.activeFilterPill}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.activeFilterPillText}>
+                      {activeSortLabel} ×
+                    </Text>
+                  </Pressable>
+                )}
+              </ScrollView>
+            )}
 
             {/* Book Cards Grid (2-column layout stretching down) */}
             {loading ? (
@@ -262,19 +507,40 @@ export default function HomeScreen() {
             ) : books.length === 0 ? (
               <View style={styles.emptyBooksBox}>
                 <Text style={styles.emptyBooksText}>Không tìm thấy sách phù hợp.</Text>
+                {hasAnyFilterOrSearch && (
+                  <LibbyButton
+                    title="Đặt lại bộ lọc"
+                    variant="outline"
+                    onPress={handleResetFilters}
+                    style={styles.resetEmptyButton}
+                  />
+                )}
               </View>
             ) : (
-              <View style={styles.bookGrid}>
-                {books.map((book, idx) => (
-                  <BookCatalogCard
-                    key={book.id}
-                    book={book}
-                    themeIndex={idx}
-                    cardWidth={cardWidth}
-                    onPress={() => setSelectedBook(book)}
-                  />
-                ))}
-              </View>
+              <>
+                <View style={styles.bookGrid}>
+                  {books.map((book, idx) => (
+                    <BookCatalogCard
+                      key={book.id}
+                      book={book}
+                      themeIndex={idx}
+                      cardWidth={cardWidth}
+                      onPress={() => setSelectedBook(book)}
+                    />
+                  ))}
+                </View>
+
+                {hasMore && (
+                  <View style={styles.loadMoreWrapper}>
+                    <LibbyButton
+                      title="Xem thêm sách"
+                      variant="outline"
+                      loading={loadingMore}
+                      onPress={handleLoadMore}
+                    />
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>
@@ -288,6 +554,20 @@ export default function HomeScreen() {
       />
 
       {/* Overlays / Modals */}
+      <CatalogFilterModal
+        visible={filterModalVisible}
+        categories={categoryOptions}
+        selectedCategoryId={selectedCategoryId}
+        selectedAvailability={filterAvailability}
+        selectedSort={sortBy}
+        onClose={() => setFilterModalVisible(false)}
+        onApply={({ categoryId, availability, sort }) => {
+          setSelectedCategoryId(categoryId);
+          setFilterAvailability(availability);
+          setSortBy(sort);
+        }}
+      />
+
       <BookDetailModal
         book={selectedBook}
         visible={!!selectedBook}
@@ -297,7 +577,7 @@ export default function HomeScreen() {
 
       <CartDrawerModal
         onCheckoutSuccess={(loanCode, paymentStatus) => {
-          loadData();
+          loadData(0, false);
           if (paymentStatus === 'PENDING') {
             router.push(`/borrow-payment/${encodeURIComponent(loanCode)}`);
             return;
@@ -391,7 +671,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: LibbyColors.white,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+  },
   searchBar: {
+    flex: 1,
     height: 52,
     borderRadius: 26,
     backgroundColor: LibbyColors.white,
@@ -399,7 +686,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 18,
-    marginTop: 8,
   },
   searchInput: {
     flex: 1,
@@ -407,6 +693,40 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: LibbyColors.ink,
     height: '100%',
+  },
+  filterButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  filterButtonIdle: {
+    backgroundColor: LibbyColors.lilac,
+    borderColor: LibbyColors.lilac,
+  },
+  filterButtonActive: {
+    backgroundColor: LibbyColors.accentLime,
+    borderColor: LibbyColors.accentLime,
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    backgroundColor: LibbyColors.ink,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: {
+    fontFamily: LibbyFonts.bold,
+    fontSize: 11,
+    color: LibbyColors.white,
   },
   contentScroll: {
     flex: 1,
@@ -416,7 +736,7 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   section: {
-    gap: 16,
+    gap: 14,
   },
   sectionHeader: {
     paddingHorizontal: 20,
@@ -439,11 +759,57 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
   },
+  resultMetaRow: {
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  resultCountText: {
+    fontFamily: LibbyFonts.medium,
+    fontSize: 13,
+    color: LibbyColors.textMuted,
+  },
+  sortTrigger: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: LibbyColors.white,
+    borderWidth: 1,
+    borderColor: LibbyColors.borderLight,
+  },
+  sortTriggerText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 12,
+    color: LibbyColors.ink,
+  },
+  activeFiltersRow: {
+    paddingHorizontal: 20,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  activeFilterPill: {
+    backgroundColor: LibbyColors.lilac,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: LibbyColors.ink,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  activeFilterPillText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 12,
+    color: LibbyColors.ink,
+  },
   bookGrid: {
     paddingHorizontal: 20,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 14,
+  },
+  loadMoreWrapper: {
+    paddingHorizontal: 20,
+    paddingTop: 4,
   },
   loadingBox: {
     paddingVertical: 40,
@@ -452,11 +818,17 @@ const styles = StyleSheet.create({
   },
   emptyBooksBox: {
     paddingVertical: 32,
+    paddingHorizontal: 20,
     alignItems: 'center',
+    gap: 14,
   },
   emptyBooksText: {
     fontFamily: LibbyFonts.regular,
     fontSize: 14,
     color: LibbyColors.textMuted,
+  },
+  resetEmptyButton: {
+    width: 'auto',
+    minWidth: 180,
   },
 });

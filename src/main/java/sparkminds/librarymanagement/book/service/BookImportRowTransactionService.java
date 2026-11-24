@@ -82,6 +82,8 @@ class BookImportRowTransactionService {
                 borrowFee,
                 price,
                 lateFeePerDay,
+                // Sách nhập từ CSV chưa phân loại danh mục.
+                null,
                 false
         );
     }

@@ -1,13 +1,15 @@
-import { Alert, DatePicker, Form, Input, InputNumber, Modal } from 'antd';
+import { Alert, DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd';
 import axios from 'axios';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import type { ApiEnvelope } from '../../auth/types';
 import { useAppNotification } from '../../components/AppNotificationProvider';
 import { bookApi } from './api';
 import { BookCoverPicker } from './BookCoverPicker';
 import { formatVndInput, isValidIsbn, parseVndInput } from './formatting';
 import type { BookDetail, BookUpdateInput, BookWriteInput } from './types';
+import { categoryApi } from '../categories/api';
+import type { CategorySummary } from '../categories/types';
 
 interface BookFormValues {
   title: string;
@@ -19,6 +21,7 @@ interface BookFormValues {
   borrowFee: string;
   price: string;
   lateFeePerDay: string;
+  categoryIds: number[];
 }
 
 function toFormValues(book?: BookDetail): BookFormValues {
@@ -32,6 +35,7 @@ function toFormValues(book?: BookDetail): BookFormValues {
     borrowFee: formatVndInput(book?.borrowFee ?? 0),
     price: formatVndInput(book?.price ?? 0),
     lateFeePerDay: formatVndInput(book?.lateFeePerDay ?? 0),
+    categoryIds: book?.categories?.map((category) => category.id) ?? [],
   };
 }
 
@@ -49,6 +53,7 @@ function errorMessage(error: unknown): string {
     case 'BOOK_COVER_UPLOAD_FAILED': return 'Tải ảnh bìa thất bại. Sách chưa được lưu; hãy thử lại.';
     case 'BOOK_COVER_TOO_LARGE': return 'Ảnh bìa không được vượt quá 5 MiB.';
     case 'BOOK_VALIDATION_ERROR':
+    case 'CATEGORY_VALIDATION_ERROR':
     case 'VALIDATION_ERROR': return 'Thông tin chưa hợp lệ. Hãy kiểm tra các trường được đánh dấu.';
     default: return 'Không thể lưu thông tin sách lúc này. Hãy thử lại.';
   }
@@ -71,6 +76,7 @@ function buildInput(values: BookFormValues): BookWriteInput {
     borrowFee,
     price,
     lateFeePerDay,
+    categoryIds: values.categoryIds,
   };
 }
 
@@ -99,6 +105,15 @@ export function BookFormModal({
   const [similarConfirmation, setSimilarConfirmation] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [reloadError, setReloadError] = useState<string | null>(null);
+  const [categoryOptions, setCategoryOptions] = useState<CategorySummary[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void categoryApi.getOptions({}, controller.signal)
+      .then((options) => setCategoryOptions(options))
+      .catch(() => setCategoryOptions([]));
+    return () => controller.abort();
+  }, []);
 
   const reloadLatest = async () => {
     if (!book) return;
@@ -145,8 +160,11 @@ export function BookFormModal({
         setCoverError(fieldErrors.cover);
         return;
       }
-      const mapped = (['title', 'author', 'isbn', 'publisher', 'publishedDate', 'totalQuantity', 'borrowFee', 'lateFeePerDay'] as const)
+      const mapped: { name: keyof BookFormValues; errors: string[] }[] = (['title', 'author', 'isbn', 'publisher', 'publishedDate', 'totalQuantity', 'borrowFee', 'lateFeePerDay'] as const)
         .flatMap((field) => fieldErrors[field] ? [{ name: field, errors: [fieldErrors[field]] }] : []);
+      if (fieldErrors.categoryIds) {
+        mapped.push({ name: 'categoryIds', errors: [fieldErrors.categoryIds] });
+      }
       if (mapped.length > 0) {
         form.setFields(mapped);
         return;
@@ -280,6 +298,16 @@ export function BookFormModal({
             <Input inputMode="decimal" aria-label="Phí trễ mỗi ngày (VND)" />
           </Form.Item>
         </div>
+        <Form.Item label="Danh mục" name="categoryIds" help="Sách có thể thuộc nhiều danh mục.">
+          <Select
+            mode="multiple"
+            aria-label="Danh mục sách"
+            placeholder="Chọn danh mục (tùy chọn)"
+            allowClear
+            options={categoryOptions.map((category) => ({ value: category.id, label: category.name }))}
+            loading={categoryOptions.length === 0 && undefined}
+          />
+        </Form.Item>
       </Modal>
     </Form>
   );
