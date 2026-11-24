@@ -1,3 +1,5 @@
+import type { CategorySummary } from '../categories/types';
+
 export interface PageResponse<T> {
   content: T[];
   page: number;
@@ -34,6 +36,7 @@ export interface CatalogBook {
   borrowFee: number;
   price: number;
   lateFeePerDay: number;
+  categories?: CategorySummary[];
   coverImageUrl: string | null;
 }
 
@@ -164,4 +167,5 @@ export interface BorrowListQuery {
   sort: string;
   q?: string;
   availability?: 'AVAILABLE' | 'UNAVAILABLE';
+  categoryId?: number;
 }

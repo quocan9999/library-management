@@ -1,11 +1,14 @@
 import { Alert, Button, Pagination, Skeleton } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { usePermission } from '../../auth/permissions';
 import { BORROW_PAGE_SIZE, borrowApi } from './api';
 import { BorrowBookAction } from './BorrowBookAction';
 import { borrowErrorMessage } from './errors';
 import { formatVnd } from '../books/formatting';
 import type { BorrowListQuery, CatalogBook, PageResponse } from './types';
+import { categoryApi } from '../categories/api';
+import type { CategorySummary } from '../categories/types';
 import {
   UserBookCard,
   UserButton,
@@ -21,13 +24,26 @@ const AVAILABILITY_CHIPS = [
   { value: 'UNAVAILABLE', label: 'Hết sách' },
 ];
 
+const DEFAULT_SORT = 'title,asc';
+
+const SORT_OPTIONS = [
+  { value: 'title,asc', label: 'Tên sách (A → Z)' },
+  { value: 'createdAt,desc', label: 'Mới cập nhật' },
+  { value: 'borrowFee,asc', label: 'Phí mượn thấp → cao' },
+  { value: 'availableQuantity,desc', label: 'Còn nhiều nhất' },
+];
+
 export function CatalogPage() {
   const navigate = useNavigate();
+  const canReadCategories = usePermission('category:read');
   const { cartItems, addToCart, openCart } = useUserCart();
 
   const [searchDraft, setSearchDraft] = useState('');
   const [queryText, setQueryText] = useState('');
   const [availability, setAvailability] = useState<'ALL' | 'AVAILABLE' | 'UNAVAILABLE'>('ALL');
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<string>(DEFAULT_SORT);
+  const [categoryOptions, setCategoryOptions] = useState<CategorySummary[]>([]);
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -45,13 +61,33 @@ export function CatalogPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!canReadCategories) return undefined;
+    const controller = new AbortController();
+    let current = true;
+    void categoryApi.getOptions({}, controller.signal)
+      .then((options) => {
+        if (!current) return;
+        setCategoryOptions(options);
+        setCategoryId((prev) => (prev !== null && !options.some((c) => c.id === prev) ? null : prev));
+      })
+      .catch(() => {
+        if (current) setCategoryOptions([]);
+      });
+    return () => {
+      current = false;
+      controller.abort();
+    };
+  }, [canReadCategories, reloadKey]);
+
   const query = useMemo<BorrowListQuery>(() => ({
     ...(queryText ? { q: queryText } : {}),
     ...(availability === 'ALL' ? {} : { availability }),
+    ...(categoryId !== null ? { categoryId } : {}),
     page: page - 1,
     size: BORROW_PAGE_SIZE,
-    sort: 'title,asc',
-  }), [availability, page, queryText]);
+    sort: sortBy,
+  }), [availability, categoryId, page, queryText, sortBy]);
 
   const requestKey = `${JSON.stringify(query)}:${reloadKey}`;
   const result = loaded?.key === requestKey ? loaded.data : null;
@@ -129,6 +165,16 @@ export function CatalogPage() {
     setPage(1);
   };
 
+  const handleCategoryChange = (val: string) => {
+    setCategoryId(val === 'ALL' ? null : Number(val));
+    setPage(1);
+  };
+
+  const handleSortChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSortBy(event.target.value);
+    setPage(1);
+  };
+
   // Reset filters
   const handleResetFilters = () => {
     if (debounceTimerRef.current) {
@@ -137,8 +183,21 @@ export function CatalogPage() {
     setSearchDraft('');
     setQueryText('');
     setAvailability('ALL');
+    setCategoryId(null);
+    setSortBy(DEFAULT_SORT);
     setPage(1);
   };
+
+  const categoryChips = useMemo(
+    () => [
+      { value: 'ALL', label: 'Tất cả danh mục' },
+      ...categoryOptions.map((cat) => ({ value: String(cat.id), label: cat.name })),
+    ],
+    [categoryOptions],
+  );
+
+  const hasActiveFilters =
+    queryText !== '' || availability !== 'ALL' || categoryId !== null || sortBy !== DEFAULT_SORT;
 
   // Handle book card action button
   const handleBookAction = (book: CatalogBook) => {
@@ -216,7 +275,7 @@ export function CatalogPage() {
           )}
         </div>
 
-        {/* Hàng 2: Bộ lọc chip tình trạng sách và nút tải lại */}
+        {/* Hàng 2: Bộ lọc chip tình trạng sách, sắp xếp và nút tải lại */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <UserFilterChips
             ariaLabel="Lọc sách theo tình trạng"
@@ -224,10 +283,58 @@ export function CatalogPage() {
             value={availability}
             onChange={handleAvailabilityChange}
           />
-          <UserButton variant="ghost" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
-            Tải lại
-          </UserButton>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <select
+              aria-label="Sắp xếp sách"
+              value={sortBy}
+              onChange={handleSortChange}
+              style={{
+                height: '44px',
+                padding: '0 16px',
+                borderRadius: '9999px',
+                border: 'var(--user-border-main, 2px solid #14112B)',
+                background: 'var(--user-white, #FFFFFF)',
+                color: 'var(--user-ink, #14112B)',
+                fontFamily: 'var(--user-font-body)',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <UserButton variant="ghost" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
+              Tải lại
+            </UserButton>
+          </div>
         </div>
+
+        {/* Hàng 3: Chip lọc theo danh mục (khi tài khoản có category:read và có dữ liệu danh mục) */}
+        {categoryOptions.length > 0 && (
+          <UserFilterChips
+            ariaLabel="Lọc sách theo danh mục"
+            options={categoryChips}
+            value={categoryId === null ? 'ALL' : String(categoryId)}
+            onChange={handleCategoryChange}
+            style={{ flexWrap: 'wrap' }}
+          />
+        )}
+
+        {/* Thanh đếm kết quả & xóa nhanh bộ lọc */}
+        {loadState === 'ready' && result && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <span style={{ fontSize: '14px', color: 'var(--user-text-muted, #4B4570)', fontWeight: 600 }}>
+              {result.totalElements} đầu sách
+            </span>
+            {hasActiveFilters && (
+              <UserButton variant="ghost" size="sm" onClick={handleResetFilters}>
+                Xóa bộ lọc
+              </UserButton>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 3. Các trạng thái giao diện */}
@@ -318,6 +425,7 @@ export function CatalogPage() {
                 lateFeePerDay: book.lateFeePerDay,
                 availableQuantity: book.availableQuantity,
                 totalQuantity: book.totalQuantity,
+                categories: book.categories,
               };
 
               return (
@@ -387,6 +495,26 @@ export function CatalogDetailPage() {
         <h1 id="catalog-detail-heading">{book.title}</h1>
         <p className="catalog-card__author">{book.author}</p>
         <p>{book.publisher || 'Chưa có thông tin nhà xuất bản'}{book.publishedDate ? ` · ${book.publishedDate}` : ''}</p>
+        {book.categories && book.categories.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', margin: '12px 0' }} aria-label="Danh mục sách">
+            {book.categories.map((cat) => (
+              <span
+                key={cat.id}
+                style={{
+                  backgroundColor: 'var(--user-lilac, #EFEBFF)',
+                  color: 'var(--user-ink, #14112B)',
+                  border: '1px solid #DDD9F5',
+                  borderRadius: '9999px',
+                  padding: '4px 12px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                }}
+              >
+                {cat.name}
+              </span>
+            ))}
+          </div>
+        )}
         <dl className="catalog-card__facts">
           <div><dt>Bản sẵn có / tổng số</dt><dd>{book.availableQuantity} / {book.totalQuantity}</dd></div>
           <div><dt>Phí mượn</dt><dd>{formatVnd(book.borrowFee)}</dd></div>
