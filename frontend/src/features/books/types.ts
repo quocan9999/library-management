@@ -47,6 +47,7 @@ export interface BookListQuery {
   publishedFrom?: string;
   publishedTo?: string;
   availability?: 'ALL' | 'AVAILABLE' | 'UNAVAILABLE';
+  categoryId?: number;
   page: number;
   size: number;
   sort: string;

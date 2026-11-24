@@ -202,6 +202,14 @@ class CategoryApiIntegrationTests {
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.categories[0].id").value(categoryA));
+
+        // Bảng quản trị /api/v1/books cũng lọc được theo categoryId.
+        mockMvc.perform(get("/api/v1/books")
+                        .param("categoryId", String.valueOf(categoryA))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(bookA));
     }
 
     @Test

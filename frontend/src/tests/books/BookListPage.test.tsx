@@ -330,4 +330,35 @@ describe('BookListPage', () => {
     expect(screen.getByText('Sách cùng tên và tác giả.')).toBeTruthy();
     expect(uploaded).toBe(true);
   });
+
+  it('filters the admin book list by categoryId when category:read is granted', async () => {
+    authState.permissions = ['book:read', 'category:read'];
+    const bookRequests: Array<Record<string, unknown>> = [];
+    apiClient.defaults.adapter = (async (config) => {
+      if (String(config.url).includes('/categories/options')) {
+        return response(config, success('CATEGORY_OPTIONS_SUCCESS', [
+          { id: 1, name: 'Kỹ thuật' },
+          { id: 2, name: 'Văn học' },
+        ]));
+      }
+      bookRequests.push(config.params as Record<string, unknown>);
+      return response(config, success('BOOK_LIST_SUCCESS', page()));
+    }) satisfies AxiosAdapter;
+
+    render(<MemoryRouter><BookListPage /></MemoryRouter>);
+    await screen.findByRole('heading', { name: 'Quản lý sách' });
+    await vi.waitFor(() => expect(bookRequests).toHaveLength(1));
+
+    fireEvent.click(screen.getByText('Bộ lọc nâng cao'));
+    const categoryCombobox = await screen.findByRole('combobox', { name: 'Danh mục' });
+    fireEvent.mouseDown(categoryCombobox);
+    fireEvent.click(await screen.findByText('Kỹ thuật'));
+
+    await vi.waitFor(() => expect(bookRequests).toHaveLength(2));
+    expect(bookRequests[1]).toMatchObject({ categoryId: 1, page: 0 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }));
+    await vi.waitFor(() => expect(bookRequests).toHaveLength(3));
+    expect(bookRequests[2]).not.toHaveProperty('categoryId');
+  });
 });
