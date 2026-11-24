@@ -166,4 +166,28 @@ describe('BookDetailPage', () => {
     expect(screen.getByLabelText('current path').textContent).toBe('/admin/books/12');
     expect(screen.getByText('Lập trình Java')).toBeTruthy();
   });
+
+  it('displays book categories as tags and falls back to dash when empty', async () => {
+    const bookWithCategories: BookDetail = {
+      ...detail(),
+      categories: [
+        { id: 1, name: 'Kỹ thuật' },
+        { id: 2, name: 'Lập trình' },
+      ],
+    };
+    let reads = 0;
+    apiClient.defaults.adapter = (async (config) => {
+      reads += 1;
+      return response(config, success('BOOK_DETAIL_SUCCESS', reads === 1 ? bookWithCategories : detail()));
+    }) satisfies AxiosAdapter;
+
+    renderDetail();
+    expect(await screen.findByText('Kỹ thuật')).toBeTruthy();
+    expect(screen.getByText('Lập trình')).toBeTruthy();
+
+    cleanup();
+    renderDetail();
+    expect(await screen.findByText('Lập trình Java')).toBeTruthy();
+    expect(screen.queryByText('Kỹ thuật')).toBeNull();
+  });
 });
