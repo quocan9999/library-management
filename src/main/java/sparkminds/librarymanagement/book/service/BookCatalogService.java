@@ -15,8 +15,15 @@ public class BookCatalogService {
     private final BookService bookService;
 
     /** Giữ nguyên search/sort whitelist của Book; DTO riêng không đưa metadata quản trị ra catalog. */
-    public PagedResponse<BookCatalogResponse> search(String q, String availability, String page, String size, String sort) {
-        var books = bookQueryService.search(q, null, null, null, availability, page, size, sort);
+    public PagedResponse<BookCatalogResponse> search(
+            String q,
+            String availability,
+            String categoryId,
+            String page,
+            String size,
+            String sort
+    ) {
+        var books = bookQueryService.search(q, null, null, null, availability, categoryId, page, size, sort);
         var content = books.content().stream().map(BookCatalogResponse::from).toList();
         return PagedResponse.of(content, books.page(), books.size(), books.totalElements());
     }

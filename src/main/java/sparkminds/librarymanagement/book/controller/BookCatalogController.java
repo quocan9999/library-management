@@ -28,7 +28,7 @@ public class BookCatalogController {
     private final BookCatalogService catalogService;
 
     @GetMapping
-    @Operation(summary = "Tìm kiếm danh mục sách", description = "Trả danh sách sách tối thiểu cho catalog, hỗ trợ q, availability, phân trang và sort whitelist.")
+    @Operation(summary = "Tìm kiếm danh mục sách", description = "Trả danh sách sách tối thiểu cho catalog, hỗ trợ q, availability, categoryId, phân trang và sort whitelist.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Trang sách trong catalog", useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Tham số lọc, phân trang hoặc sort không hợp lệ", content = @io.swagger.v3.oas.annotations.media.Content(schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = sparkminds.librarymanagement.common.api.ApiResponse.class))),
@@ -39,12 +39,13 @@ public class BookCatalogController {
     public ResponseEntity<ApiResponse<PagedResponse<BookCatalogResponse>>> list(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String availability,
+            @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String page,
             @RequestParam(required = false) String size,
             @RequestParam(required = false) String sort) {
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(ApiResponse.success(200,
                 "BOOK_CATALOG_LIST_SUCCESS", "Lấy danh mục sách thành công",
-                catalogService.search(q, availability, page, size, sort)));
+                catalogService.search(q, availability, categoryId, page, size, sort)));
     }
 
     @GetMapping("/{bookId}")

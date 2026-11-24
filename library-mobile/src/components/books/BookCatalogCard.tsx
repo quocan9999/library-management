@@ -33,6 +33,7 @@ export const BookCatalogCard: React.FC<BookCatalogCardProps> = ({
   const formattedFee = (book.borrowFee || 0).toLocaleString('vi-VN');
   const formattedDeposit = (book.price || 0).toLocaleString('vi-VN');
   const imageUri = (!imageError && (book.coverImageUrl || DEFAULT_BOOK_COVER_URL)) || null;
+  const categories = book.categories ?? [];
 
   return (
     <Pressable
@@ -65,6 +66,16 @@ export const BookCatalogCard: React.FC<BookCatalogCardProps> = ({
           </View>
         )}
       </View>
+
+      {categories.length > 0 && (
+        <View style={styles.categoryPill}>
+          <Text numberOfLines={1} style={styles.categoryPillText}>
+            {categories.length > 1
+              ? `${categories[0].name} +${categories.length - 1}`
+              : categories[0].name}
+          </Text>
+        </View>
+      )}
 
       <Text numberOfLines={2} style={styles.bookTitle}>
         {book.title}
@@ -139,6 +150,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 23,
     letterSpacing: -0.5,
+  },
+  categoryPill: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    backgroundColor: LibbyColors.lilac,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  categoryPillText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 11,
+    color: LibbyColors.ink,
   },
   bookTitle: {
     fontFamily: LibbyFonts.display,

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -28,10 +29,13 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   onAddedSuccess,
 }) => {
   const { addToCart, isInCart } = useCart();
-  const [imageError, setImageError] = useState(false);
+  const [failedCoverKey, setFailedCoverKey] = useState<string | null>(null);
 
   if (!book) return null;
 
+  const coverKey = `${book.id}:${book.coverImageUrl ?? ''}`;
+  const imageError = failedCoverKey === coverKey;
+  const categories = book.categories ?? [];
   const inCart = isInCart(book.id);
   const isAvailable = book.availableQuantity > 0;
   const formattedFee = (book.borrowFee || 0).toLocaleString('vi-VN');
@@ -80,75 +84,92 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             </Pressable>
           </View>
 
-          {/* Book Hero Card */}
-          <View style={styles.bookHero}>
-            <View style={styles.coverBox}>
-              {imageUri ? (
-                <Image
-                  source={{ uri: imageUri }}
-                  style={styles.coverImage}
-                  contentFit="cover"
-                  transition={150}
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <Text numberOfLines={4} style={styles.coverText}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollBody}
+          >
+            {/* Book Hero Card */}
+            <View style={styles.bookHero}>
+              <View style={styles.coverBox}>
+                {imageUri ? (
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.coverImage}
+                    contentFit="cover"
+                    transition={150}
+                    onError={() => setFailedCoverKey(coverKey)}
+                  />
+                ) : (
+                  <Text numberOfLines={4} style={styles.coverText}>
+                    {book.title}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.bookInfo}>
+                <Text numberOfLines={2} style={styles.titleText}>
                   {book.title}
                 </Text>
-              )}
+                <Text style={styles.authorText}>Tác giả: {book.author || 'Đang cập nhật'}</Text>
+                {book.publisher && (
+                  <Text style={styles.publisherText}>NXB: {book.publisher}</Text>
+                )}
+                <Text style={styles.publisherText}>Mã sách: {book.bookCode}</Text>
+              </View>
             </View>
 
-            <View style={styles.bookInfo}>
-              <Text numberOfLines={2} style={styles.titleText}>
-                {book.title}
+            {/* Category Tags */}
+            {categories.length > 0 && (
+              <View style={styles.categoriesRow}>
+                {categories.map((category) => (
+                  <View key={category.id} style={styles.categoryTag}>
+                    <Text style={styles.categoryTagText}>{category.name}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Fee & deposit summary */}
+            <View style={styles.feeSummary}>
+              <View style={styles.feeLine}>
+                <Text style={styles.feeLabel}>Phí mượn</Text>
+                <Text style={styles.feeValue}>{formattedFee} đ</Text>
+              </View>
+              <View style={styles.feeLine}>
+                <Text style={styles.feeLabel}>Tiền cọc</Text>
+                <Text style={styles.feeValue}>{formattedDeposit} đ</Text>
+              </View>
+              <View style={[styles.feeLine, styles.feeTotalLine]}>
+                <Text style={styles.feeTotalLabel}>Tổng thanh toán</Text>
+                <Text style={styles.feeTotalValue}>{totalPayment.toLocaleString('vi-VN')} đ</Text>
+              </View>
+              <Text style={styles.depositNote}>
+                Tiền cọc được hoàn trả 100% khi trả sách nguyên vẹn tại quầy.
               </Text>
-              <Text style={styles.authorText}>Tác giả: {book.author || 'Đang cập nhật'}</Text>
-              {book.publisher && (
-                <Text style={styles.publisherText}>NXB: {book.publisher}</Text>
-              )}
             </View>
-          </View>
 
-          {/* Fee & deposit summary */}
-          <View style={styles.feeSummary}>
-            <View style={styles.feeLine}>
-              <Text style={styles.feeLabel}>Phí mượn</Text>
-              <Text style={styles.feeValue}>{formattedFee} đ</Text>
-            </View>
-            <View style={styles.feeLine}>
-              <Text style={styles.feeLabel}>Tiền cọc</Text>
-              <Text style={styles.feeValue}>{formattedDeposit} đ</Text>
-            </View>
-            <View style={[styles.feeLine, styles.feeTotalLine]}>
-              <Text style={styles.feeTotalLabel}>Tổng thanh toán</Text>
-              <Text style={styles.feeTotalValue}>{totalPayment.toLocaleString('vi-VN')} đ</Text>
-            </View>
-            <Text style={styles.depositNote}>
-              Tiền cọc được hoàn trả 100% khi trả sách nguyên vẹn tại quầy.
-            </Text>
-          </View>
-
-          {/* Status Row */}
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Tình trạng:</Text>
-            <View
-              style={[
-                styles.badge,
-                isAvailable ? styles.badgeAvailable : styles.badgeOutOfStock,
-              ]}
-            >
-              <Text
+            {/* Status Row */}
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Tình trạng:</Text>
+              <View
                 style={[
-                  styles.badgeText,
-                  isAvailable ? styles.badgeTextAvailable : styles.badgeTextOutOfStock,
+                  styles.badge,
+                  isAvailable ? styles.badgeAvailable : styles.badgeOutOfStock,
                 ]}
               >
-                {isAvailable
-                  ? `Còn ${book.availableQuantity} trên tổng số ${book.totalQuantity} cuốn`
-                  : 'Tạm thời hết sách'}
-              </Text>
+                <Text
+                  style={[
+                    styles.badgeText,
+                    isAvailable ? styles.badgeTextAvailable : styles.badgeTextOutOfStock,
+                  ]}
+                >
+                  {isAvailable
+                    ? `Còn ${book.availableQuantity} trên tổng số ${book.totalQuantity} cuốn`
+                    : 'Tạm thời hết sách'}
+                </Text>
+              </View>
             </View>
-          </View>
+          </ScrollView>
 
           {/* Action Button */}
           <View style={styles.footer}>
@@ -185,6 +206,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(20, 17, 43, 0.45)',
   },
   sheet: {
+    maxHeight: '88%',
     backgroundColor: LibbyColors.white,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
@@ -193,7 +215,10 @@ const styles = StyleSheet.create({
     borderRightWidth: 2,
     borderColor: LibbyColors.ink,
     padding: 24,
-    gap: 18,
+    gap: 16,
+  },
+  scrollBody: {
+    gap: 16,
   },
   header: {
     flexDirection: 'row',
@@ -259,6 +284,24 @@ const styles = StyleSheet.create({
     fontFamily: LibbyFonts.regular,
     fontSize: 12,
     color: LibbyColors.textMuted,
+  },
+  categoriesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryTag: {
+    backgroundColor: LibbyColors.lilac,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: LibbyColors.borderLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  categoryTagText: {
+    fontFamily: LibbyFonts.semiBold,
+    fontSize: 12,
+    color: LibbyColors.ink,
   },
   feeSummary: {
     backgroundColor: LibbyColors.subtleBg,

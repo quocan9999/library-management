@@ -180,6 +180,56 @@ class CategoryApiIntegrationTests {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void catalogFilterByCategoryIdReturnsMatchingBooksAndCategories() throws Exception {
+        String adminToken = loginAsSuperAdmin();
+        Integer categoryA = createCategory(adminToken, categoryNameFixture + " A");
+        Integer categoryB = createCategory(adminToken, categoryNameFixture + " B");
+        Integer bookA = createBookWithCategories(adminToken, "Catalog Book A " + fixtureSuffix, categoryA);
+        createBookWithCategories(adminToken, "Catalog Book B " + fixtureSuffix, categoryB);
+
+        String userToken = loginAsUser();
+        mockMvc.perform(get("/api/v1/catalog/books")
+                        .param("categoryId", String.valueOf(categoryA))
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(bookA))
+                .andExpect(jsonPath("$.data.content[0].categories[0].id").value(categoryA))
+                .andExpect(jsonPath("$.data.content[0].categories[0].name").value(categoryNameFixture + " A"));
+
+        mockMvc.perform(get("/api/v1/catalog/books/{bookId}", bookA)
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.categories[0].id").value(categoryA));
+    }
+
+    @Test
+    void catalogFilterByInvalidCategoryIdReturns400() throws Exception {
+        String userToken = loginAsUser();
+        for (String invalidId : List.of("abc", "0", "-1")) {
+            mockMvc.perform(get("/api/v1/catalog/books")
+                            .param("categoryId", invalidId)
+                            .header("Authorization", "Bearer " + userToken))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_BOOK_QUERY"));
+        }
+    }
+
+    @Test
+    void catalogFilterByEmptyCategoryReturnsEmptyPage() throws Exception {
+        String adminToken = loginAsSuperAdmin();
+        Integer emptyCategory = createCategory(adminToken, categoryNameFixture + " Empty");
+
+        String userToken = loginAsUser();
+        mockMvc.perform(get("/api/v1/catalog/books")
+                        .param("categoryId", String.valueOf(emptyCategory))
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0))
+                .andExpect(jsonPath("$.data.content").isEmpty());
+    }
+
     private String loginAsSuperAdmin() throws Exception {
         return login("admin", "admin");
     }
@@ -221,10 +271,14 @@ class CategoryApiIntegrationTests {
     }
 
     private Integer createBookWithCategories(String token, Integer categoryId) throws Exception {
+        return createBookWithCategories(token, "Category Book " + fixtureSuffix, categoryId);
+    }
+
+    private Integer createBookWithCategories(String token, String title, Integer categoryId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/books")
                         .header("Authorization", "Bearer " + token)
                         .contentType(APPLICATION_JSON)
-                        .content(bookBody("Category Book " + fixtureSuffix, "[" + categoryId + "]")))
+                        .content(bookBody(title, "[" + categoryId + "]")))
                 .andExpect(status().isCreated())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.data.id");

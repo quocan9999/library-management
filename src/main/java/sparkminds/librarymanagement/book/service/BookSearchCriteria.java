@@ -8,7 +8,8 @@ public record BookSearchCriteria(
         String publisher,
         LocalDate publishedFrom,
         LocalDate publishedTo,
-        Availability availability
+        Availability availability,
+        Integer categoryId
 ) {
     public enum Availability {
         ALL,
